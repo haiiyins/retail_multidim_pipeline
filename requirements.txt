@@ -1,0 +1,15 @@
+duckdb>=1.1
+dbt-core>=1.8
+dbt-duckdb>=1.8
+pyarrow
+pandas
+polars
+python-dotenv
+pyyaml
+holidays
+lightgbm
+scikit-learn
+psutil
+matplotlib
+confluent-kafka
+gdown

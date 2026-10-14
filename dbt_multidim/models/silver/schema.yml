@@ -1,0 +1,28 @@
+version: 2
+models:
+  - name: slv_member_bridge
+    columns: [{name: transaction_id, tests: [not_null, unique]}, {name: member_id, tests: [not_null]}]
+  - name: slv_member_profile
+    columns: [{name: member_id, tests: [not_null, unique]}]
+  - name: slv_dim_model
+    columns: [{name: item_code, tests: [not_null, unique]}, {name: model_code, tests: [not_null]}]
+  - name: slv_fact_sales_line
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [transaction_id, item_code]       # QC-4
+    columns:
+      - {name: transaction_id, tests: [not_null]}                   # QC-1
+      - {name: model_code, tests: [not_null]}
+      - {name: country_code, tests: [not_null]}
+      - name: qty
+        tests: [{dbt_utils.accepted_range: {min_value: 0, inclusive: false}}]   # QC-3
+      - name: gmv_local
+        tests: [{dbt_utils.accepted_range: {min_value: 0, inclusive: false}}]
+  - name: slv_price_sku_interval
+    columns:
+      - {name: price, tests: [{dbt_utils.accepted_range: {min_value: 0, inclusive: false}}]}
+      - {name: promo_kind, tests: [{accepted_values: {values: ['NONE', 'DAILY', 'SEASONAL', 'CLEARANCE', 'DROP']}}]}
+  - name: slv_user_to_member
+    columns: [{name: user_id, tests: [not_null, unique]}, {name: member_id, tests: [not_null]}]
+  - name: slv_stock_daily_model
+    columns: [{name: model_code, tests: [not_null]}]

@@ -1,0 +1,20 @@
+# Optional streaming lane (step 8): Redpanda (Kafka-API compatible) + Console
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.1.1
+    container_name: retail-kafka-broker
+    command:
+      - redpanda start
+      - --smp 2
+      - --memory 1G
+      - --overprovisioned
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+    ports: ["19092:19092"]
+  console:
+    image: docker.redpanda.com/redpandadata/console:v2.6.0
+    container_name: retail-kafka-ui
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    ports: ["8080:8080"]
+    depends_on: [redpanda]

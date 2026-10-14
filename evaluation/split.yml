@@ -1,0 +1,7 @@
+# TODO: fill after audit.date_span exists. Rule: test = last 6 months minus Δ; valid = 2 months before test; gap 2 weeks (Δ=30) / 6 weeks (Δ=90)
+train_lo: "2023-01-02"
+train_hi: "2025-05-31"
+valid_lo: "2025-06-16"
+valid_hi: "2025-08-15"
+test_lo:  "2025-09-01"
+test_hi:  "2026-02-28"

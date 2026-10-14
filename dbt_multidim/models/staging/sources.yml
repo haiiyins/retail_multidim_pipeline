@@ -1,0 +1,34 @@
+version: 2
+sources:
+  - name: bronze
+    schema: bronze
+    tables:
+      - name: sales_detail
+        columns:
+          - {name: transaction_id, tests: [not_null]}
+          - {name: transaction_num_line, tests: [not_null]}
+          - name: item_operation_type
+            tests: [{accepted_values: {values: ['sale', 'return', 'cancel']}}]
+      - name: sales_tender_detail
+      - name: f_member_purchase
+        columns: [{name: transaction_id, tests: [not_null]}, {name: member_id, tests: [not_null]}]
+      - name: d_member
+        columns: [{name: member_id, tests: [not_null, unique]}]
+      - name: dim_item
+        columns: [{name: item_code, tests: [not_null]}]
+      - name: dim_business_unit
+      - name: dim_calendar
+      - name: all_store_selling_price
+        columns:
+          - name: price_type
+            tests: [{accepted_values: {values: ['STANDARD', 'DAY_TO_DAY_PROMOTION', 'SEASON_SALES', 'END_OF_LINE', 'DROP']}}]
+      - name: stock_availability_rate
+      - name: f_member_favorite_sport
+        columns: [{name: event_type, tests: [{accepted_values: {values: ['create', 'delete']}}]}]
+      - name: tracking_ecom_events
+        columns: [{name: id, tests: [not_null]}]
+  - name: ext
+    schema: ext
+    tables:
+      - name: public_holidays
+      - name: commercial_event_names

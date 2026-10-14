@@ -1,0 +1,13 @@
+retail_multidim:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', './data/lakehouse.duckdb') }}"
+      threads: "{{ env_var('DUCKDB_THREADS', '6') | int }}"
+      extensions: [parquet, json, icu]
+      settings:
+        memory_limit: "{{ env_var('DUCKDB_MEMORY', '10GB') }}"
+        temp_directory: "{{ env_var('DATA_ROOT', './data') }}/duck_temp"
+        max_temp_directory_size: "300GB"
+        preserve_insertion_order: false

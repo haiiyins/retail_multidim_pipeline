@@ -1,0 +1,44 @@
+# Data contracts for the 11 source tables: keys, Bronze partitioning, required columns, key columns cast to VARCHAR
+sales_detail:
+  key: [transaction_id, transaction_num_line]
+  partition: [economical_businessunit_country_code, year, month]
+  not_null: [transaction_id, transaction_num_line, item_code, gmv_recorded_at]
+  cast: {item_code: VARCHAR, model_code: VARCHAR, economical_businessunit_id: VARCHAR}
+sales_tender_detail:
+  key: [transaction_id, tender_num_line]
+  partition: [year, month]
+  not_null: [transaction_id]
+f_member_purchase:
+  key: [transaction_id, member_id]
+  partition: [member_country_code, tech_year, tech_month]
+  not_null: [transaction_id, member_id]
+d_member:
+  key: [member_id]
+  partition: [member_country_code]
+  not_null: [member_id]
+dim_item:
+  key: [item_code]
+  partition: []
+  cast: {item_code: VARCHAR, model_code: VARCHAR, supermodel_code: VARCHAR}
+dim_business_unit:
+  key: [business_unit_gln]
+  partition: []
+  cast: {business_unit_gln: VARCHAR, business_unit_third_id: VARCHAR}
+dim_calendar:
+  key: [date_of_day]
+  partition: []
+all_store_selling_price:
+  key: [item_code, business_unit_gln_code, price_start_date, price_type]
+  partition: [country_code, tech_ingestion_year]
+  cast: {item_code: VARCHAR, business_unit_gln_code: VARCHAR}
+stock_availability_rate:
+  key: [site_gln, item_code, snapshot_date, availability_type]
+  partition: [country_code, year, month]
+  cast: {item_code: VARCHAR, site_gln: VARCHAR}
+f_member_favorite_sport:
+  key: [member_id, sport_id, event_datetime_utc]
+  partition: [country_code, year]
+tracking_ecom_events:
+  key: [id]
+  partition: [country_code, year, month]
+  not_null: [id, session_id, timestamp_utc, country_code]

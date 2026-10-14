@@ -1,0 +1,24 @@
+# data & artefacts
+data/raw_csv/*
+data/bronze/*
+data/silver/*
+data/gold/*
+data/quarantine/*
+data/audit/*
+data/duck_temp/*
+!data/**/.gitkeep
+*.duckdb
+*.duckdb.wal
+# environment
+.env
+.venv/
+__pycache__/
+*.pyc
+# dbt
+dbt_multidim/target/
+dbt_multidim/logs/
+dbt_multidim/dbt_packages/
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/

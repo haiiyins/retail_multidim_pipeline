@@ -1,0 +1,16 @@
+version: 2
+models:
+  - name: gld_fs_member
+    columns: [{name: member_id, tests: [not_null]}, {name: anchor_date, tests: [not_null]}]
+    tests:
+      - dbt_utils.unique_combination_of_columns: {combination_of_columns: [member_id, anchor_date]}
+  - name: gld_fs_model_country
+    tests:
+      - dbt_utils.unique_combination_of_columns: {combination_of_columns: [model_code, country_code, anchor_date]}
+    columns:
+      - {name: promo_depth, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 0.9, inclusive: true}}]}
+  - name: gld_fs_pair
+    tests:
+      - dbt_utils.unique_combination_of_columns: {combination_of_columns: [member_id, model_code, anchor_date]}   # QC-4
+  - name: gld_ranking_dataset
+    columns: [{name: label_30, tests: [{accepted_values: {values: [0, 1]}}]}]

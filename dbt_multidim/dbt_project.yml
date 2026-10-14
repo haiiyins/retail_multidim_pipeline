@@ -1,0 +1,27 @@
+name: retail_multidim
+version: "1.0"
+config-version: 2
+profile: retail_multidim
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+target-path: target
+clean-targets: [target, dbt_packages]
+vars:
+  countries: ["XX", "XX", "XX", "XX", "XX"]      # TODO: the 5 country codes from data/audit/csv_profile.md
+  country_filter: "{{ env_var('COUNTRY_FILTER', 'ALL') }}"
+  n_candidates: "{{ env_var('N_CANDIDATES', '200') }}"
+  allow_store_prices: false                       # enable if audit.price_uniformity shows large store-vs-website gaps
+  data_root: "{{ env_var('DATA_ROOT', './data') }}"
+models:
+  retail_multidim:
+    staging:
+      +materialized: view
+      +schema: staging
+    silver:
+      +materialized: table
+      +schema: silver
+    gold:
+      +materialized: table
+      +schema: gold
