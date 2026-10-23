@@ -99,6 +99,8 @@ All Python dependencies are listed in `requirements.txt`.
 
    ```bash
    python3.11 -m venv .venv
+   # or, if the python3.11 binary is not installed:
+   uv venv --python 3.11 .venv
    ```
 
 3. **Activate the virtual environment**
@@ -119,7 +121,11 @@ All Python dependencies are listed in `requirements.txt`.
    cp .env.example .env
    ```
 
-   Edit `.env`: `DATA_ROOT`, `DUCKDB_MEMORY` (about 60–70 % of RAM), `DUCKDB_THREADS`, `COUNTRY_FILTER` (a single country code while developing, `ALL` for the full run) and `COUNTRIES` (the five codes found in step 2).
+   Edit `.env`: `DATA_ROOT`, `DUCKDB_PATH`, `DUCKDB_MEMORY` (about 60–70 % of RAM), `DUCKDB_THREADS`, `COUNTRY_FILTER` (a single country code while developing, `ALL` for the full run) and `COUNTRIES` (the five codes found in step 2).
+
+   Use **absolute paths** for `DATA_ROOT` and `DUCKDB_PATH`. dbt runs from `dbt_multidim/` while the Python scripts run from the repository root, so a relative path points to two different files. `make` normalises relative paths; a plain `dbt` command does not.
+
+   Check the setup with `cd dbt_multidim && dbt deps && dbt debug` (export the variables first: `set -a; source .env; set +a`). All checks must pass before continuing.
 
 6. **Place the raw data**
 
@@ -208,6 +214,8 @@ Step 7 writes its outputs to `data/audit/`: `ablation_results_d30.csv`, `ablatio
 | Out of memory on a large join | `memory_limit` too high or `temp_directory` unset | lower `DUCKDB_MEMORY`; make sure `data/duck_temp` exists and has space |
 | Regex extraction returns mostly null | key name or spacing differs in the raw string | inspect five raw `metadata` values and adjust the pattern in `dbt_multidim/macros/extract_map_field.sql` |
 | `ASOF JOIN` error | only one inequality on the time column is allowed | write `ON a.key = b.key AND a.ts >= b.ts` |
+| `Cannot open file ".../dbt_multidim/data/lakehouse.duckdb"` on `dbt debug` | relative `DUCKDB_PATH` / `DATA_ROOT` resolved from `dbt_multidim/` | use absolute paths in `.env`, or run dbt through `make` (which normalises them) |
+| `python3.11: command not found` | Python 3.11 not installed | `uv venv --python 3.11 .venv` (uv downloads the interpreter) |
 | `accepted_values` test fails | a value not seen during profiling | check `csv_profile.md`, extend the list, note it in the report |
 | LightGBM slow or out of memory | pair table too large | raise `TRAIN_ANCHOR_STRIDE`, lower `N_CANDIDATES`, or move to the server |
 

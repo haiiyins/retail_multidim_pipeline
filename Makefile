@@ -1,4 +1,8 @@
 include .env
+# resolve relative paths so that dbt (run from dbt_multidim/) and the Python scripts
+# (run from the repository root) open the same database
+DATA_ROOT := $(abspath $(DATA_ROOT))
+DUCKDB_PATH := $(abspath $(DUCKDB_PATH))
 export
 .PHONY: probe bronze gates holidays silver gold train ablation docs all
 probe:

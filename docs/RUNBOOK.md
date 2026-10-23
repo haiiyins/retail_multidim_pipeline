@@ -46,12 +46,15 @@ For files above 2 GB that fail with `gdown`, use `rclone` with a Google Drive re
 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate
+# or, if the python3.11 binary is not installed: uv venv --python 3.11 .venv
 pip install -r requirements.txt
 ```
 
 ### 1.4 Configuration
 
-- Copy `.env.example` to `.env`; set `DATA_ROOT`, `DUCKDB_MEMORY` (≈ 60–70 % of RAM), `DUCKDB_THREADS`, `COUNTRY_FILTER`.
+- Copy `.env.example` to `.env`; set `DATA_ROOT`, `DUCKDB_PATH`, `DUCKDB_MEMORY` (≈ 60–70 % of RAM), `DUCKDB_THREADS`, `COUNTRY_FILTER`.
+- Use **absolute paths** for `DATA_ROOT` and `DUCKDB_PATH`: dbt runs from `dbt_multidim/`, the Python scripts from the repository root. `make` normalises relative paths; a plain `dbt` command does not and would create a second database under `dbt_multidim/data/`.
+- Verify: `set -a; source .env; set +a; cd dbt_multidim && dbt deps && dbt debug`.
 - `dbt_multidim/profiles.yml` reads these variables; `dbt_multidim/dbt_project.yml` holds `vars.countries` (fill after step 2).
 - `Makefile` targets: `probe`, `bronze`, `gates`, `holidays`, `silver`, `gold`, `train`, `ablation`, `docs`.
 
@@ -316,3 +319,5 @@ Submission checklist:
 | `ASOF JOIN` error | exactly one inequality on the time column is allowed; other conditions must be equalities | write `ON a.key = b.key AND a.ts >= b.ts` |
 | `accepted_values` test fails | a value not seen in profiling | check `csv_profile.md`, extend the list, note it in the report |
 | LightGBM slow or out of memory | pair table too large | raise `TRAIN_ANCHOR_STRIDE`, lower `N_CANDIDATES`, or move to the server |
+| `Cannot open file ".../dbt_multidim/data/lakehouse.duckdb"` on `dbt debug` | relative `DUCKDB_PATH` / `DATA_ROOT` resolved from `dbt_multidim/` | use absolute paths in `.env`, or run dbt through `make` (which normalises them) |
+| `python3.11: command not found` | Python 3.11 not installed | `uv venv --python 3.11 .venv` (uv downloads the interpreter) |
