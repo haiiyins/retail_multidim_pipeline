@@ -60,9 +60,10 @@ pip install -r requirements.txt
 
 ### 1.5 DBeaver
 
-1. New connection → DuckDB → path `data/lakehouse.duckdb`; download the driver when prompted.
-2. Edit connection → Driver properties → `duckdb.read_only = true`. **Mandatory:** DuckDB allows one writer; an open writable DBeaver connection makes `dbt run` fail with `Could not set lock on file`.
-3. Use DBeaver to browse `bronze / silver / gold / quarantine / audit / ext`, run checks, take screenshots for the report, and `EXPLAIN ANALYZE` queries.
+1. New connection → DuckDB → path: the **absolute** path of `data/lakehouse.duckdb`; download the driver when prompted and pick the version matching the `duckdb` package in the venv (for example `2.0.0.0` for duckdb 2.0.0).
+2. Driver properties tab → set `access_mode` to `READ_ONLY` (equivalent to adding `duckdb.read_only = true`). **Mandatory:** read-only stops DBeaver from writing to the lakehouse and lets several readers share the file.
+3. **Disconnect DBeaver before running `make …`, `dbt run` or any loader; reconnect afterwards.** A DuckDB writer needs an exclusive lock on the file, and any other open connection, even read-only, makes it fail with `Could not set lock on file … Conflicting lock is held` (verified with DuckDB 2.0.0).
+4. Use DBeaver to browse `bronze / silver / gold / quarantine / audit / ext`, run checks, take screenshots for the report, and `EXPLAIN ANALYZE` queries.
 
 **DoD:** `dbt debug` reports all checks passed; DBeaver opens the (empty) database read-only; 11 CSV files with checksums.
 
@@ -313,7 +314,7 @@ Submission checklist:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Could not set lock on file` on `dbt run` | DBeaver holds a writable connection | set `duckdb.read_only = true` or disconnect |
+| `Could not set lock on file … Conflicting lock is held` on `dbt run` or a loader | another process has the database open, usually DBeaver, even read-only | disconnect DBeaver (right-click the connection → Disconnect), rerun, reconnect afterwards |
 | Out of memory on a large join | `memory_limit` too high for the machine or `temp_directory` unset | set `memory_limit` to ≈ 60–70 % of RAM; make sure `temp_directory` is writable and has space |
 | Regex extraction returns mostly null | key name or spacing differs in the string | inspect five raw strings, adjust the pattern; compare null rates |
 | `ASOF JOIN` error | exactly one inequality on the time column is allowed; other conditions must be equalities | write `ON a.key = b.key AND a.ts >= b.ts` |

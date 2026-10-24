@@ -148,7 +148,7 @@ All Python dependencies are listed in `requirements.txt`.
 
 8. **Inspect the lakehouse**
 
-   Open `data/lakehouse.duckdb` in DBeaver with the driver property `duckdb.read_only = true`. DuckDB allows a single writer, and dbt needs it.
+   Open `data/lakehouse.duckdb` in DBeaver with the driver property `access_mode = READ_ONLY` (or `duckdb.read_only = true`). Disconnect DBeaver before running `make` or `dbt`: a DuckDB writer needs an exclusive lock on the file, and any other open connection, even read-only, blocks it.
 
 ### Option 2: Streaming lane with Docker (optional)
 
@@ -210,7 +210,7 @@ Step 7 writes its outputs to `data/audit/`: `ablation_results_d30.csv`, `ablatio
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Could not set lock on file` on `dbt run` | DBeaver holds a writable connection | set `duckdb.read_only = true` or disconnect |
+| `Could not set lock on file … Conflicting lock is held` on `dbt run` or a loader | another process has the database open, usually DBeaver, even read-only | disconnect DBeaver (right-click the connection → Disconnect), rerun, reconnect afterwards |
 | Out of memory on a large join | `memory_limit` too high or `temp_directory` unset | lower `DUCKDB_MEMORY`; make sure `data/duck_temp` exists and has space |
 | Regex extraction returns mostly null | key name or spacing differs in the raw string | inspect five raw `metadata` values and adjust the pattern in `dbt_multidim/macros/extract_map_field.sql` |
 | `ASOF JOIN` error | only one inequality on the time column is allowed | write `ON a.key = b.key AND a.ts >= b.ts` |
