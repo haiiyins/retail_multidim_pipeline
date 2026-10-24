@@ -30,17 +30,27 @@ Conventions: `$ROOT` is the repository root; commands assume the virtual environ
 
 ### 1.2 Data download
 
+The Drive folder must be shared as *Anyone with the link → Viewer*, otherwise `gdown` gets HTTP 401. The whole export is about 27 GB (11 files, the largest 5.4 GB), so expect one to several hours depending on the connection.
+
 ```bash
-pip install gdown
 mkdir -p data/raw_csv && cd data/raw_csv
-gdown --folder "<TEAM_DRIVE_FOLDER_LINK>"
-# rename to plain table names
+# --continue resumes .part files and skips files already present; --timeout avoids hanging on a dead connection
+caffeinate -i gdown --continue --retries 20 --timeout 60 "<TEAM_DRIVE_FOLDER_LINK>"   # drop caffeinate on Linux
+# gdown recreates the Drive sub-folder ("Raw data/"); flatten it and rename to plain table names
+mv "Raw data"/*.csv . && rmdir "Raw data"
 for f in *.csv; do mv "$f" "$(echo "$f" | sed -E 's/ — .*\.csv$/.csv/')"; done
 ls -la          # 11 files expected: sales_detail.csv … d_member.csv
 md5sum *.csv > ../raw_csv_md5.txt
 ```
 
-For files above 2 GB that fail with `gdown`, use `rclone` with a Google Drive remote or download through the browser.
+Run exactly one `gdown` at a time: two copies resuming the same `.part` file corrupt it silently. If a download has to be restarted, check with `ps -axo pid,command | grep gdown` that no copy is still running. Before trusting a file, compare its size with the exact byte count Drive reports:
+
+```bash
+curl -sIL -r 0-0 -b ~/.cache/gdown/cookies.txt \
+  "https://drive.usercontent.google.com/download?id=<FILE_ID>&export=download&confirm=t" | grep -i content-range
+```
+
+If `gdown` keeps failing on a large file, use `rclone` with a Google Drive remote or download through the browser.
 
 ### 1.3 Python environment
 
