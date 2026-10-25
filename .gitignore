@@ -7,6 +7,8 @@ data/quarantine/*
 data/audit/*
 data/duck_temp/*
 !data/**/.gitkeep
+!data/audit/csv_profile.md
+!data/audit/csv_fullscan.md
 *.duckdb
 *.duckdb.wal
 # environment

@@ -4,9 +4,11 @@ include .env
 DATA_ROOT := $(abspath $(DATA_ROOT))
 DUCKDB_PATH := $(abspath $(DUCKDB_PATH))
 export
-.PHONY: probe bronze gates holidays silver gold train ablation docs all
+.PHONY: probe probe-full bronze gates holidays silver gold train ablation docs all
 probe:
 	python ingestion/probe_csv_format.py
+probe-full:
+	python ingestion/probe_full_scan.py
 bronze:
 	python ingestion/batch_csv_to_bronze.py
 gates:
