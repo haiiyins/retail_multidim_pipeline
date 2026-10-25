@@ -1,6 +1,6 @@
 """Step 2 — Profile the raw CSV files: column types, null ratio, enumerated values, format of the 3 nested columns, country list.
 Run: make probe  →  data/audit/csv_profile.md"""
-import duckdb, pathlib, os
+import duckdb, pathlib, os, re
 from dotenv import load_dotenv
 load_dotenv()
 RAW = pathlib.Path(os.environ.get("DATA_ROOT", "./data")) / "raw_csv"
@@ -40,7 +40,12 @@ for f in sorted(RAW.glob("*.csv")):
             sample = con.execute(f'SELECT "{c}" FROM p WHERE "{c}" IS NOT NULL LIMIT 2').fetchall()
             txt = str(sample[0][0]) if sample else ""
             kind = "JSON" if txt.lstrip().startswith(("{", "[")) else "Map(k -> v) / List(Map(...))  → use the extract_map_field macro"
-            report.append(f"\n**{c}** format: **{kind}**\n\n```\n{txt[:600]}\n```")
+            if kind == "JSON":  # commit-safe: structure (keys and types) only, no raw values
+                try: txt = str(con.execute(f'SELECT json_structure("{c}") FROM p WHERE "{c}" IS NOT NULL LIMIT 1').fetchone()[0])
+                except Exception: txt = re.sub(r'"[^"]*"\s*:\s*"[^"]*"', '"k":"…"', txt)
+            else:
+                txt = re.sub(r"->\s*[^,}\]]+", "-> …", txt)
+            report.append(f"\n**{c}** format: **{kind}** (structure only, values redacted)\n\n```\n{txt[:600]}\n```")
         except Exception as e:
             report.append(f"\n**{c}**: {e}")
     # date span of the transaction table

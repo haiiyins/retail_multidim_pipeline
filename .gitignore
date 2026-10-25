@@ -7,6 +7,8 @@ data/quarantine/*
 data/audit/*
 data/duck_temp/*
 !data/**/.gitkeep
+!data/audit/csv_profile.md
+!data/audit/csv_fullscan.md
 *.duckdb
 *.duckdb.wal
 # environment
@@ -18,6 +20,7 @@ __pycache__/
 dbt_multidim/target/
 dbt_multidim/logs/
 dbt_multidim/dbt_packages/
+dbt_multidim/.user.yml
 # IDE / OS
 .DS_Store
 .idea/

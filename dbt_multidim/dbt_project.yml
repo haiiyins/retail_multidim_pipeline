@@ -9,7 +9,7 @@ seed-paths: ["seeds"]
 target-path: target
 clean-targets: [target, dbt_packages]
 vars:
-  countries: ["XX", "XX", "XX", "XX", "XX"]      # TODO: the 5 country codes from data/audit/csv_profile.md
+  countries: ["PH", "SG", "TH", "TW", "VN"]      # measured in data/audit/csv_fullscan.md (2026-10-25)
   country_filter: "{{ env_var('COUNTRY_FILTER', 'ALL') }}"
   n_candidates: "{{ env_var('N_CANDIDATES', '200') }}"
   allow_store_prices: false                       # enable if audit.price_uniformity shows large store-vs-website gaps
