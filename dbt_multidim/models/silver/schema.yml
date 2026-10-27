@@ -58,3 +58,24 @@ models:
       - {name: country_code, tests: [not_null]}
       - {name: calendar_date, tests: [not_null]}
       - {name: promo_share, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}}]}
+  - name: slv_member_sport_asof
+    description: Favourite-sport validity intervals per member × sport; open intervals have valid_to NULL; from_before_export marks sports active before the export window (issue #22).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [member_id, sport_id, valid_from]
+    columns:
+      - {name: member_id, tests: [not_null]}
+      - {name: sport_id, tests: [not_null]}
+      - {name: valid_from, tests: [not_null]}
+      - name: valid_to
+        tests: [{dbt_utils.expression_is_true: {expression: "> valid_from", config: {where: "valid_to IS NOT NULL"}}}]
+  - name: slv_member_store_daily
+    description: Running usual store per member × offline purchase day (mode of cumulative transactions, ties → most recent), read point-in-time by Gold (issue #23).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [member_id, as_of_date]
+    columns:
+      - {name: member_id, tests: [not_null]}
+      - {name: as_of_date, tests: [not_null]}
+      - {name: usual_store_id, tests: [not_null]}
+      - {name: usual_store_share, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}}]}
