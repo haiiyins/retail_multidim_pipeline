@@ -1,34 +1,118 @@
 version: 2
+# Bronze sources = the 11 raw tables as delivered (ingestion/batch_csv_to_bronze.py, contracts in ingestion/table_contracts.yml).
+# Tests here are QC-1 (null keys) and value domains measured on the whole files (data/audit/csv_fullscan.md). Tables whose
+# contract key is NOT unique in the export (sales_detail 9.5 %, f_member_purchase 68 %, stock_availability_rate 14.5 %,
+# f_member_favorite_sport 9.8 % duplicate rows) get no uniqueness test at source level: Silver deduplicates them.
 sources:
   - name: bronze
     schema: bronze
+    description: Raw tables converted to partitioned ZSTD Parquet, one view per table; rows are kept exactly as exported.
     tables:
       - name: sales_detail
+        description: >
+          Sales lines, grain (transaction_id, transaction_num_line); 2026-10-27 Parquet re-export, SG/TH/VN, 2023-01-01 → 2026-10-26,
+          89.3 M rows of which 8.5 M duplicate the key (8.47 M exact copies, mostly 2023). Nested tax / price-modifier details are lists of structs.
         columns:
-          - {name: transaction_id, tests: [not_null]}
-          - {name: transaction_num_line, tests: [not_null]}
+          - {name: transaction_id, description: Transaction identifier (30–48 chars), tests: [not_null]}
+          - {name: transaction_num_line, description: Line number inside the transaction, tests: [not_null]}
+          - {name: item_code, description: SKU, cast to VARCHAR in Bronze, tests: [not_null]}
+          - {name: gmv_recorded_at, description: Line timestamp (local time of the selling unit), tests: [not_null]}
+          - name: economical_businessunit_country_code
+            description: Country of the selling business unit; Bronze partition column
+            tests: [not_null, {accepted_values: {values: ['SG', 'TH', 'VN']}}]   # scope decided 2026-10-28 (issue #54)
           - name: item_operation_type
             tests: [{accepted_values: {values: ['sale', 'return', 'cancel']}}]
+          - name: transaction_channel_type
+            tests: [{accepted_values: {values: ['offline', 'online']}}]
+          - name: transaction_status
+            tests: [{accepted_values: {values: ['finished', 'canceled', 'shipped', 'authorized', 'partialship', 'delivered']}}]
       - name: sales_tender_detail
-      - name: f_member_purchase
-        columns: [{name: transaction_id, tests: [not_null]}, {name: member_id, tests: [not_null]}]
-      - name: d_member
-        columns: [{name: member_id, tests: [not_null, unique]}]
-      - name: dim_item
-        columns: [{name: item_code, tests: [not_null]}]
-      - name: dim_business_unit
-      - name: dim_calendar
-      - name: all_store_selling_price
+        description: >
+          Payment lines of the transactions, grain (transaction_id, tender_num_line); Parquet re-export, 29.7 M rows, SGD/THB/VND,
+          2023-01-01 → 2026-10-26; every transaction_id exists in sales_detail. No country column: loaded through the sales lines.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [transaction_id, tender_num_line]
         columns:
+          - {name: transaction_id, tests: [not_null]}
+          - {name: tender_num_line, tests: [not_null]}
+          - name: tender_operation_type
+            tests: [{accepted_values: {values: ['sale', 'refund']}}]
+      - name: f_member_purchase
+        description: >
+          Link transaction → member, grain (transaction_id, member_id); Parquet re-export, 63.0 M rows = 20.1 M distinct pairs
+          (42.9 M exact duplicate rows), 85 member country codes plus 1.5 M NULL, 2023-01 → 2026-10.
+        columns:
+          - {name: transaction_id, tests: [not_null]}
+          - {name: member_id, description: 36-char UUID, tests: [not_null]}
+      - name: d_member
+        description: Member master data, one row per member_id; CSV export, 5.69 M rows, five countries; 5 malformed lines quarantined.
+        columns:
+          - {name: member_id, tests: [not_null, unique]}
+      - name: dim_item
+        description: Item (SKU) dimension, one row per item_code; CSV export, 3.85 M rows; last line of the export is cut and quarantined.
+        columns:
+          - {name: item_code, description: SKU, cast to VARCHAR in Bronze, tests: [not_null, unique]}
+      - name: dim_business_unit
+        description: Store / warehouse dimension, one row per 13-digit GLN; CSV export, 275 rows, five countries.
+        columns:
+          - {name: business_unit_gln, tests: [not_null, unique]}
+          - {name: country_code, tests: [not_null]}
+      - name: dim_calendar
+        description: Calendar dimension, one row per day, 2023-01-01 → 2026-12-31 (1,461 rows); CSV export.
+        columns:
+          - {name: date_of_day, tests: [not_null, unique]}
+      - name: all_store_selling_price
+        description: >
+          Selling prices per item × store × start date × price type; Parquet re-export, 42.4 M rows, SG/TH/VN, key unique in the export.
+          Dates run from 2019 to planned prices in 2027.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [item_code, business_unit_gln_code, price_start_date, price_type]
+        columns:
+          - {name: item_code, tests: [not_null]}
+          - {name: business_unit_gln_code, tests: [not_null]}
+          - {name: price_start_date, tests: [not_null]}
           - name: price_type
-            tests: [{accepted_values: {values: ['STANDARD', 'DAY_TO_DAY_PROMOTION', 'SEASON_SALES', 'END_OF_LINE', 'DROP']}}]
+            tests: [not_null, {accepted_values: {values: ['STANDARD', 'DAY_TO_DAY_PROMOTION', 'END_OF_LINE', 'DROP']}}]   # SEASON_SALES not observed in the export
+          - name: country_code
+            tests: [not_null, {accepted_values: {values: ['SG', 'TH', 'VN']}}]
       - name: stock_availability_rate
+        description: >
+          Daily stock availability per site × item × availability type; CSV export, 36.7 M rows, five countries, 2024-01-04 → 2026-09-28;
+          14.5 % of rows duplicate the key.
+        columns:
+          - {name: site_gln, tests: [not_null]}
+          - {name: item_code, tests: [not_null]}
+          - {name: snapshot_date, tests: [not_null]}
+          - {name: availability_type, tests: [not_null]}
       - name: f_member_favorite_sport
-        columns: [{name: event_type, tests: [{accepted_values: {values: ['create', 'delete']}}]}]
+        description: Member ↔ favourite sport events (create / delete); CSV export, 796 k rows, five countries; 9.8 % of rows duplicate the key.
+        columns:
+          - {name: member_id, tests: [not_null]}
+          - {name: sport_id, tests: [not_null]}
+          - {name: event_datetime_utc, tests: [not_null]}
+          - name: event_type
+            tests: [{accepted_values: {values: ['create', 'delete']}}]
       - name: tracking_ecom_events
-        columns: [{name: id, tests: [not_null]}]
+        description: >
+          Web and app analytics events, one row per event id; 2026-10-27 export as 1,774 daily Parquet parts (200 GB, 1.0 bn events,
+          SG/TH/VN, 2023-01-01 → 2026-10-25 with a gap 2023-10 → 2024-04; 34 % of events carry a member_id). Nested metadata struct.
+        columns:
+          - {name: id, description: 32-char event id, tests: [not_null]}
+          - {name: session_id, tests: [not_null]}
+          - {name: timestamp_utc, tests: [not_null]}
+          - {name: country_code, tests: [not_null]}
+          - {name: name, description: Event type (page_viewed, product_page_viewed, product_added_to_cart, order_completed, …), tests: [not_null]}
+          - name: platform
+            tests: [{accepted_values: {values: ['web', 'app']}}]
+          - name: is_event_to_use
+            tests: [{accepted_values: {values: [true, false], quote: false}}]
   - name: ext
     schema: ext
+    description: Reference data built in step 5 (holiday_commercial_builder.py), not part of the raw export.
     tables:
       - name: public_holidays
+        description: Public holidays per country and day from the `holidays` library.
       - name: commercial_event_names
+        description: Named commercial events (sales periods) per country.
