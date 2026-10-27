@@ -183,7 +183,23 @@ SELECT country_code, id_source, COUNT(*) n, ROUND(100.0*COUNT(*)/SUM(COUNT(*)) O
 FROM gold.gld_web_stitched GROUP BY 1,2 ORDER BY 1,2;   -- after step 6; compare with the raw 15.6 %
 ```
 
-**DoD:** `dbt run --select silver` succeeds; `dbt test --select silver` passes (warnings explained); 20 sale/cancel transactions verified.
+Quarantine (schema `quarantine`, built by `make silver` together with Silver; rows a model refuses, kept with a reason):
+
+| Table | Source model | Reasons |
+|---|---|---|
+| `rejects_<table>` | Bronze loader (CSV inputs) | DuckDB parse errors of the raw CSV (cut rows, embedded delimiters) |
+| `qrt_sales_line` | `slv_fact_sales_line` | `NET_QTY_NONPOSITIVE`, `NET_GMV_NONPOSITIVE`, `TXN_NOT_SALE`, `SERVICE_LINE`, `ITEM_NOT_IN_CATALOGUE` |
+| `qrt_price_interval` | `slv_price_sku_interval` | `ABOVE_REFERENCE`, `DEPTH_GT_0_9` |
+| `slv_identity_conflicts` | `slv_user_to_member` | cookie linked to more than one member |
+
+```sql
+SELECT 'sales' t, reason, COUNT(*) FROM quarantine.qrt_sales_line GROUP BY 1,2
+UNION ALL SELECT 'price', reason, COUNT(*) FROM quarantine.qrt_price_interval GROUP BY 1,2 ORDER BY 1,3 DESC;
+```
+
+Warn-level tests (do not block): `discount_local >= 0` on the sales fact (negative values are surcharges), `store_tz` not null (missing store timezone falls back to UTC), `member_bridge_conflicts`, `referential_member_link_rate` (QC-2 is enforced through the gates, not the test).
+
+**DoD:** `make silver` succeeds (`dbt run` and `dbt test` over staging, silver and quarantine, warnings explained); quarantine tables listed above exist; 20 sale/cancel transactions verified.
 
 ---
 

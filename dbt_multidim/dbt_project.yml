@@ -25,3 +25,6 @@ models:
     gold:
       +materialized: table
       +schema: gold
+    quarantine:
+      +materialized: table
+      +schema: quarantine
