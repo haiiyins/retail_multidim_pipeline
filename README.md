@@ -134,8 +134,8 @@ All Python dependencies are listed in `requirements.txt`.
 7. **Run the pipeline**
 
    ```bash
-   make probe      # step 2 — profile the CSV files              → data/audit/csv_profile.md
-   make bronze     # step 3 — CSV → partitioned Parquet          → bronze.* views
+   make probe      # step 2 — profile the raw files (+ make probe-full) → data/audit/csv_profile.md
+   make bronze     # step 3 — raw CSV/Parquet → partitioned Parquet, scope = COUNTRY_FILTER → bronze.* views
    make gates      # step 4 — four go/no-go gates + audit checks
    make silver     # step 5 — holiday calendar, dbt run / test for Silver
    make gold       # step 6 — anchor grid, feature store, candidates, leakage tests

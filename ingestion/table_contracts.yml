@@ -1,9 +1,11 @@
-# Data contracts for the 11 source tables: keys, Bronze partitioning, required columns, key columns cast to VARCHAR
+# Data contracts for the 11 source tables: keys, Bronze partitioning, required columns, key columns cast to VARCHAR,
+# country_col = column COUNTRY_FILTER applies to (tables without one are loaded whole; country_via follows a parent table)
 # Key formats measured on the full files (data/audit/csv_fullscan.md, 2026-10-25): every *_gln is a 13-digit number,
 # item_code is digits only (1-13 chars, sniffed VARCHAR in sales_detail and BIGINT elsewhere), model_code is 99.9 % digits,
 # transaction_id (28-48 chars) and member_id (36-char UUID) are strings -> all join keys are cast to VARCHAR.
 sales_detail:
   key: [transaction_id, transaction_num_line]
+  country_col: economical_businessunit_country_code
   partition: [economical_businessunit_country_code, year, month]
   not_null: [transaction_id, transaction_num_line, item_code, gmv_recorded_at]
   cast: {item_code: VARCHAR, model_code: VARCHAR, economical_businessunit_id: VARCHAR, economical_businessunit_gln: VARCHAR,
@@ -11,14 +13,17 @@ sales_detail:
          stock_origin_businessunit_gln: VARCHAR}
 sales_tender_detail:
   key: [transaction_id, tender_num_line]
+  country_via: {table: sales_detail, key: transaction_id}   # no country column: follow the sales lines already loaded
   partition: [year, month]
   not_null: [transaction_id]
 f_member_purchase:
   key: [transaction_id, member_id]
+  country_col: member_country_code
   partition: [member_country_code, tech_year, tech_month]
   not_null: [transaction_id, member_id]
 d_member:
   key: [member_id]
+  country_col: member_country_code
   partition: [member_country_code]
   not_null: [member_id]
   cast: {preferred_store_gln: VARCHAR, creation_store_gln: VARCHAR}
@@ -35,16 +40,20 @@ dim_calendar:
   partition: []
 all_store_selling_price:
   key: [item_code, business_unit_gln_code, price_start_date, price_type]
+  country_col: country_code
   partition: [country_code, tech_ingestion_year]
   cast: {item_code: VARCHAR, business_unit_gln_code: VARCHAR}
 stock_availability_rate:
   key: [site_gln, item_code, snapshot_date, availability_type]
+  country_col: country_code
   partition: [country_code, year, month]
   cast: {item_code: VARCHAR, site_gln: VARCHAR}
 f_member_favorite_sport:
   key: [member_id, sport_id, event_datetime_utc]
+  country_col: country_code
   partition: [country_code, year]
 tracking_ecom_events:
   key: [id]
+  country_col: country_code
   partition: [country_code, year, month]
   not_null: [id, session_id, timestamp_utc, country_code]
