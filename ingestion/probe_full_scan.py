@@ -1,10 +1,11 @@
-"""Step 2b — Whole-file scan of the raw CSV files. The sample profile (make probe) reads only the first 20,000
+"""Step 2b — Whole-file scan of the raw files (data/raw_csv/<table>.parquet preferred, else <table>.csv). The sample profile (make probe) reads only the first 20,000
 rows per table and the exports are sorted by country, so it cannot give the country list, the value domains
 or the date span. This script reads every file once (about 27 GB) and writes data/audit/csv_fullscan.md with:
 country codes and rows per country, min/max of the main timestamp per country, enumerated-value domains,
-and the format of the key columns (digits only? length, distinct count) to decide the casts in table_contracts.yml.
-Run: make probe-full   (minutes on the laptop; needs DUCKDB_MEMORY / DUCKDB_THREADS from .env)"""
-import duckdb, pathlib, os, time
+the format of the key columns (digits only? length, distinct count) to decide the casts in table_contracts.yml,
+and the number of rows that duplicate the contract key (table_contracts.yml) — the Silver dedup must absorb them.
+Run: make probe-full   (seconds to minutes on the laptop; needs DUCKDB_MEMORY / DUCKDB_THREADS from .env)"""
+import duckdb, pathlib, os, re, time, yaml
 from dotenv import load_dotenv
 load_dotenv()
 ROOT = pathlib.Path(os.environ.get("DATA_ROOT", "./data"))
@@ -32,6 +33,11 @@ SPEC = {
     "f_member_favorite_sport": ("country_code", "event_datetime_utc", ["event_type"], ["member_id", "sport_id"]),
     "tracking_ecom_events": ("country_code", "timestamp_utc", ["name", "platform", "is_event_to_use"], ["id", "session_id"]),
 }
+REDACT = [t.strip() for t in os.environ.get("REDACT_TERMS", "").split(",") if t.strip()]
+def redact(text):  # organisation-specific tokens listed in .env (REDACT_TERMS, never in the repo) are masked in the report
+    for t in REDACT: text = re.sub(re.escape(t), "[org]", text, flags=re.IGNORECASE)
+    return text
+CONTRACTS = yaml.safe_load(open(pathlib.Path(__file__).with_name("table_contracts.yml")))
 q = lambda c: f'"{c}"'
 def ts(c):  # robust cast of a VARCHAR timestamp / timestamptz / date column
     return (f"COALESCE(TRY_CAST({q(c)} AS TIMESTAMP), TRY_CAST(TRY_CAST({q(c)} AS TIMESTAMPTZ) AS TIMESTAMP), "
@@ -43,26 +49,31 @@ con.execute(f"SET threads={int(os.environ.get('DUCKDB_THREADS', '6'))}")
 con.execute(f"SET temp_directory='{ROOT / 'duck_temp'}'")
 con.execute("SET preserve_insertion_order=false")
 
-report = ["# CSV full-file scan\n", "Every file read once with `all_varchar=true`; counts are exact, distinct counts are approximate (HyperLogLog).\n"]
-summary_countries, summary_span = {}, {}
+report = ["# Raw full-file scan\n", "Every raw file (Parquet preferred, else CSV read with `all_varchar=true`) is read once; counts are exact, distinct counts are approximate (HyperLogLog).\n"]
+summary_countries, summary_span, summary_dups = {}, {}, {}
 for t, (ccol, tcol, enums, keys) in SPEC.items():
-    f = RAW / f"{t}.csv"
-    if not f.exists():
+    f = next((p for p in (RAW / f"{t}.parquet", RAW / f"{t}.csv") if p.exists()), None)
+    if f is None:
         report.append(f"\n## {t}\n\n_file missing_"); continue
     t0 = time.time()
     sel = [f"{q(ccol) if ccol else chr(39)+'ALL'+chr(39)} AS country", "COUNT(*) AS n"]
     sel += [f"MIN({ts(tcol)}) AS min_ts", f"MAX({ts(tcol)}) AS max_ts"] if tcol else ["NULL AS min_ts", "NULL AS max_ts"]
     sel += [f"histogram({q(e)}) AS h_{i}" for i, e in enumerate(enums)]
     for i, k in enumerate(keys):
-        sel += [f"SUM(CASE WHEN regexp_matches({q(k)}, '^[0-9]+$') THEN 1 ELSE 0 END) AS k{i}_digits",
-                f"MIN(length({q(k)})) AS k{i}_minlen", f"MAX(length({q(k)})) AS k{i}_maxlen",
+        kv = f"CAST({q(k)} AS VARCHAR)"
+        sel += [f"SUM(CASE WHEN regexp_matches({kv}, '^[0-9]+$') THEN 1 ELSE 0 END) AS k{i}_digits",
+                f"MIN(length({kv})) AS k{i}_minlen", f"MAX(length({kv})) AS k{i}_maxlen",
                 f"approx_count_distinct({q(k)}) AS k{i}_nd", f"SUM(CASE WHEN {q(k)} IS NULL THEN 1 ELSE 0 END) AS k{i}_null"]
-    sql = (f"SELECT {', '.join(sel)} FROM read_csv('{f}', all_varchar=true, header=true, nullstr=['null',''], ignore_errors=true, "
-           f"max_line_size=10000000) GROUP BY 1 ORDER BY 1")
+    ckey = CONTRACTS.get(t, {}).get("key", [])
+    if ckey:  # exact: every row of the Bronze partition tree is deduplicated on this key in Silver
+        sel += [f"COUNT(DISTINCT ROW({', '.join(q(k) for k in ckey)})) AS key_nd"]
+    reader = (f"read_parquet('{f}')" if f.suffix == ".parquet" else
+              f"read_csv('{f}', all_varchar=true, header=true, nullstr=['null',''], ignore_errors=true, max_line_size=10000000)")
+    sql = f"SELECT {', '.join(sel)} FROM {reader} GROUP BY 1 ORDER BY 1"
     rows = con.execute(sql).fetchall(); cols = [d[0] for d in con.description]
     recs = [dict(zip(cols, r)) for r in rows]
     total = sum(r["n"] for r in recs)
-    report.append(f"\n## {t}  ({total:,} rows, {time.time()-t0:.0f} s)\n")
+    report.append(f"\n## {t}  ({total:,} rows, {f.suffix[1:]}, {time.time()-t0:.0f} s)\n")
     report.append(f"| {ccol or 'country'} | rows | min {tcol or '-'} | max {tcol or '-'} |\n|---|---:|---|---|")
     for r in recs:
         report.append(f"| {r['country']} | {r['n']:,} | {r['min_ts']} | {r['max_ts']} |")
@@ -84,14 +95,22 @@ for t, (ccol, tcol, enums, keys) in SPEC.items():
         nd = sum(r[f"k{i}_nd"] or 0 for r in recs)
         pct = 100.0 * dig / max(total - nul, 1)
         report.append(f"| {k} | {pct:.1f} % | {mn} | {mx} | {nd:,} | {nul:,} |")
+    if ckey:
+        knd = sum(r["key_nd"] or 0 for r in recs); dup = total - knd
+        summary_dups[t] = (dup, 100.0 * dup / max(total, 1))
+        report.append(f"\n**Contract key** ({', '.join(ckey)}): {knd:,} distinct, {dup:,} duplicate rows ({summary_dups[t][1]:.1f} %)")
     print(f"{t}: {total:,} rows in {time.time()-t0:.0f} s", flush=True)
 
-head = ["\n## Summary\n", "| table | country codes |", "|---|---|"]
-head += [f"| {t} | {', '.join(sorted(v))} |" for t, v in summary_countries.items()]
+head = ["\n## Summary\n", "| table | country codes | contract-key duplicate rows |", "|---|---|---:|"]
+def summary_row(t):
+    cc = ", ".join(sorted(summary_countries.get(t, []))) or "-"
+    dup = f"{summary_dups[t][0]:,} ({summary_dups[t][1]:.1f} %)" if t in summary_dups else "-"
+    return f"| {t} | {cc} | {dup} |"
+head += [summary_row(t) for t in SPEC if t in summary_countries or t in summary_dups]
 allc = sorted({c for v in summary_countries.values() for c in v})
 head.append(f"\n**Union of country codes:** {', '.join(allc)}\n")
 head += ["| country | sales_detail rows | min gmv_recorded_at | max gmv_recorded_at |", "|---|---:|---|---|"]
 head += [f"| {c} | {n:,} | {a} | {b} |" for c, (n, a, b) in sorted(summary_span.items())]
 report[2:2] = head
-OUT.joinpath("csv_fullscan.md").write_text("\n".join(report), encoding="utf-8")
+OUT.joinpath("csv_fullscan.md").write_text(redact("\n".join(report)), encoding="utf-8")
 print(f"→ {OUT / 'csv_fullscan.md'}")

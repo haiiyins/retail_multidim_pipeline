@@ -37,10 +37,10 @@ mkdir -p data/raw_csv && cd data/raw_csv
 # --continue resumes .part files and skips files already present; --timeout avoids hanging on a dead connection
 caffeinate -i gdown --continue --retries 20 --timeout 60 "<TEAM_DRIVE_FOLDER_LINK>"   # drop caffeinate on Linux
 # gdown recreates the Drive sub-folder ("Raw data/"); flatten it and rename to plain table names
-mv "Raw data"/*.csv . && rmdir "Raw data"
-for f in *.csv; do mv "$f" "$(echo "$f" | sed -E 's/ — .*\.csv$/.csv/')"; done
-ls -la          # 11 files expected: sales_detail.csv … d_member.csv
-md5sum *.csv > ../raw_csv_md5.txt
+mv "Raw data"/* . && rmdir "Raw data"
+for f in *.csv *.parquet; do [ -e "$f" ] && mv "$f" "$(echo "$f" | sed -E 's/ — .*\.(csv|parquet)$/.\1/')"; done
+ls -la          # 11 files expected: sales_detail.parquet … d_member.csv (Parquet for the 4 re-exported tables, CSV for the rest)
+md5sum *.csv *.parquet > ../raw_csv_md5.txt
 ```
 
 Run exactly one `gdown` at a time: two copies resuming the same `.part` file corrupt it silently. If a download has to be restarted, check with `ps -axo pid,command | grep gdown` that no copy is still running. Before trusting a file, compare its size with the exact byte count Drive reports:
@@ -51,6 +51,8 @@ curl -sIL -r 0-0 -b ~/.cache/gdown/cookies.txt \
 ```
 
 If `gdown` keeps failing on a large file, use `rclone` with a Google Drive remote or download through the browser.
+
+**Re-exports.** When the team re-exports a table in a new format (2026-10-27: `sales_detail`, `sales_tender_detail`, `f_member_purchase`, `all_store_selling_price` arrived as Parquet), download only the new files and move the superseded file to `data/raw_csv/superseded_<YYYY-MM-DD>/` (ignored by git, kept for reconciliation) so that exactly one file per table remains in `data/raw_csv/`; the loader and both probes prefer `<table>.parquet` over `<table>.csv` only as a safety net. Then recompute `md5sum *.csv *.parquet > ../raw_csv_md5.txt`, rerun `make probe` and `make probe-full`, and commit the checksum file and both reports in the same PR.
 
 ### 1.3 Python environment
 
@@ -75,13 +77,13 @@ pip install -r requirements.txt
 3. **Disconnect DBeaver before running `make …`, `dbt run` or any loader; reconnect afterwards.** A DuckDB writer needs an exclusive lock on the file, and any other open connection, even read-only, makes it fail with `Could not set lock on file … Conflicting lock is held` (verified with DuckDB 2.0.0).
 4. Use DBeaver to browse `bronze / silver / gold / quarantine / audit / ext`, run checks, take screenshots for the report, and `EXPLAIN ANALYZE` queries.
 
-**DoD:** `dbt debug` reports all checks passed; DBeaver opens the (empty) database read-only; 11 CSV files with checksums.
+**DoD:** `dbt debug` reports all checks passed; DBeaver opens the (empty) database read-only; 11 raw files (CSV or Parquet) with checksums.
 
 ---
 
 ## Step 2 — CSV profiling
 
-Nothing is transformed before its assumptions are measured. `ingestion/probe_csv_format.py` reads the first 20,000 rows of each file and reports column types, null ratios, enumerated values, the format of the three nested columns, and the date span.
+Nothing is transformed before its assumptions are measured. `ingestion/probe_csv_format.py` (`make probe`) reads the first 20,000 rows of each file and reports column types, null ratios, enumerated values, the format of the three nested columns, and the date span. Because the exports are sorted by country, that sample cannot give the country list or the real date span: `ingestion/probe_full_scan.py` (`make probe-full`, seconds on the laptop) reads every file once and writes `data/audit/csv_fullscan.md` with rows and min/max timestamp per country, value domains and key-column formats. Both scripts read `<table>.parquet` when present, else `<table>.csv`.
 
 ```bash
 make probe        # → data/audit/csv_profile.md
@@ -104,7 +106,7 @@ Fill in from the report:
 
 ## Step 3 — Bronze
 
-`ingestion/table_contracts.yml` declares, per table, the key, Bronze partition columns, required columns and key casts. `ingestion/batch_csv_to_bronze.py` converts each CSV to ZSTD Parquet (`PARTITION_BY` per contract), stores CSV rejects in `quarantine.rejects_<table>`, creates `bronze.<table>` views over the Parquet tree and logs rows/bytes/seconds to `audit.pipeline_run_metrics`.
+`ingestion/table_contracts.yml` declares, per table, the key, Bronze partition columns, required columns and key casts. `ingestion/batch_csv_to_bronze.py` converts each raw file (`<table>.parquet` preferred, else `<table>.csv`) to ZSTD Parquet (`PARTITION_BY` per contract), stores CSV parse rejects in `quarantine.rejects_<table>` (CSV inputs only), creates `bronze.<table>` views over the Parquet tree and logs rows/bytes/seconds to `audit.pipeline_run_metrics`.
 
 ```bash
 make bronze
@@ -119,7 +121,7 @@ SELECT 'sales_detail' t, economical_businessunit_country_code c, COUNT(*) n FROM
 UNION ALL SELECT 'f_member_purchase', member_country_code, COUNT(*) FROM bronze.f_member_purchase GROUP BY 1,2 ORDER BY 1,2;
 ```
 
-**DoD:** 11 `bronze.*` views; Parquet rows + rejects = CSV rows minus header; rejects < 0.1 % per table; 11 rows with `layer = 'bronze'` in `audit.pipeline_run_metrics`.
+**DoD:** 11 `bronze.*` views; for CSV inputs Bronze rows + rejects = CSV rows minus header, for Parquet inputs Bronze rows = source rows; rejects < 0.1 % per table; 11 rows with `layer = 'bronze'` in `audit.pipeline_run_metrics`.
 
 ---
 
