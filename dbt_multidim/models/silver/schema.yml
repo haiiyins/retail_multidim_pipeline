@@ -35,6 +35,7 @@ models:
       - {name: transaction_num_line, tests: [not_null]}
       - {name: item_code, tests: [not_null]}
       - {name: return_date, tests: [not_null]}
+      - {name: qty, tests: [{dbt_utils.accepted_range: {min_value: 0, inclusive: false}}]}   # QC-3, returned quantity is positive
   - name: slv_user_to_member
     columns: [{name: user_id, tests: [not_null, unique]}, {name: member_id, tests: [not_null]}]
   - name: slv_stock_daily_model
