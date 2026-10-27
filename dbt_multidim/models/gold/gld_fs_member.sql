@@ -16,11 +16,10 @@ tx AS (
   GROUP BY 1, 2),
 ret AS (SELECT g.member_id, g.anchor_date, COUNT(*) AS n_ret FROM g JOIN {{ ref('slv_fact_returns') }} r
         ON r.member_id = g.member_id AND r.return_date < g.anchor_date AND r.return_date >= g.anchor_date - 365 GROUP BY 1, 2),
-store AS (SELECT member_id, anchor_date, store_id AS usual_store_id FROM (
-          SELECT g.member_id, g.anchor_date, s.store_id,
-                 ROW_NUMBER() OVER (PARTITION BY g.member_id, g.anchor_date ORDER BY SUM(s.n_lines) DESC, MAX(s.transaction_date) DESC) rn
-          FROM g JOIN {{ ref('slv_member_store_daily') }} s ON s.member_id = g.member_id
-            AND s.transaction_date BETWEEN g.anchor_date - 180 AND g.anchor_date - 1 GROUP BY 1, 2, 3) WHERE rn = 1),
+store AS (SELECT member_id, anchor_date, usual_store_id FROM (   -- running usual store known strictly before the anchor (#23)
+          SELECT g.member_id, g.anchor_date, s.usual_store_id,
+                 ROW_NUMBER() OVER (PARTITION BY g.member_id, g.anchor_date ORDER BY s.as_of_date DESC) rn
+          FROM g JOIN {{ ref('slv_member_store_daily') }} s ON s.member_id = g.member_id AND s.as_of_date < g.anchor_date) WHERE rn = 1),
 sport AS (SELECT g.member_id, g.anchor_date, COUNT(*) AS n_sports, LIST(sa.sport_id) AS sport_ids
           FROM g JOIN {{ ref('slv_member_sport_asof') }} sa ON sa.member_id = g.member_id AND sa.is_active
             AND sa.valid_from <= g.anchor_date AND (sa.valid_to IS NULL OR sa.valid_to > g.anchor_date) GROUP BY 1, 2),
