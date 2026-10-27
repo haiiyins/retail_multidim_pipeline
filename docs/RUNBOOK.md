@@ -106,22 +106,26 @@ Fill in from the report:
 
 ## Step 3 — Bronze
 
-`ingestion/table_contracts.yml` declares, per table, the key, Bronze partition columns, required columns and key casts. `ingestion/batch_csv_to_bronze.py` converts each raw file (`<table>.parquet` preferred, else `<table>.csv`) to ZSTD Parquet (`PARTITION_BY` per contract), stores CSV parse rejects in `quarantine.rejects_<table>` (CSV inputs only), creates `bronze.<table>` views over the Parquet tree and logs rows/bytes/seconds to `audit.pipeline_run_metrics`.
+`ingestion/table_contracts.yml` declares, per table, the key, Bronze partition columns, required columns, key casts and the country column (`country_col`; `sales_tender_detail` has none and follows the loaded sales lines through `country_via`). `ingestion/batch_csv_to_bronze.py` converts each raw file (`<table>.parquet` preferred, else `<table>.csv`) to ZSTD Parquet under `data/bronze/<table>/` (`PARTITION_BY` per contract; an unpartitioned table is written as `<table>/<table>.parquet`), stores CSV parse rejects in `quarantine.rejects_<table>` (CSV inputs only), creates `bronze.<table>` views over the Parquet tree and logs rows/bytes/seconds and the country filter to `audit.pipeline_run_metrics`.
+
+`COUNTRY_FILTER` in `.env` selects the scope: a single code (laptop: `VN`, the smallest country with complete data) loads only that country's rows from the seven tables that have a country column plus the matching tender lines, and loads the three dimension tables whole; `ALL` (server) loads everything. A table without rows for the chosen country (web events exist only for SG) still gets an empty `bronze.<table>` view with the source schema.
 
 ```bash
 make bronze
 ```
 
-Notes: `nullstr=['null','']` because the Spark export writes the string `null`; `max_line_size` is raised for `tracking_ecom_events`.
+Notes: `nullstr=['null','']` because the Spark export writes the string `null`; `max_line_size` is raised for `tracking_ecom_events`. DuckDB 2.x keeps two reject tables per CSV scan, so both are named per table (`rej_<table>`, `rejscan_<table>`); reject counts cover the whole file, not only the selected country. Disconnect DBeaver first (§1.5).
 
 Verification:
 
 ```sql
 SELECT 'sales_detail' t, economical_businessunit_country_code c, COUNT(*) n FROM bronze.sales_detail GROUP BY 1,2
 UNION ALL SELECT 'f_member_purchase', member_country_code, COUNT(*) FROM bronze.f_member_purchase GROUP BY 1,2 ORDER BY 1,2;
+SELECT model_name, country_filter, output_rows, ROUND(wall_time_sec) s FROM audit.pipeline_run_metrics WHERE layer = 'bronze' ORDER BY executed_at;
+SELECT error_type, column_name, COUNT(*) FROM quarantine.rejects_d_member GROUP BY 1,2 ORDER BY 3 DESC;   -- one table per CSV input with rejects
 ```
 
-**DoD:** 11 `bronze.*` views; for CSV inputs Bronze rows + rejects = CSV rows minus header, for Parquet inputs Bronze rows = source rows; rejects < 0.1 % per table; 11 rows with `layer = 'bronze'` in `audit.pipeline_run_metrics`.
+**DoD:** 11 `bronze.*` views; Bronze rows per table = rows of the selected country in `data/audit/csv_fullscan.md` (for CSV inputs minus the rows quarantined); rejects < 0.1 % per table; 11 rows with `layer = 'bronze'` and the run's `country_filter` in `audit.pipeline_run_metrics`.
 
 ---
 
