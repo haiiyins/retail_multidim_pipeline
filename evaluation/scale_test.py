@@ -1,9 +1,9 @@
-"""Step 7.6 — Scale test: run Silver→Gold for 1 → 3 → 5 countries; record wall time vs Bronze rows; plot."""
+"""Step 7.6 — Scale test: run Silver→Gold for 1 → 2 → 3 countries (VN, then +TH, then +SG); record wall time vs Bronze rows; plot."""
 import subprocess, time, duckdb, os, sys, matplotlib
 matplotlib.use("Agg"); import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 load_dotenv()
-countries = sys.argv[1:]   # e.g. VN SG MY ...
+countries = sys.argv[1:]   # cumulative order, e.g. VN TH SG
 assert countries, "pass the country codes in cumulative order"
 con = duckdb.connect(os.environ["DUCKDB_PATH"])
 con.execute("CREATE TABLE IF NOT EXISTS audit.scale_test(n_countries INT, countries VARCHAR, bronze_rows BIGINT, wall_time_sec DOUBLE, executed_at TIMESTAMP DEFAULT current_timestamp)")

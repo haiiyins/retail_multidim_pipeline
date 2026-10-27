@@ -1,11 +1,11 @@
 """Self-built source #1a — public holidays per country (holidays library) → ext.public_holidays.
 Inferred commercial events live in the dbt model silver/slv_calendar_enriched.sql.
-TODO: set the 5 country codes (COUNTRIES in .env) after step 2 (see data/audit/csv_profile.md)."""
+Country codes come from COUNTRIES in .env (SG, TH, VN; scope decision 2026-10-28, issue #54)."""
 import holidays, duckdb, pandas as pd, os
 from dotenv import load_dotenv
 load_dotenv()
-COUNTRIES = os.environ.get("COUNTRIES", "XX,XX,XX,XX,XX").split(",")   # TODO
-SUBDIV = {"AU": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]}  # add MY/IN/NZ subdivisions if among the 5 countries
+COUNTRIES = os.environ.get("COUNTRIES", "SG,TH,VN").split(",")
+SUBDIV = {"AU": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]}  # none of SG/TH/VN needs subdivisions; kept as an example
 rows = []
 for c in COUNTRIES:
     c = c.strip()
