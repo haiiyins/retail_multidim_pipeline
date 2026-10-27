@@ -1,9 +1,13 @@
--- (1) version dedup on (transaction_id, transaction_num_line) → (2) net out sale–cancel pairs on (transaction_id, item_code)
--- → (3) classify the transaction by SUM(gmv_amount) → keep SALE transactions and physical items only
+-- (1) contextual dedup: drop exact duplicate rows (the export repeats 9.5 % of lines, mostly 2023) and, when a line was
+--     re-emitted with a newer transaction_version_at, keep the latest version only. Rows that share (transaction_id,
+--     transaction_num_line) but differ in quantity / amount are legitimate split lines (same item, same version) and are kept
+--     for the netting step (issue #14, measured on the VN Bronze: 2,062 such groups, none with a differing version or item)
+-- → (2) net out sale–cancel pairs on (transaction_id, item_code) → (3) classify the transaction by SUM(gmv_amount)
+-- → keep SALE transactions and physical items only
 WITH v AS (
-  SELECT * FROM {{ ref('stg_sales_detail') }}
+  SELECT DISTINCT * FROM {{ ref('stg_sales_detail') }}
   WHERE transaction_status = 'finished'
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY transaction_id, transaction_num_line ORDER BY transaction_version_at DESC) = 1
+  QUALIFY transaction_version_at = MAX(transaction_version_at) OVER (PARTITION BY transaction_id, transaction_num_line)
 ),
 net AS (
   SELECT transaction_id, item_code,
@@ -14,7 +18,7 @@ net AS (
          ANY_VALUE(regular_selling_price) AS rsp_local, ANY_VALUE(discount_amount) AS discount_local,
          ANY_VALUE(fx_eur) AS fx_eur, ANY_VALUE(year) AS year, ANY_VALUE(month) AS month
   FROM v WHERE item_operation_type IN ('sale', 'cancel')
-  GROUP BY 1, 2 HAVING net_qty > 0
+  GROUP BY 1, 2 HAVING net_qty > 0 AND net_gmv > 0   -- QC-3: free or fully refunded lines (VN: 10,433 of 10.2 M) are not purchases; routed to quarantine in #24
 ),
 txn AS (
   SELECT transaction_id,
