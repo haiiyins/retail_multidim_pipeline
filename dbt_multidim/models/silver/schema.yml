@@ -19,9 +19,22 @@ models:
       - name: gmv_local
         tests: [{dbt_utils.accepted_range: {min_value: 0, inclusive: false}}]
   - name: slv_price_sku_interval
+    description: Non-overlapping SKU price intervals per country, national (website) prices, promo_kind and promo_depth (issue #16).
     columns:
+      - {name: item_code, tests: [not_null]}
+      - {name: country_code, tests: [not_null]}
+      - {name: eff_start, tests: [not_null]}
+      - {name: eff_end, tests: [not_null]}
       - {name: price, tests: [{dbt_utils.accepted_range: {min_value: 0, inclusive: false}}]}
       - {name: promo_kind, tests: [{accepted_values: {values: ['NONE', 'DAILY', 'SEASONAL', 'CLEARANCE', 'DROP']}}]}
+      - {name: promo_depth, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 0.9, inclusive: true}}]}   # QC-3
+  - name: slv_fact_returns
+    description: Return lines of finished return transactions with the original sale when the export links it (issue #15).
+    columns:
+      - {name: transaction_id, tests: [not_null]}
+      - {name: transaction_num_line, tests: [not_null]}
+      - {name: item_code, tests: [not_null]}
+      - {name: return_date, tests: [not_null]}
   - name: slv_user_to_member
     columns: [{name: user_id, tests: [not_null, unique]}, {name: member_id, tests: [not_null]}]
   - name: slv_stock_daily_model
