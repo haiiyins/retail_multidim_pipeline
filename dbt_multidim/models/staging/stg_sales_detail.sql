@@ -1,4 +1,4 @@
-SELECT transaction_id, transaction_num_line, CAST(transaction_version_at AS TIMESTAMP) AS transaction_version_at, transaction_status,
+SELECT transaction_id, transaction_num_line, customer_purchase_order_id, CAST(transaction_version_at AS TIMESTAMP) AS transaction_version_at, transaction_status,
        item_operation_type, item_type, item_code, model_code,
        economical_businessunit_country_code AS country_code,
        CAST(economical_businessunit_id AS VARCHAR) AS store_id,
