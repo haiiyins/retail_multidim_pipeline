@@ -26,18 +26,21 @@ The **pipeline is the deliverable**. A single fixed ranking model (LightGBM Lamb
 
 ## 3. Data facts established from the samples and confirmed by the team
 
+Re-checked on the whole 2026-10-27 exports and the VN Bronze on 2026-10-28 (issue #6): rows marked *confirmed* or *corrected*.
+
 | Fact | Consequence |
 |---|---|
-| `item_operation_type` ∈ {sale, cancel, return}; a cancelled online order appears as a `sale` line plus a `cancel` line whose amounts net to zero | Version dedup on (`transaction_id`, `transaction_num_line`, `transaction_version_at`), then net sale–cancel pairs on (`transaction_id`, `item_code`) |
+| *Confirmed.* `item_operation_type` ∈ {sale, cancel, return} (89.3 M lines: 97.6 / 0.5 / 2.0 %); a cancelled online order appears as a `sale` line plus a `cancel` line whose amounts net to zero. 9.5 % of lines are exact duplicates of a key | Version dedup on (`transaction_id`, `transaction_num_line`, `transaction_version_at`), then net sale–cancel pairs on (`transaction_id`, `item_code`) |
 | Return transactions have `SUM(gmv_amount) < 0` at transaction level | Transaction status = SALE / CANCELLED / RETURN from the net GMV; line-level flags kept for exchanges |
 | `economical_businessunit_country_code` exists on every sales line | Used as the country key; `dim_business_unit` is joined only for store name, timezone and region |
 | `gmv_recorded_at` is local time; `transaction_version_at` is UTC | Keep `transaction_ts_local`; derive UTC through the store timezone |
-| `price_type` has five values: STANDARD, DAY_TO_DAY_PROMOTION, SEASON_SALES, END_OF_LINE, DROP | `promo_kind` with five levels; `is_temp_promo` = DAILY or SEASONAL; DROP is a permanent price change (F1), not a promotion |
-| Website business unit (`business_unit_third_type = 50`) carries the national reference price | Filter it first; allow store prices only if audit shows large gaps |
+| *Corrected.* `price_type` has four values in the export: STANDARD, DAY_TO_DAY_PROMOTION, END_OF_LINE, DROP; SEASON_SALES never occurs (VN has no DROP either). Seasonal promotions surface instead in `sales_detail.price_modifier_detail` (rules DayToDayPromotion, PromotionalPrice, DiscountCoupon, MixAndMatch, EndOfLine) | `promo_kind` keeps the SEASONAL branch dormant; `is_temp_promo` = DAILY (SEASONAL if it ever appears); DROP is a permanent price change (F1), not a promotion; realised discounts come from `modifier_amount()` on the sales line |
+| *Confirmed.* `business_unit_third_type = 50` is the WEBSITE unit (`dim_business_unit.plant_type`, 49 units across the countries); type 15 is a COUNTRY unit whose prices equal the website prices exactly (VN: 2.14 M pairs, 100 % equal) and type 7 are stores. VN store prices equal the website prices too (`audit.price_uniformity`: mean and p95 gap 0.0) | Website unit is the national reference price; `allow_store_prices` stays false; SG / TH to be confirmed on the server |
 | SKU price intervals of one model do not align | Do not build model-level intervals; ASOF-join the anchor grid to SKU intervals, then take the median per model |
-| The nested columns `metadata`, `tax_detail`, `price_modifier_detail` are Spark toString `Map(k -> v)` strings in the CSV | Extract the few needed fields with regular expressions; do not parse the full structure |
-| Only 15.6 % of web events carry a `member_id` | Two-tier stitching (order-based, login-based ± 90 days); a cookie mapping to more than one member is excluded; `identity_verified_ts ≤ anchor_date` is enforced in Gold |
-| `availability_type` is always `spare`, yet the stock table covers ≈ 100 % of sold items | The value is a default label of the technical job; use the stock table as designed and ignore the filter |
+| *Corrected.* In the Parquet exports the nested columns are real `STRUCT` / `LIST<STRUCT>` values: `metadata.user_details.member_id`, `metadata.product_details[].model_code`, `tax_detail[]`, `price_modifier_detail[].{type, rule, amt}`. `_errors` is a list of soft quality checks present on every event (not a reason to drop) | Read fields by path; list helpers `product_model_codes()` and `modifier_amount()` replace the regex macros; filter events on `is_event_to_use` only |
+| *Corrected.* 33.9 % of the 1.0 bn web events carry a `member_id` (VN sample day 26.8 %); `user_id` is present on every event | Two-tier stitching (order-based, login-based ± 90 days); a cookie mapping to more than one member is excluded; `identity_verified_ts ≤ anchor_date` is enforced in Gold |
+| *Corrected, pending the data owner.* `availability_type` is always `spare` and the VN stock table covers 1.7 % of the items sold since 2025 (984 items, 16 sites) | Ask for the complete stock export (issue #10); otherwise drop the stock signal as foreseen in §9 |
+| *New.* `dim_item` is incomplete: 4,569 VN item codes (1,484 models, 14.5 % of stock sale lines) have no dimension row and their model codes are absent too | Gate 2 cannot reach 95 % until the complete `dim_item` arrives (issue #54); gate 2 is reported, not blocking, in the provisional grouping |
 
 ## 4. Layers
 
