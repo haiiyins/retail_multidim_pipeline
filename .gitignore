@@ -25,3 +25,8 @@ dbt_multidim/.user.yml
 .DS_Store
 .idea/
 .vscode/
+
+# data archives moved between machines are never committed
+*.tar.gz
+*.tgz
+*.zip
