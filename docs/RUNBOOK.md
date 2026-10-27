@@ -52,6 +52,8 @@ curl -sIL -r 0-0 -b ~/.cache/gdown/cookies.txt \
 
 If `gdown` keeps failing on a large file, use `rclone` with a Google Drive remote or download through the browser.
 
+**Chunked tables.** A table may arrive as a Drive sub-folder of Spark parts (`part-*.snappy.parquet`; 2026-10-27: `Tracking Ecom Event`, about 1,800 daily files of 110–155 MB, many uploaded twice under the same name). `gdown` downloads the sub-folder recursively and skips a second copy with the same name, so the local directory holds each part once; move it to `data/raw_csv/tracking_ecom_events/` (plain table name) and the loader and probes read `<table>/*.parquet`. Verify the directory with `ls | wc -l` against the number of distinct names on Drive and `md5sum tracking_ecom_events/*.parquet` for the checksum file.
+
 **Re-exports.** When the team re-exports a table in a new format (2026-10-27: `sales_detail`, `sales_tender_detail`, `f_member_purchase`, `all_store_selling_price` arrived as Parquet), download only the new files and move the superseded file to `data/raw_csv/superseded_<YYYY-MM-DD>/` (ignored by git, kept for reconciliation) so that exactly one file per table remains in `data/raw_csv/`; the loader and both probes prefer `<table>.parquet` over `<table>.csv` only as a safety net. Then recompute `md5sum *.csv *.parquet > ../raw_csv_md5.txt`, rerun `make probe` and `make probe-full`, and commit the checksum file and both reports in the same PR.
 
 ### 1.3 Python environment
@@ -83,7 +85,7 @@ pip install -r requirements.txt
 
 ## Step 2 — CSV profiling
 
-Nothing is transformed before its assumptions are measured. `ingestion/probe_csv_format.py` (`make probe`) reads the first 20,000 rows of each file and reports column types, null ratios, enumerated values, the format of the three nested columns, and the date span. Because the exports are sorted by country, that sample cannot give the country list or the real date span: `ingestion/probe_full_scan.py` (`make probe-full`, seconds on the laptop) reads every file once and writes `data/audit/csv_fullscan.md` with rows and min/max timestamp per country, value domains and key-column formats. Both scripts read `<table>.parquet` when present, else `<table>.csv`.
+Nothing is transformed before its assumptions are measured. `ingestion/probe_csv_format.py` (`make probe`) reads the first 20,000 rows of each file and reports column types, null ratios, enumerated values, the format of the three nested columns, and the date span. Because the exports are sorted by country, that sample cannot give the country list or the real date span: `ingestion/probe_full_scan.py` (`make probe-full`, seconds on the laptop) reads every file once and writes `data/audit/csv_fullscan.md` with rows and min/max timestamp per country, value domains and key-column formats. Both scripts resolve the raw input through `ingestion/raw_source.py`: `<table>.parquet`, else a directory `<table>/*.parquet`, else `<table>.csv`.
 
 ```bash
 make probe        # → data/audit/csv_profile.md
@@ -106,7 +108,7 @@ Fill in from the report:
 
 ## Step 3 — Bronze
 
-`ingestion/table_contracts.yml` declares, per table, the key, Bronze partition columns, required columns, key casts and the country column (`country_col`; `sales_tender_detail` has none and follows the loaded sales lines through `country_via`). `ingestion/batch_csv_to_bronze.py` converts each raw file (`<table>.parquet` preferred, else `<table>.csv`) to ZSTD Parquet under `data/bronze/<table>/` (`PARTITION_BY` per contract; an unpartitioned table is written as `<table>/<table>.parquet`), stores CSV parse rejects in `quarantine.rejects_<table>` (CSV inputs only), creates `bronze.<table>` views over the Parquet tree and logs rows/bytes/seconds and the country filter to `audit.pipeline_run_metrics`.
+`ingestion/table_contracts.yml` declares, per table, the key, Bronze partition columns, required columns, key casts and the country column (`country_col`; `sales_tender_detail` has none and follows the loaded sales lines through `country_via`). `ingestion/batch_csv_to_bronze.py` converts each raw table (`ingestion/raw_source.py`: `<table>.parquet`, else `<table>/*.parquet`, else `<table>.csv`) to ZSTD Parquet under `data/bronze/<table>/` (`PARTITION_BY` per contract; an unpartitioned table is written as `<table>/<table>.parquet`), stores CSV parse rejects in `quarantine.rejects_<table>` (CSV inputs only), creates `bronze.<table>` views over the Parquet tree and logs rows/bytes/seconds and the country filter to `audit.pipeline_run_metrics`.
 
 `COUNTRY_FILTER` in `.env` selects the scope: a single code (laptop: `VN`, the smallest country with complete data) loads only that country's rows from the seven tables that have a country column plus the matching tender lines, and loads the three dimension tables whole; `ALL` (server) loads everything. A table without rows for the chosen country (web events exist only for SG) still gets an empty `bronze.<table>` view with the source schema.
 

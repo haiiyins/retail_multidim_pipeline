@@ -1,4 +1,4 @@
-"""Step 2b — Whole-file scan of the raw files (data/raw_csv/<table>.parquet preferred, else <table>.csv). The sample profile (make probe) reads only the first 20,000
+"""Step 2b — Whole-file scan of the raw files (data/raw_csv/<table>.parquet, else <table>/*.parquet, else <table>.csv). The sample profile (make probe) reads only the first 20,000
 rows per table and the exports are sorted by country, so it cannot give the country list, the value domains
 or the date span. This script reads every file once (about 27 GB) and writes data/audit/csv_fullscan.md with:
 country codes and rows per country, min/max of the main timestamp per country, enumerated-value domains,
@@ -6,6 +6,7 @@ the format of the key columns (digits only? length, distinct count) to decide th
 and the number of rows that duplicate the contract key (table_contracts.yml) — the Silver dedup must absorb them.
 Run: make probe-full   (seconds to minutes on the laptop; needs DUCKDB_MEMORY / DUCKDB_THREADS from .env)"""
 import duckdb, pathlib, os, re, time, yaml
+from raw_source import raw_source, parquet_reader
 from dotenv import load_dotenv
 load_dotenv()
 ROOT = pathlib.Path(os.environ.get("DATA_ROOT", "./data"))
@@ -52,7 +53,7 @@ con.execute("SET preserve_insertion_order=false")
 report = ["# Raw full-file scan\n", "Every raw file (Parquet preferred, else CSV read with `all_varchar=true`) is read once; counts are exact, distinct counts are approximate (HyperLogLog).\n"]
 summary_countries, summary_span, summary_dups = {}, {}, {}
 for t, (ccol, tcol, enums, keys) in SPEC.items():
-    f = next((p for p in (RAW / f"{t}.parquet", RAW / f"{t}.csv") if p.exists()), None)
+    f, kind = raw_source(RAW, t)
     if f is None:
         report.append(f"\n## {t}\n\n_file missing_"); continue
     t0 = time.time()
@@ -67,13 +68,13 @@ for t, (ccol, tcol, enums, keys) in SPEC.items():
     ckey = CONTRACTS.get(t, {}).get("key", [])
     if ckey:  # exact: every row of the Bronze partition tree is deduplicated on this key in Silver
         sel += [f"COUNT(DISTINCT ROW({', '.join(q(k) for k in ckey)})) AS key_nd"]
-    reader = (f"read_parquet('{f}')" if f.suffix == ".parquet" else
+    reader = (parquet_reader(f, kind) if kind != "csv" else
               f"read_csv('{f}', all_varchar=true, header=true, nullstr=['null',''], ignore_errors=true, max_line_size=10000000)")
     sql = f"SELECT {', '.join(sel)} FROM {reader} GROUP BY 1 ORDER BY 1"
     rows = con.execute(sql).fetchall(); cols = [d[0] for d in con.description]
     recs = [dict(zip(cols, r)) for r in rows]
     total = sum(r["n"] for r in recs)
-    report.append(f"\n## {t}  ({total:,} rows, {f.suffix[1:]}, {time.time()-t0:.0f} s)\n")
+    report.append(f"\n## {t}  ({total:,} rows, {kind}, {time.time()-t0:.0f} s)\n")
     report.append(f"| {ccol or 'country'} | rows | min {tcol or '-'} | max {tcol or '-'} |\n|---|---:|---|---|")
     for r in recs:
         report.append(f"| {r['country']} | {r['n']:,} | {r['min_ts']} | {r['max_ts']} |")
