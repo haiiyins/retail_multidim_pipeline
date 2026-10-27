@@ -25,7 +25,7 @@ Course project for **Data Processing Engineering** (IT2047.26.1.CH.01), Master o
 
 Most retail recommender systems in production are driven by a single signal: what a customer bought before. The information that would make recommendations sharper — the price range a customer usually pays, which products sell together, seasonality and promotions, repurchase rhythms, and what the customer browsed online — usually exists inside the company, but it is scattered across many tables, several storage layers, different update frequencies and incompatible identifiers. The bottleneck is therefore not the ranking algorithm; it is the data engineering needed to turn those scattered sources into trustworthy, leakage-free features.
 
-This repository builds that missing layer. It implements a three-tier **local lakehouse** (Bronze → Silver → Gold) on DuckDB and Parquet, orchestrated with dbt, that ingests about 34 GB of raw CSV covering three APAC countries (SG, TH, VN) from 2023 to 2026, cleans and reconciles it, and produces three point-in-time feature entities: member, product × country × date, and member–candidate pair. A fixed LightGBM LambdaRank model sits at the end of the pipeline as a measuring instrument, so that every change in recommendation quality can be traced back to a specific data-processing decision and weighed against its processing cost.
+This repository builds that missing layer. It implements a three-tier **local lakehouse** (Bronze → Silver → Gold) on DuckDB and Parquet, orchestrated with dbt, that ingests about 230 GB of raw CSV and Parquet (about 200 GB of it web and app events) covering three APAC countries (SG, TH, VN) from 2023 to 2026, cleans and reconciles it, and produces three point-in-time feature entities: member, product × country × date, and member–candidate pair. A fixed LightGBM LambdaRank model sits at the end of the pipeline as a measuring instrument, so that every change in recommendation quality can be traced back to a specific data-processing decision and weighed against its processing cost.
 
 ## Motivation
 
@@ -38,7 +38,7 @@ This repository builds that missing layer. It implements a three-tier **local la
 ## Architecture
 
 ```
-Raw CSV (11 tables, ~34 GB)
+Raw CSV + Parquet (11 tables, ~230 GB)
    │  batch loader (DuckDB)                  optional: Redpanda replay of the 3 event tables
    ▼
 BRONZE      ZSTD Parquet, Hive-partitioned (country / year / month)
@@ -72,7 +72,18 @@ Key decisions, frozen in [`docs/DESIGN_DECISIONS.md`](docs/DESIGN_DECISIONS.md):
 
 ## Installation Guide
 
-The pipeline runs on a laptop for development (one country, a few months) and on a 32 vCPU / 256 GB server for the full five-country run. All SQL is DuckDB-flavoured and platform independent.
+The pipeline runs on a laptop for development (one country, without the full web-event table) and on a 16-thread / 125 GB RAM / 894 GB NVMe server for the full three-country run. All SQL is DuckDB-flavoured and platform independent.
+
+| | Raw size | Format |
+|---|---|---|
+| `tracking_ecom_events` | ≈ 200 GB | 1,774 daily Parquet parts, ≈ 1.0 B events |
+| `sales_detail` | 12.2 GB | Parquet |
+| `stock_availability_rate` | 5.4 GB | CSV |
+| `dim_item` | 3.9 GB | CSV |
+| `d_member` | 2.0 GB | CSV |
+| `f_member_purchase`, `sales_tender_detail`, `all_store_selling_price` | 3.8 GB together | Parquet |
+| `f_member_favorite_sport`, `dim_business_unit`, `dim_calendar` | < 0.1 GB together | CSV |
+| **Total** | **≈ 230 GB** (≈ 27 GB without web events) | |
 
 ### Prerequisites
 
@@ -82,7 +93,7 @@ The pipeline runs on a laptop for development (one country, a few months) and on
 - holidays, lightgbm, scikit-learn, psutil, matplotlib
 - confluent-kafka and Docker (optional, streaming lane only)
 - DBeaver (optional, to browse the lakehouse read-only)
-- Disk: ≥ 150 GB free for a one-country development run; ≥ 2 TB NVMe for the full run
+- Disk: ≥ 150 GB free for a one-country development run; for the full run, NVMe with room for the ≈ 230 GB raw set plus Bronze, Silver, Gold and DuckDB spill (the server above has 894 GB)
 
 All Python dependencies are listed in `requirements.txt`.
 
@@ -121,7 +132,7 @@ All Python dependencies are listed in `requirements.txt`.
    cp .env.example .env
    ```
 
-   Edit `.env`: `DATA_ROOT`, `DUCKDB_PATH`, `DUCKDB_MEMORY` (about 60–70 % of RAM), `DUCKDB_THREADS`, `COUNTRY_FILTER` (a single country code while developing, `ALL` for the full run) and `COUNTRIES` (the five codes found in step 2).
+   Edit `.env`: `DATA_ROOT`, `DUCKDB_PATH`, `DUCKDB_MEMORY` (about 60–70 % of RAM), `DUCKDB_THREADS`, `COUNTRY_FILTER` (a single country code while developing, `ALL` for the full run) and `COUNTRIES` (`SG,TH,VN`, the evaluation scope).
 
    Use **absolute paths** for `DATA_ROOT` and `DUCKDB_PATH`. dbt runs from `dbt_multidim/` while the Python scripts run from the repository root, so a relative path points to two different files. `make` normalises relative paths; a plain `dbt` command does not.
 
