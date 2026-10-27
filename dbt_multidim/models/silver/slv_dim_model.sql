@@ -4,8 +4,9 @@ SELECT item_code, model_code, model_label, supermodel_code, supermodel_label, it
        retail_department_code, retail_department_label, retail_univers_code, retail_univers_label,
        sport_department_code, sport_department_label, sport_univers_code, sport_univers_label,
        brand_type, age, item_size,
-       CASE WHEN gender IS NULL OR gender IN ('', 'null', 'List()') THEN 'UNISEX'
-            ELSE array_to_string(list_sort(string_split(regexp_replace(gender, '^List\(|\)$', ''), ', ')), '|') END AS gender_std
+       -- gender arrives as a JSON-style list string in the CSV export, e.g. ["WOMEN"] or ["BOYS","GIRLS"]; the first samples showed List(...)
+       CASE WHEN gender IS NULL OR trim(regexp_replace(gender, '[\[\]"()]|^List', '', 'g')) IN ('', 'null') THEN 'UNISEX'
+            ELSE array_to_string(list_sort(list_transform(string_split(regexp_replace(gender, '[\[\]"()]|^List', '', 'g'), ','), lambda g: trim(g))), '|') END AS gender_std
 FROM {{ source('bronze', 'dim_item') }}
 WHERE item_code IS NOT NULL AND model_code IS NOT NULL
   AND NOT regexp_matches(item_code, '^[0-9a-fA-F]{8}-')
