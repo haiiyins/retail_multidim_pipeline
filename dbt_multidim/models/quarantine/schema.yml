@@ -1,0 +1,21 @@
+version: 2
+# Quarantine: rows that a Silver model refuses, kept with a reason so nothing is dropped silently (issue #24). Bronze CSV parse
+# rejects land in quarantine.rejects_<table> from the loader. Expected to be small; row counts are reported per run.
+models:
+  - name: qrt_sales_line
+    description: Netted (transaction, item) rows not kept by slv_fact_sales_line, with the reason.
+    columns:
+      - {name: transaction_id, tests: [not_null]}
+      - {name: item_code, tests: [not_null]}
+      - name: reason
+        tests: [not_null, {accepted_values: {values: ['NET_QTY_NONPOSITIVE', 'NET_GMV_NONPOSITIVE', 'TXN_NOT_SALE', 'SERVICE_LINE', 'ITEM_NOT_IN_CATALOGUE']}}]
+  - name: qrt_price_interval
+    description: National price rows with a promotion depth outside [0, 0.9], excluded from slv_price_sku_interval.
+    columns:
+      - {name: item_code, tests: [not_null]}
+      - {name: reason, tests: [not_null, {accepted_values: {values: ['ABOVE_REFERENCE', 'DEPTH_GT_0_9']}}]}
+  - name: slv_identity_conflicts
+    description: Cookies linked to more than one member across the order and login tiers, excluded from stitching.
+    columns:
+      - {name: user_id, tests: [not_null, unique]}
+      - {name: n_members, tests: [{dbt_utils.accepted_range: {min_value: 2, inclusive: true}}]}

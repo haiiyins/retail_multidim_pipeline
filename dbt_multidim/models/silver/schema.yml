@@ -18,6 +18,10 @@ models:
         tests: [{dbt_utils.accepted_range: {min_value: 0, inclusive: false}}]   # QC-3
       - name: gmv_local
         tests: [{dbt_utils.accepted_range: {min_value: 0, inclusive: false}}]
+      - name: discount_local
+        tests: [{dbt_utils.accepted_range: {min_value: 0, inclusive: true, config: {severity: warn}}}]   # VN: 1,291 negative discounts (surcharges) — reviewed, warn only
+      - name: store_tz
+        tests: [{not_null: {config: {severity: warn}}}]   # missing timezone falls back to UTC in transaction_ts_utc
   - name: slv_price_sku_interval
     description: Non-overlapping SKU price intervals per country, national (website) prices, promo_kind and promo_depth (issue #16).
     columns:
@@ -30,6 +34,9 @@ models:
       - {name: promo_depth, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 0.9, inclusive: true}}]}   # QC-3
   - name: slv_fact_returns
     description: Return lines of finished return transactions with the original sale when the export links it (issue #15).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [transaction_id, transaction_num_line]       # QC-4
     columns:
       - {name: transaction_id, tests: [not_null]}
       - {name: transaction_num_line, tests: [not_null]}
