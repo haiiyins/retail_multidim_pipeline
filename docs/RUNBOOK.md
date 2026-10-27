@@ -24,13 +24,14 @@ Conventions: `$ROOT` is the repository root; commands assume the virtual environ
 
 | | Laptop (development, one country) | Server (all three countries, Gold, experiments) |
 |---|---|---|
-| CPU / RAM | 8 cores / 16 GB | 32 vCPU / 256 GB |
-| Free disk | ≥ 150 GB | ≥ 2 TB NVMe |
-| OS | macOS / Ubuntu | Ubuntu 22.04 |
+| CPU / RAM | 8 cores / 16 GB | 16 threads / 125 GB (≈ 100 GB free for DuckDB) |
+| Free disk | ≥ 150 GB | 894 GB NVMe (raw set ≈ 230 GB) |
+| OS | macOS / Ubuntu | Linux |
+| DuckDB | `DUCKDB_MEMORY=10GB`, `DUCKDB_THREADS=6` | `DUCKDB_MEMORY=80GB`, `DUCKDB_THREADS=16` |
 
 ### 1.2 Data download
 
-The Drive folder must be shared as *Anyone with the link → Viewer*, otherwise `gdown` gets HTTP 401. The whole export is about 27 GB (11 files, the largest 5.4 GB), so expect one to several hours depending on the connection.
+The Drive folder must be shared as *Anyone with the link → Viewer*, otherwise `gdown` gets HTTP 401. The ten single-file tables are about 27 GB (the largest, `sales_detail.parquet`, 12.2 GB); the web-event table adds about 200 GB as 1,774 Parquet parts, so download it on the server only and keep a few parts on the laptop. Expect hours for the files and a day or more for the web events, depending on the connection.
 
 ```bash
 mkdir -p data/raw_csv && cd data/raw_csv

@@ -21,7 +21,7 @@ The **pipeline is the deliverable**. A single fixed ranking model (LightGBM Lamb
 | Label windows | Δ = 30 (primary), 90 (secondary) | Validated against the inter-purchase gap distribution in step 4 |
 | Metrics | HR, MRR, NDCG @10 and @20; Recall@50; candidate recall per source; coverage | NDCG@20 drives early stopping |
 | Hyper-parameters | Tuned once on **Full**, then frozen for every arm | Isolates the effect of data from the effect of tuning |
-| Platform | DuckDB + Parquet + dbt-duckdb; laptop for development, 32 vCPU / 256 GB server for the full run | Platform-independent SQL; portable to Spark |
+| Platform | DuckDB + Parquet + dbt-duckdb; laptop for development, 16-thread / 125 GB / 894 GB NVMe server for the full run (below the Tier 1 sizing of §7; training stays sampled) | Platform-independent SQL; portable to Spark |
 | Streaming lane | Optional Redpanda replay for the three event tables, reconciled against batch (QC-7) | Kept as a genuine check, not a demo |
 
 ## 3. Data facts established from the samples and confirmed by the team
