@@ -20,12 +20,14 @@ NESTED = {"sales_detail": ["tax_detail", "price_modifier_detail"], "tracking_eco
 
 con = duckdb.connect()
 report = ["# CSV profile (first 20,000 rows per table)\n"]
-for f in sorted(RAW.glob("*.csv")):
-    t = f.stem
-    con.execute(f"CREATE OR REPLACE TABLE p AS SELECT * FROM read_csv_auto('{f}', sample_size=200000, header=true, "
-                f"nullstr=['null',''], max_line_size=10000000) LIMIT 20000")
+files = {f.stem: f for f in sorted(RAW.glob("*.csv"))}
+files.update({f.stem: f for f in sorted(RAW.glob("*.parquet"))})   # Parquet re-export wins over the CSV of the same table
+for t, f in sorted(files.items()):
+    reader = (f"read_parquet('{f}')" if f.suffix == ".parquet" else
+              f"read_csv_auto('{f}', sample_size=200000, header=true, nullstr=['null',''], max_line_size=10000000)")
+    con.execute(f"CREATE OR REPLACE TABLE p AS SELECT * FROM {reader} LIMIT 20000")
     cols = con.execute("DESCRIBE p").fetchall()
-    report.append(f"\n## {t}  ({len(cols)} columns)\n\n| column | type | % null |\n|---|---|---|")
+    report.append(f"\n## {t}  ({len(cols)} columns, {f.suffix[1:]})\n\n| column | type | % null |\n|---|---|---|")
     for c, ty, *_ in cols:
         nul = con.execute(f'SELECT ROUND(100.0*SUM(CASE WHEN "{c}" IS NULL THEN 1 ELSE 0 END)/COUNT(*),1) FROM p').fetchone()[0]
         report.append(f"| {c} | {ty} | {nul} |")
@@ -52,5 +54,9 @@ for f in sorted(RAW.glob("*.csv")):
     if t == "sales_detail":
         mx = con.execute("SELECT MIN(gmv_recorded_at), MAX(gmv_recorded_at) FROM p").fetchone()
         report.append(f"\n**gmv_recorded_at (sample)**: {mx}")
-OUT.joinpath("csv_profile.md").write_text("\n".join(report), encoding="utf-8")
+REDACT = [t.strip() for t in os.environ.get("REDACT_TERMS", "").split(",") if t.strip()]
+def redact(text):  # organisation-specific tokens listed in .env (REDACT_TERMS, never in the repo) are masked in the report
+    for t in REDACT: text = re.sub(re.escape(t), "[org]", text, flags=re.IGNORECASE)
+    return text
+OUT.joinpath("csv_profile.md").write_text(redact("\n".join(report)), encoding="utf-8")
 print(f"→ {OUT/'csv_profile.md'}")

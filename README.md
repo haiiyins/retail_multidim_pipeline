@@ -129,7 +129,7 @@ All Python dependencies are listed in `requirements.txt`.
 
 6. **Place the raw data**
 
-   Put the eleven CSV files in `data/raw_csv/<table>.csv`. The download and renaming commands are in [`docs/RUNBOOK.md`](docs/RUNBOOK.md) §1.2. The `data/` directory is git-ignored.
+   Put the eleven raw files in `data/raw_csv/<table>.parquet` or `data/raw_csv/<table>.csv`. The 2026-10-27 re-export delivers `sales_detail`, `sales_tender_detail`, `f_member_purchase` and `all_store_selling_price` as Parquet, the other seven tables stay CSV; when both formats exist for a table the Parquet file wins. The download and renaming commands are in [`docs/RUNBOOK.md`](docs/RUNBOOK.md) §1.2. The `data/` directory is git-ignored.
 
 7. **Run the pipeline**
 

@@ -1,4 +1,5 @@
-"""Step 3 — Bronze: CSV → ZSTD Parquet partitioned per table_contracts.yml, rejects → quarantine, bronze.* views.
+"""Step 3 — Bronze: raw files → ZSTD Parquet partitioned per table_contracts.yml, rejects → quarantine, bronze.* views.
+Raw input is data/raw_csv/<table>.parquet when present (re-export of 2026-10-27), otherwise <table>.csv.
 Run: make bronze"""
 import duckdb, yaml, os, time, pathlib
 from dotenv import load_dotenv
@@ -17,9 +18,10 @@ con.execute("""CREATE TABLE IF NOT EXISTS audit.pipeline_run_metrics(
 contracts = yaml.safe_load(open("ingestion/table_contracts.yml"))
 run_id = time.strftime("%Y%m%d-%H%M%S")
 for table, c in contracts.items():
-    src = ROOT / "raw_csv" / f"{table}.csv"; dst = ROOT / "bronze" / table
-    if not src.exists():
-        print(f"{table:28s} SKIPPED — {src} not found"); continue
+    src = next((p for p in (ROOT / "raw_csv" / f"{table}.{e}" for e in ("parquet", "csv")) if p.exists()), None)
+    dst = ROOT / "bronze" / table
+    if src is None:
+        print(f"{table:28s} SKIPPED — no {table}.parquet / {table}.csv in {ROOT / 'raw_csv'}"); continue
     t0 = time.time()
     casts = c.get("cast", {})
     if casts:
@@ -28,10 +30,14 @@ for table, c in contracts.items():
     else:
         sel = "*"
     part = f"PARTITION_BY ({', '.join(c['partition'])})," if c.get("partition") else ""
+    if src.suffix == ".parquet":
+        reader = f"read_parquet('{src}')"
+    else:
+        reader = (f"read_csv_auto('{src}', header=true, sample_size=500000, nullstr=['null',''], max_line_size=10000000, "
+                  f"store_rejects=true, rejects_table='rej_{table}', rejects_limit=1000000)")
     con.execute(f"""
       COPY (SELECT {sel}, current_timestamp AS _ingested_at, '{src.name}' AS _source_file
-            FROM read_csv_auto('{src}', header=true, sample_size=500000, nullstr=['null',''], max_line_size=10000000,
-                               store_rejects=true, rejects_table='rej_{table}', rejects_limit=1000000))
+            FROM {reader})
       TO '{dst}' (FORMAT PARQUET, COMPRESSION ZSTD, {part} OVERWRITE_OR_IGNORE 1)""")
     con.execute(f"CREATE OR REPLACE VIEW bronze.{table} AS SELECT * FROM read_parquet('{dst}/**/*.parquet', hive_partitioning=true)")
     rows = con.execute(f"SELECT COUNT(*) FROM bronze.{table}").fetchone()[0]
