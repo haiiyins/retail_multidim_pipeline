@@ -1,9 +1,11 @@
 """Step 3 — Bronze: raw files → ZSTD Parquet partitioned per table_contracts.yml, rejects → quarantine, bronze.* views.
-Raw input is data/raw_csv/<table>.parquet when present (re-export of 2026-10-27), otherwise <table>.csv.
+Raw input per table (ingestion/raw_source.py): data/raw_csv/<table>.parquet, else <table>/*.parquet (directory of parts),
+else <table>.csv.
 COUNTRY_FILTER=<code> loads one country (tables with a country_col in the contract; sales_tender_detail follows the
 loaded sales lines; dimension tables are always loaded whole); COUNTRY_FILTER=ALL loads everything.
 Run: make bronze"""
 import duckdb, yaml, os, time, pathlib
+from raw_source import raw_source, parquet_reader
 from dotenv import load_dotenv
 load_dotenv()
 ROOT = pathlib.Path(os.environ["DATA_ROOT"]); DB = os.environ["DUCKDB_PATH"]
@@ -22,10 +24,10 @@ contracts = yaml.safe_load(open("ingestion/table_contracts.yml"))
 run_id = time.strftime("%Y%m%d-%H%M%S")
 print(f"run {run_id}  COUNTRY_FILTER={CF}")
 for table, c in contracts.items():
-    src = next((p for p in (ROOT / "raw_csv" / f"{table}.{e}" for e in ("parquet", "csv")) if p.exists()), None)
+    src, kind = raw_source(ROOT / "raw_csv", table)
     dst = ROOT / "bronze" / table
     if src is None:
-        print(f"{table:28s} SKIPPED — no {table}.parquet / {table}.csv in {ROOT / 'raw_csv'}"); continue
+        print(f"{table:28s} SKIPPED — no {table}.parquet, {table}/*.parquet or {table}.csv in {ROOT / 'raw_csv'}"); continue
     t0 = time.time()
     casts = c.get("cast", {})
     if casts:
@@ -36,8 +38,8 @@ for table, c in contracts.items():
     part = f"PARTITION_BY ({', '.join(c['partition'])})," if c.get("partition") else ""
     target = dst if part else dst / f"{table}.parquet"   # unpartitioned table: one file inside the table directory
     if not part: dst.mkdir(parents=True, exist_ok=True)
-    if src.suffix == ".parquet":
-        reader = reader_plain = f"read_parquet('{src}')"
+    if kind != "csv":
+        reader = reader_plain = parquet_reader(src, kind)
     else:
         reader_plain = f"read_csv_auto('{src}', header=true, sample_size=500000, nullstr=['null',''], max_line_size=10000000)"
         # DuckDB 2.x keeps two reject tables per scan; both need a per-table name or the second CSV table fails with "already in use"

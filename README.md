@@ -129,7 +129,7 @@ All Python dependencies are listed in `requirements.txt`.
 
 6. **Place the raw data**
 
-   Put the eleven raw files in `data/raw_csv/<table>.parquet` or `data/raw_csv/<table>.csv`. The 2026-10-27 re-export delivers `sales_detail`, `sales_tender_detail`, `f_member_purchase` and `all_store_selling_price` as Parquet, the other seven tables stay CSV; when both formats exist for a table the Parquet file wins. The download and renaming commands are in [`docs/RUNBOOK.md`](docs/RUNBOOK.md) §1.2. The `data/` directory is git-ignored.
+   Put the eleven raw tables in `data/raw_csv/` as `<table>.parquet` (single file), `<table>/*.parquet` (directory of parts) or `<table>.csv`; when several exist for one table the precedence is that order. The 2026-10-27 re-export delivers `sales_detail`, `sales_tender_detail`, `f_member_purchase` and `all_store_selling_price` as single Parquet files and `tracking_ecom_events` as a directory of about 1,800 daily Parquet parts (sub-folder of the Drive folder); the other six tables stay CSV. The download and renaming commands are in [`docs/RUNBOOK.md`](docs/RUNBOOK.md) §1.2. The `data/` directory is git-ignored.
 
 7. **Run the pipeline**
 

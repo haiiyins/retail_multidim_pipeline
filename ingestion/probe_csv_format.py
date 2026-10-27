@@ -1,6 +1,7 @@
 """Step 2 — Profile the raw CSV files: column types, null ratio, enumerated values, format of the 3 nested columns, country list.
 Run: make probe  →  data/audit/csv_profile.md"""
-import duckdb, pathlib, os, re
+import duckdb, pathlib, os, re, yaml
+from raw_source import parquet_reader
 from dotenv import load_dotenv
 load_dotenv()
 RAW = pathlib.Path(os.environ.get("DATA_ROOT", "./data")) / "raw_csv"
@@ -21,13 +22,16 @@ NESTED = {"sales_detail": ["tax_detail", "price_modifier_detail"], "tracking_eco
 con = duckdb.connect()
 report = ["# CSV profile (first 20,000 rows per table)\n"]
 files = {f.stem: f for f in sorted(RAW.glob("*.csv"))}
-files.update({f.stem: f for f in sorted(RAW.glob("*.parquet"))})   # Parquet re-export wins over the CSV of the same table
+TABLES = set(yaml.safe_load(open(pathlib.Path(__file__).with_name("table_contracts.yml"))))
+files.update({d.name: d for d in sorted(RAW.iterdir()) if d.is_dir() and d.name in TABLES and any(d.glob("*.parquet"))})   # directory of Parquet parts, contract tables only
+files.update({f.stem: f for f in sorted(RAW.glob("*.parquet"))})   # single Parquet re-export wins over both
 for t, f in sorted(files.items()):
-    reader = (f"read_parquet('{f}')" if f.suffix == ".parquet" else
+    kind = "csv" if f.suffix == ".csv" else ("parquet" if f.is_file() else "parquet-dir")
+    reader = (parquet_reader(f, kind) if kind != "csv" else
               f"read_csv_auto('{f}', sample_size=200000, header=true, nullstr=['null',''], max_line_size=10000000)")
     con.execute(f"CREATE OR REPLACE TABLE p AS SELECT * FROM {reader} LIMIT 20000")
     cols = con.execute("DESCRIBE p").fetchall()
-    report.append(f"\n## {t}  ({len(cols)} columns, {f.suffix[1:]})\n\n| column | type | % null |\n|---|---|---|")
+    report.append(f"\n## {t}  ({len(cols)} columns, {kind})\n\n| column | type | % null |\n|---|---|---|")
     for c, ty, *_ in cols:
         nul = con.execute(f'SELECT ROUND(100.0*SUM(CASE WHEN "{c}" IS NULL THEN 1 ELSE 0 END)/COUNT(*),1) FROM p').fetchone()[0]
         report.append(f"| {c} | {ty} | {nul} |")
