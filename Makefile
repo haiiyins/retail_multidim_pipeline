@@ -18,7 +18,7 @@ gates:
 holidays:
 	python ingestion/holiday_commercial_builder.py
 silver: holidays
-	cd dbt_multidim && dbt deps && dbt run --select staging silver quarantine && dbt test --select staging silver quarantine
+	cd dbt_multidim && dbt deps && dbt run --select staging silver quarantine audit && dbt test --select staging silver quarantine audit
 gold:
 	python evaluation/build_anchor_grid.py
 	cd dbt_multidim && dbt run --select gold && dbt test --select gold

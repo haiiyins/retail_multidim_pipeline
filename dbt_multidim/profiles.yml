@@ -8,6 +8,7 @@ retail_multidim:
       extensions: [parquet, json, icu]
       settings:
         memory_limit: "{{ env_var('DUCKDB_MEMORY', '10GB') }}"
-        temp_directory: "{{ env_var('DATA_ROOT', './data') }}/duck_temp"
+        # temp_directory is left at DuckDB's default (<database>.tmp next to lakehouse.duckdb): dbt-duckdb re-applies settings on
+        # every connection and DuckDB 2.x refuses to switch the temp directory once it has been used (spill in a parallel model)
         max_temp_directory_size: "300GB"
         preserve_insertion_order: false

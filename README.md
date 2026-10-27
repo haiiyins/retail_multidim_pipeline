@@ -222,7 +222,7 @@ Step 7 writes its outputs to `data/audit/`: `ablation_results_d30.csv`, `ablatio
 | Symptom | Cause | Fix |
 |---|---|---|
 | `Could not set lock on file … Conflicting lock is held` on `dbt run` or a loader | another process has the database open, usually DBeaver, even read-only | disconnect DBeaver (right-click the connection → Disconnect), rerun, reconnect afterwards |
-| Out of memory on a large join | `memory_limit` too high or `temp_directory` unset | lower `DUCKDB_MEMORY`; make sure `data/duck_temp` exists and has space |
+| Out of memory on a large join | `memory_limit` too high, or the spill directory full (dbt spills to `data/lakehouse.duckdb.tmp`, the loaders to `data/duck_temp`) | lower `DUCKDB_MEMORY`; make sure `data/duck_temp` exists and has space |
 | Regex extraction returns mostly null | key name or spacing differs in the raw string | inspect five raw `metadata` values and adjust the pattern in `dbt_multidim/macros/extract_map_field.sql` |
 | `ASOF JOIN` error | only one inequality on the time column is allowed | write `ON a.key = b.key AND a.ts >= b.ts` |
 | `Cannot open file ".../dbt_multidim/data/lakehouse.duckdb"` on `dbt debug` | relative `DUCKDB_PATH` / `DATA_ROOT` resolved from `dbt_multidim/` | use absolute paths in `.env`, or run dbt through `make` (which normalises them) |

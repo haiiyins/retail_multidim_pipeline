@@ -1,0 +1,10 @@
+version: 2
+models:
+  - name: stitching_coverage
+    description: Share of web events per country by identity source (DIRECT / STITCHED / ANON), the before-and-after view of identity stitching (issue #20, runbook §5).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [country_code, id_source]
+    columns:
+      - {name: id_source, tests: [{accepted_values: {values: ['DIRECT', 'STITCHED', 'ANON']}}]}
+      - {name: pct, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 100, inclusive: true}}]}

@@ -28,3 +28,8 @@ models:
     quarantine:
       +materialized: table
       +schema: quarantine
+    audit:
+      +materialized: table
+      +schema: audit
+on-run-end:
+  - "{{ log_run_results(results) }}"      # wall time and rows per model → audit.pipeline_run_metrics

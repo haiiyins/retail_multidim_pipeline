@@ -6,10 +6,21 @@ WITH days AS (SELECT CAST(date_of_day AS DATE) AS d, iso_week_YYYYWW, is_weekend
 ctry AS (SELECT DISTINCT country_code FROM {{ ref('slv_price_sku_interval') }}),
 grid AS (SELECT c.country_code, d.* FROM ctry c CROSS JOIN days d),
 promo_share AS (
-  SELECT g.country_code, g.d,
-         COUNT(DISTINCT CASE WHEN p.promo_kind IN ('DAILY', 'SEASONAL') THEN p.item_code END) * 1.0 / NULLIF(COUNT(DISTINCT p.item_code), 0) AS share
-  FROM grid g JOIN {{ ref('slv_price_sku_interval') }} p ON p.country_code = g.country_code AND g.d BETWEEN p.eff_start AND p.eff_end
-  GROUP BY 1, 2),
+  -- share of SKUs on a DAILY / SEASONAL promotion among SKUs with a STANDARD price in force, per day. Computed with a difference
+  -- array (+1 at eff_start, -1 the day after eff_end, running sum) instead of a day × interval join: O(intervals + days) and a few MB,
+  -- where the join produced ~170 M intermediate rows and ran out of memory next to the sales-line models.
+  WITH p AS (SELECT country_code, eff_start, eff_end, is_temp_promo, (price_type = 'STANDARD') AS is_std FROM {{ ref('slv_price_sku_interval') }}),
+  deltas AS (
+    SELECT country_code, eff_start AS d, CASE WHEN is_temp_promo THEN 1 ELSE 0 END AS dp, CASE WHEN is_std THEN 1 ELSE 0 END AS ds FROM p
+    UNION ALL
+    SELECT country_code, eff_end + INTERVAL 1 DAY, CASE WHEN is_temp_promo THEN -1 ELSE 0 END, CASE WHEN is_std THEN -1 ELSE 0 END FROM p
+  ),
+  agg AS (SELECT country_code, CAST(d AS DATE) AS d, SUM(dp) AS dp, SUM(ds) AS ds FROM deltas GROUP BY 1, 2),
+  cum AS (SELECT country_code, d, SUM(dp) OVER w AS promo_active, SUM(ds) OVER w AS std_active FROM agg
+          WINDOW w AS (PARTITION BY country_code ORDER BY d ROWS UNBOUNDED PRECEDING))
+  SELECT g.country_code, g.d, c.promo_active * 1.0 / NULLIF(c.std_active, 0) AS share
+  FROM grid g ASOF LEFT JOIN cum c ON c.country_code = g.country_code AND g.d >= c.d
+),
 z AS (SELECT *, AVG(share) OVER w AS mu, STDDEV_SAMP(share) OVER w AS sigma FROM promo_share
       WINDOW w AS (PARTITION BY country_code ORDER BY d ROWS BETWEEN 60 PRECEDING AND 1 PRECEDING)),
 ev AS (SELECT country_code, d, share, (mu IS NOT NULL AND share > mu + 1.5 * COALESCE(sigma, 0) AND share >= 0.002) AS is_peak FROM z),
