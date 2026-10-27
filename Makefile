@@ -4,13 +4,15 @@ include .env
 DATA_ROOT := $(abspath $(DATA_ROOT))
 DUCKDB_PATH := $(abspath $(DUCKDB_PATH))
 export
-.PHONY: probe probe-full bronze gates holidays silver gold train ablation docs all
+.PHONY: probe probe-full bronze bronze-views gates holidays silver gold train ablation docs all
 probe:
 	python ingestion/probe_csv_format.py
 probe-full:
 	python ingestion/probe_full_scan.py
 bronze:
 	python ingestion/batch_csv_to_bronze.py
+bronze-views:
+	python ingestion/bronze_views_from_parquet.py
 gates:
 	python -c "import duckdb,os;c=duckdb.connect(os.environ['DUCKDB_PATH']);c.execute(open('sql/gates_by_country.sql').read());c.execute(open('sql/audit_checks.sql').read());print(c.execute('SELECT * FROM audit.gates_by_country').df())"
 holidays:
