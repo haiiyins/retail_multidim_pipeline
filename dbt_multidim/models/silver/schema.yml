@@ -49,3 +49,12 @@ models:
       - {name: platform, tests: [{accepted_values: {values: ['web', 'app']}}]}
       - name: model_code
         tests: [{dbt_utils.expression_is_true: {expression: "SIMILAR TO '[0-9]+'", config: {where: "model_code IS NOT NULL"}}}]   # column-level form: "<column> <expression>"
+  - name: slv_calendar_enriched
+    description: One row per country × day 2023–2026 with public holidays and commercial events inferred from the promotion share (issues #17, #18).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [country_code, calendar_date]
+    columns:
+      - {name: country_code, tests: [not_null]}
+      - {name: calendar_date, tests: [not_null]}
+      - {name: promo_share, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}}]}
