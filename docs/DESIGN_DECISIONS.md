@@ -13,7 +13,7 @@ The **pipeline is the deliverable**. A single fixed ranking model (LightGBM Lamb
 | Item | Decision | Rationale |
 |---|---|---|
 | Source tables | 11 (including `d_member`) | `d_member` is used only for account-exclusion flags and static attributes dated ≤ t |
-| Countries | 5 APAC countries present in the export | Country is a pipeline parameter; the pipeline loops over all five |
+| Countries | SG, TH, VN — decision 2026-10-28 (issue #54): the three countries covered by the 2026-10-27 Parquet and web-event re-exports; PH and TW exist only in the size-capped CSV export (sales Jan–Oct 2023, no prices, no web events) and are out of scope | Country is a pipeline parameter; the pipeline loops over the three |
 | Period | 2023 – 2026, all available data | No time-budget constraint; full history |
 | Recommendation unit | `model_code` | SKUs (`item_code`) split by size/colour are too sparse (701 SKUs per 1,000 lines in the sample) |
 | Eligible members | ≥ 2 transactions, not flagged as staff / business / legal entity / club / school | Personalisation needs history; non-consumer accounts distort it |
@@ -69,7 +69,7 @@ The **pipeline is the deliverable**. A single fixed ranking model (LightGBM Lamb
 - **Candidate axis:** −R1 … −R5.
 - **Statistics:** member-level bootstrap (≥ 500 resamples), 95 % CI for every metric and for the paired difference Full − arm.
 - **Cost:** wall time, peak RSS, output rows and bytes per dbt model, recorded in `audit.pipeline_run_metrics`.
-- **Scale test:** Silver→Gold for 1 → 3 → 5 countries and for 3 → 12 → 36 months of one country, plus four with/without comparisons (Parquet vs CSV, column projection, ASOF vs daily explode, regex extraction vs row-wise Python).
+- **Scale test:** Silver→Gold for 1 → 2 → 3 countries (VN → +TH → +SG, smallest first) and for 3 → 12 → 36 months of one country, plus four with/without comparisons (Parquet vs CSV, column projection, ASOF vs daily explode, regex extraction vs row-wise Python).
 
 ## 7. Server sizing
 
@@ -92,7 +92,7 @@ Pair-table size ≈ members × anchors per member per year × 200. With a stride
 | 1.4 | Streaming lane + QC-7 | 1.1 | Kha | three topics running; reconciliation diff = 0 |
 | 2.1 – 2.2 | fact_sales_line, fact_returns, dim_model, member_bridge, member_profile | 1.1 | Mạnh | QC-1, 3, 4 pass; 20 sale/cancel transactions verified by hand |
 | 2.3 | price_sku_interval + price at anchor | 2.2, 3.1 | Yến | ≥ 90 % of models priced at the anchor in the main country |
-| 2.4 | calendar_enriched | 2.3 | Yến | 5 countries; named commercial events |
+| 2.4 | calendar_enriched | 2.3 | Yến | 3 countries; named commercial events |
 | 2.5 | web_events_clean + stitching | 1.1 | Yến | coverage report; `quarantine.identity_conflicts` |
 | 2.6 | stock_daily_model | 0.4 | Mạnh | day × model × (site, country) table |
 | 2.7 | sport_asof, member_store_daily, account exclusion | 2.1 | Mạnh | as-of state verified for 20 members |

@@ -7,7 +7,7 @@ Conventions: `$ROOT` is the repository root; commands assume the virtual environ
 | Step | Name | Main output |
 |---|---|---|
 | 1 | Environment | repo, venv, `.env`, `profiles.yml`, DBeaver connection |
-| 2 | CSV profiling | `data/audit/csv_profile.md`, the 5 country codes, nested-column format |
+| 2 | CSV profiling | `data/audit/csv_profile.md`, the country codes, nested-column format |
 | 3 | Bronze | 11 partitioned Parquet tables + `bronze.*` views + rejects |
 | 4 | Gates & audit | `audit.gates_by_country`, stock coverage, price uniformity, inter-purchase gaps, date span |
 | 5 | Silver (dbt) | 13 Silver models, tests passing |
@@ -22,7 +22,7 @@ Conventions: `$ROOT` is the repository root; commands assume the virtual environ
 
 ### 1.1 Machines
 
-| | Laptop (development, one country) | Server (five countries, Gold, experiments) |
+| | Laptop (development, one country) | Server (all three countries, Gold, experiments) |
 |---|---|---|
 | CPU / RAM | 8 cores / 16 GB | 32 vCPU / 256 GB |
 | Free disk | ≥ 150 GB | ≥ 2 TB NVMe |
@@ -93,7 +93,7 @@ Fill in from the report:
 
 | Question | Where to record |
 |---|---|
-| The 5 country codes present in `sales_detail` | `vars.countries` in `dbt_project.yml` and `COUNTRIES` in `.env` |
+| The country codes present in `sales_detail` (SG, TH, VN since the 2026-10-27 re-export; scope decision in #54) | `vars.countries` in `dbt_project.yml` and `COUNTRIES` in `.env` |
 | `item_operation_type` ∈ {sale, return, cancel}? | confirms the dedup rule in `slv_fact_sales_line` |
 | `price_type` has exactly five values? | confirms the `promo_kind` macro |
 | Nested columns are `Map(k -> v)` strings (already confirmed) | `extract_map_field` macro is used |
@@ -305,7 +305,7 @@ Submission checklist:
 - [ ] README states machine requirements, `make all`, `.env` variables and measured run times.
 - [ ] `requirements.txt`, DuckDB / dbt versions and `raw_csv_md5.txt` included.
 - [ ] All dbt tests pass; `leakage_*` return zero rows; `frozen_params.json` committed.
-- [ ] Numbers in slides and proposal match `audit.*` (200 candidates, 11 tables, 5 countries, @10 / @20).
+- [ ] Numbers in slides and proposal match `audit.*` (200 candidates, 11 tables, 3 countries, @10 / @20).
 - [ ] Five-minute demo: DBeaver → `audit.gates_by_country` → dbt docs lineage → ablation table.
 
 ---
