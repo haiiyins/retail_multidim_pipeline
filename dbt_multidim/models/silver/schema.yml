@@ -12,6 +12,7 @@ models:
           combination_of_columns: [transaction_id, item_code]       # QC-4
     columns:
       - {name: transaction_id, tests: [not_null]}                   # QC-1
+      - {name: transaction_ts_local, tests: [{dbt_utils.accepted_range: {max_value: "current_timestamp", inclusive: true}}]}   # QC-3, no future timestamps
       - {name: model_code, tests: [not_null]}
       - {name: country_code, tests: [not_null]}
       - name: qty

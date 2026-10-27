@@ -161,7 +161,7 @@ Run order and purpose:
 | `slv_fact_returns` | return lines |
 | `slv_price_sku_interval` | SKU price intervals, website business unit first, `promo_kind` |
 | `slv_calendar_enriched` | public holidays + commercial events inferred from the temporary-promotion share (trailing 60-day z-score) |
-| `slv_web_events_clean` | regex extraction of `metadata`, `is_event_to_use`, marketplace removed |
+| `slv_web_events_clean` | metadata struct flattened by path, `is_event_to_use`, marketplace removed |
 | `slv_user_to_member` | order-based + login-based stitching; one member per cookie |
 | `slv_identity_conflicts` | cookies with several members (quarantine) |
 | `slv_stock_daily_model`, `slv_stock_daily_national` | stock per model × site × day with ≤ 3-day forward fill |
@@ -183,6 +183,8 @@ SELECT country_code, id_source, COUNT(*) n, ROUND(100.0*COUNT(*)/SUM(COUNT(*)) O
 FROM gold.gld_web_stitched GROUP BY 1,2 ORDER BY 1,2;   -- after step 6; compare with the raw 15.6 %
 ```
 
+`audit.stitching_coverage` (dbt model in `models/audit/`, built by `make silver`): share of web events per country by identity source, DIRECT (member on the event) / STITCHED (attached within ± 90 days of `identity_verified_ts`) / ANON — the before-and-after view of stitching required by the DoD. Every `dbt run` also appends one row per model (wall time, rows, country filter) to `audit.pipeline_run_metrics` through the `on-run-end` hook `log_run_results`, the same table the Bronze loader writes.
+
 Quarantine (schema `quarantine`, built by `make silver` together with Silver; rows a model refuses, kept with a reason):
 
 | Table | Source model | Reasons |
@@ -199,7 +201,7 @@ UNION ALL SELECT 'price', reason, COUNT(*) FROM quarantine.qrt_price_interval GR
 
 Warn-level tests (do not block): `discount_local >= 0` on the sales fact (negative values are surcharges), `store_tz` not null (missing store timezone falls back to UTC), `member_bridge_conflicts`, `referential_member_link_rate` (QC-2 is enforced through the gates, not the test).
 
-**DoD:** `make silver` succeeds (`dbt run` and `dbt test` over staging, silver and quarantine, warnings explained); quarantine tables listed above exist; 20 sale/cancel transactions verified.
+**DoD:** `make silver` succeeds (`dbt run` and `dbt test` over staging, silver, quarantine and audit, warnings explained); quarantine tables listed above exist; `audit.stitching_coverage` has the before / after shares; `audit.pipeline_run_metrics` has one row per Silver model; 20 sale/cancel transactions verified.
 
 ---
 
@@ -350,7 +352,7 @@ Submission checklist:
 | Symptom | Cause | Fix |
 |---|---|---|
 | `Could not set lock on file … Conflicting lock is held` on `dbt run` or a loader | another process has the database open, usually DBeaver, even read-only | disconnect DBeaver (right-click the connection → Disconnect), rerun, reconnect afterwards |
-| Out of memory on a large join | `memory_limit` too high for the machine or `temp_directory` unset | set `memory_limit` to ≈ 60–70 % of RAM; make sure `temp_directory` is writable and has space |
+| Out of memory on a large join | `memory_limit` too high for the machine, or the spill directory full (dbt spills to `data/lakehouse.duckdb.tmp`, the loaders to `data/duck_temp`) | set `memory_limit` to ≈ 60–70 % of RAM; make sure `temp_directory` is writable and has space |
 | Regex extraction returns mostly null | key name or spacing differs in the string | inspect five raw strings, adjust the pattern; compare null rates |
 | `ASOF JOIN` error | exactly one inequality on the time column is allowed; other conditions must be equalities | write `ON a.key = b.key AND a.ts >= b.ts` |
 | `accepted_values` test fails | a value not seen in profiling | check `csv_profile.md`, extend the list, note it in the report |
