@@ -12,14 +12,17 @@ j  AS (SELECT s.*, mb.member_id, it.model_code, (pr.model_code IS NOT NULL) AS h
               LEFT JOIN pr ON pr.country = s.country AND pr.model_code = it.model_code),
 rep AS (SELECT country, year, COUNT(*) AS members_ge2 FROM (
           SELECT country, year, member_id, COUNT(DISTINCT transaction_id) n FROM j WHERE member_id IS NOT NULL
-          GROUP BY 1,2,3 HAVING n >= 2) GROUP BY 1,2)
-SELECT j.country, j.year,
-       COUNT(DISTINCT j.transaction_id) AS n_tx,
-       ROUND(100.0*COUNT(DISTINCT CASE WHEN j.member_id IS NOT NULL THEN j.transaction_id END)/COUNT(DISTINCT j.transaction_id),2) AS gate1_member_link_pct,
-       ROUND(100.0*COUNT(CASE WHEN j.model_code IS NOT NULL THEN 1 END)/COUNT(*),2) AS gate2_item_match_pct,
-       ROUND(100.0*COUNT(DISTINCT CASE WHEN j.has_price THEN j.model_code END)/COUNT(DISTINCT j.model_code),2) AS gate3_price_cov_pct,
-       COALESCE(rep.members_ge2,0) AS gate4_members_ge2,
-       CASE WHEN gate1_member_link_pct>=60 AND gate2_item_match_pct>=95 AND gate3_price_cov_pct>=90 AND COALESCE(rep.members_ge2,0)>=20000
+          GROUP BY 1,2,3 HAVING n >= 2) GROUP BY 1,2),
+g AS (
+  SELECT j.country, j.year,
+         COUNT(DISTINCT j.transaction_id) AS n_tx,
+         ROUND(100.0*COUNT(DISTINCT CASE WHEN j.member_id IS NOT NULL THEN j.transaction_id END)/COUNT(DISTINCT j.transaction_id),2) AS gate1_member_link_pct,
+         ROUND(100.0*COUNT(CASE WHEN j.model_code IS NOT NULL THEN 1 END)/COUNT(*),2) AS gate2_item_match_pct,
+         ROUND(100.0*COUNT(DISTINCT CASE WHEN j.has_price THEN j.model_code END)/COUNT(DISTINCT j.model_code),2) AS gate3_price_cov_pct,
+         COALESCE(MAX(rep.members_ge2),0) AS gate4_members_ge2
+  FROM j LEFT JOIN rep USING (country, year)
+  GROUP BY 1,2)
+SELECT *,
+       CASE WHEN gate1_member_link_pct>=60 AND gate2_item_match_pct>=95 AND gate3_price_cov_pct>=90 AND gate4_members_ge2>=20000
             THEN 'PASS' ELSE 'REVIEW' END AS gate_decision
-FROM j LEFT JOIN rep USING (country, year)
-GROUP BY ALL ORDER BY 1,2;
+FROM g ORDER BY 1,2;
