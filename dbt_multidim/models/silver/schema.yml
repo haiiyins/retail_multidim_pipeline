@@ -26,3 +26,12 @@ models:
     columns: [{name: user_id, tests: [not_null, unique]}, {name: member_id, tests: [not_null]}]
   - name: slv_stock_daily_model
     columns: [{name: model_code, tests: [not_null]}]
+  - name: slv_web_events_clean
+    description: Web/app events flattened from the metadata struct, one row per (event, model_code); only is_event_to_use events (issue #6).
+    columns:
+      - {name: event_id, tests: [not_null]}
+      - {name: event_name, tests: [not_null]}
+      - {name: country_code, tests: [not_null, {accepted_values: {values: ['SG', 'TH', 'VN']}}]}
+      - {name: platform, tests: [{accepted_values: {values: ['web', 'app']}}]}
+      - name: model_code
+        tests: [{dbt_utils.expression_is_true: {expression: "SIMILAR TO '[0-9]+'", config: {where: "model_code IS NOT NULL"}}}]   # column-level form: "<column> <expression>"
