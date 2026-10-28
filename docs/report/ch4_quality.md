@@ -107,7 +107,7 @@ event whose attribution was known at the anchor (`leakage_web_identity`) and tha
 their link (`leakage_web_stitched_window`); `copurchase_cutoff_before_validation` checks that the co-purchase statistics stop before
 the validation window. `quarantine.leakage_violations` materialises the same predicates with the model name and the rule, so a violation
 leaves a trace even after a rerun, and `leakage_violations_empty` requires it to be empty. State on the three-country build: the 10 Gold-stage
-models pass their 64 tests and the ledger has 0 rows **(t14)**. The one real violation found during development — online lines shifted by +7 hours by the timezone
+models pass their 64 tests and the ledger has 0 rows **(t14**; terminal evidence `docs/figures/dbt_tests_gold_server.png`**)**. The one real violation found during development — online lines shifted by +7 hours by the timezone
 bug (3.3) — was caught by these tests before any experiment ran.
 
 ## 4.7 dbt tests by layer
