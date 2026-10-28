@@ -145,6 +145,7 @@ make gates        # runs sql/gates_by_country.sql and sql/audit_checks.sql
 - `audit.price_uniformity` — store vs website price gaps; if `p95_rel_gap` < 5 %, keep the website business unit as the national reference (default); otherwise set `allow_store_prices: true`.
 - `audit.interpurchase_days` — quantiles of inter-purchase gaps (validates Δ).
 - `audit.date_span` — min/max transaction timestamps per country (drives `split.yml`).
+- `audit.stream_reconciliation` — QC-7 (optional streaming lane, step 8): batch vs stream Bronze, rows / distinct keys / hash per table × country × day; written by `ingestion/qc7_stream_reconciliation.py`, not by `make gates`.
 - `audit.volume_drift` — QC-5: rows per table (`sales_detail`, `tracking_ecom_events`) × country × day against the trailing 28-day mean of the same weekday; `flagged` when |drift| > 50 %, with a `probable_cause` hint (NO_ROWS, EXPORT_EDGE, AFTER_GAP, PUBLIC_HOLIDAY, ADJACENT_TO_HOLIDAY, UNEXPLAINED). `make gates` therefore runs `make holidays` first and prints the flagged-day count; review the UNEXPLAINED days and comment them on issue #25. Warn-level: nothing is blocked.
 
 QC-5 regression checks run against synthetic, in-memory Bronze tables using the production SQL:
@@ -323,14 +324,18 @@ The producer replays three topics, each ordered by event time and keyed as shown
 
 `f_member_purchase.tech_year` / `tech_month` are not used for the month filter: they contain 1970-01 and values that disagree with `association_datetime_utc`. `REPLAY_TOPICS=raw.tracking,raw.favorite_sport` replays a subset; the run prints sent / failed counts and msg/s per topic and exits non-zero if any message was not delivered. Laptop smoke test: `REPLAY_COUNTRY=VN REPLAY_MONTH=2025-06` (464 150 / 102 / 245 746 messages, matching the Bronze counts; ≈ 23 k msg/s for tracking).
 
-QC-7 reconciliation:
+QC-7 reconciliation, after the consumer has run on the same country-month:
+
+```bash
+REPLAY_COUNTRY=XX REPLAY_MONTH=2025-01 python ingestion/qc7_stream_reconciliation.py
+```
 
 ```sql
-SELECT b.country_code, b.d, b.n AS n_batch, s.n AS n_stream, b.n - COALESCE(s.n,0) AS diff
-FROM (SELECT country_code, date::DATE d, COUNT(*) n FROM bronze.tracking_ecom_events GROUP BY 1,2) b
-LEFT JOIN (SELECT country_code, date::DATE d, COUNT(*) n FROM read_parquet('data/bronze/tracking_ecom_events_stream/**/*.parquet', hive_partitioning=true) GROUP BY 1,2) s USING (country_code, d)
-WHERE s.n IS NOT NULL ORDER BY diff DESC;
+SELECT * FROM audit.stream_reconciliation WHERE NOT ok ORDER BY tbl, day;   -- empty when the lanes agree
+SELECT tbl, COUNT(*) AS country_days, SUM(n_batch) AS n_batch, SUM(n_stream) AS n_stream FROM audit.stream_reconciliation GROUP BY 1;
 ```
+
+`ingestion/qc7_stream_reconciliation.py` replaces the `REPLAY_COUNTRY` × `REPLAY_MONTH` slice of `audit.stream_reconciliation` (other countries and months stay, so SG, TH and VN can be run one after another): per table × country × day, rows (`n_*`), distinct business keys (`d_*`) and an order-independent hash (`h_*` = `SUM(hash(row columns))`, so duplicated rows do not cancel as under XOR; `f_member_purchase` repeats each `(transaction_id, member_id)` about three times in VN 2025-06), the batch − stream differences, `hash_match` and `ok`. Both sides use the same predicate and day: `tracking_ecom_events` by `date` with `WHERE is_event_to_use` on the batch side (the consumer keeps only those; pruned by `country_code, year, month`), `f_member_favorite_sport` by the UTC day of `event_datetime_utc` (pruned by `country_code, year`), `f_member_purchase` by the day of `association_datetime_utc` (`tech_year` / `tech_month` / `tech_day` are not reliable, so only the country is pruned and that country's partitions are scanned). `hash_match` covers only the columns listed in `TABLES[...]['row']` of the script (tracking: `id, session_id, name, timestamp_utc`, not `metadata` or `_errors`), so it does not mean the payload is intact. A day present on one side only shows as a difference. The script exits with status 1 when anything differs; batch Bronze stays the source for Silver either way. It writes to the lakehouse, so close DBeaver first.
 
 Consumer (`ingestion/kafka_consumer_to_bronze.py`): reads `raw.tracking`, `raw.favorite_sport` and `raw.member_purchase` from the beginning up to the offsets present at start and then exits (`STREAM_TOPICS` selects a subset, `STREAM_IDLE_TIMEOUT` = seconds without a message before it gives up, default 60). Valid messages are written to `data/bronze/<table>_stream/` (`tracking_ecom_events_stream` partitioned by `country_code, year, month` from `date`; `f_member_favorite_sport_stream` by `country_code, year`; `f_member_purchase_stream` by `member_country_code, year, month` from `association_datetime_utc`), with `metadata` and `_errors` kept as JSON. A message goes to `quarantine.rejected_stream_events(topic, kafka_partition, kafka_offset, reason, payload, rejected_at)` when it is not a JSON object (`invalid_json`, `not_a_json_object`), when a `not_null` column of the table in `ingestion/table_contracts.yml` (or its event-time column) is empty (`missing_<column>`), or, for tracking, when `is_event_to_use` is not true (`is_event_to_use_not_true`; `_errors` is not tested because the Parquet export fills it on every event). A batch whose values the declared types cannot hold is moved to the same table as `batch_write_error`. Each run first empties the stream folders and the topic's rows in the reject table, so a rerun gives the same result; it prints ok / bad per topic and the total msg/s.
 
