@@ -217,13 +217,7 @@ make gold         # build_anchor_grid.py, dbt run --select gold, dbt test --sele
 - `gld_web_stitched`, `gld_copurchase_lift` (support, confidence, lift per country over baskets before `vars.copurchase_cutoff` = `valid_lo` of `split.yml`, checked by `tests/copurchase_cutoff_before_validation.sql` against `gold.split_windows`), `gld_fs_member` (feature groups F0 / F1 / F3 / F5 / Sport / Store, `web_data_available`), `gld_fs_model_country` (price = median over the SKU intervals valid on the anchor date, temporary promotion preferred per SKU; popularity, seasonality, calendar; stock columns NULL unless `vars.use_stock`, issue #21), `gld_candidates` (R1 repurchase, R2 co-purchase partners, R3 web intent, R4 sport × offer through `gld_sport_department_affinity`, R5 national best-sellers; priority R1 > R3 > R2 > R4 > R5, capped at `n_candidates`; recall per source in `audit.candidate_recall`), `gld_fs_pair`, `gld_ranking_dataset` (labels Δ = 30 / 90, returned purchases excluded).
 - Singular tests `tests/leakage_*.sql` implement QC-6 and must return zero rows.
 
-Candidate recall per source:
-
-```sql
-SELECT 'r1' src, AVG(r1) FROM gold.gld_ranking_dataset WHERE label_30 = 1
-UNION ALL SELECT 'r2', AVG(r2) FROM gold.gld_ranking_dataset WHERE label_30 = 1
--- … r3, r4, r5
-```
+Candidate recall per source: `audit.candidate_recall` (built together with the Gold models) gives recall@`n_candidates` overall and per source r1 … r5 for Δ = 30 / 90, per country × split, measured against every non-returned purchase in the window after a used anchor — it does not depend on `gld_ranking_dataset`. VN first run: 34 % (Δ = 30) with the national best-sellers (R5) at 30 %, repurchase (R1) 7 %, co-purchase (R2) 4 %; web (R3) and sport (R4) need the server's web data and SG / TH sport events to be read.
 
 **DoD:** three entities and `gld_ranking_dataset` exist; leakage tests return zero rows; candidate recall per source recorded; training pair table ≤ ~30 M rows with stride 4.
 
