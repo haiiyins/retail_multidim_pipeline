@@ -1,0 +1,3 @@
+country_code,channel,sale_lines,business_units,lines_without_unit_timezone,pct_country_timezone_fallback
+VN,offline,6752199,10,0,0.0
+VN,online,1559629,16,95222,6.11

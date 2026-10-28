@@ -1,0 +1,5 @@
+country,year,n_tx,gate1_member_link_pct,gate2_item_match_pct,gate3_price_cov_pct,gate4_members_ge2,gate_decision
+VN,2023,802476,60.93,99.99,99.44,97625,PASS
+VN,2024,856497,74.39,100.0,99.58,123502,PASS
+VN,2025,1038523,73.37,100.0,99.58,150852,PASS
+VN,2026,1186902,63.5,100.0,99.82,150457,PASS

@@ -1,0 +1,4 @@
+country_code,split,used_anchors,anchors_with_web_signal,pct_with_web_signal,anchors_with_web_data_available
+VN,test,50000,0,0.0,0
+VN,train,50000,28,0.06,2567
+VN,valid,15000,0,0.0,0

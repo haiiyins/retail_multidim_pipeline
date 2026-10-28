@@ -1,0 +1,2 @@
+country_code,raw_rows,distinct_rows,line_keys,sale_rows,cancel_rows,return_rows,sale_lines_kept,sale_transactions,buying_members,return_lines_kept,quarantined_rows
+VN,11599372,10607241,10604977,11196431,115011,287930,8311828,3806147,1019754,262476,1133757
