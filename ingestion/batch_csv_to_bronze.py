@@ -3,6 +3,7 @@ Raw input per table (ingestion/raw_source.py): data/raw_csv/<table>.parquet, els
 else <table>.csv.
 COUNTRY_FILTER=<code> loads one country (tables with a country_col in the contract; sales_tender_detail follows the
 loaded sales lines; dimension tables are always loaded whole); COUNTRY_FILTER=ALL loads everything.
+BRONZE_TABLES=<table>[,<table>…] reloads only those tables, e.g. after a re-export (RUNBOOK §1.2); default: every table.
 Run: make bronze"""
 import duckdb, yaml, os, time, pathlib
 from raw_source import raw_source, parquet_reader
@@ -21,9 +22,13 @@ con.execute("""CREATE TABLE IF NOT EXISTS audit.pipeline_run_metrics(
   run_id VARCHAR, layer VARCHAR, model_name VARCHAR, country_filter VARCHAR,
   wall_time_sec DOUBLE, output_rows BIGINT, output_bytes BIGINT, executed_at TIMESTAMP DEFAULT current_timestamp)""")
 contracts = yaml.safe_load(open("ingestion/table_contracts.yml"))
+ONLY = {t.strip() for t in (os.environ.get("BRONZE_TABLES") or "").split(",") if t.strip()}
+if ONLY - contracts.keys():
+    raise SystemExit(f"BRONZE_TABLES not in table_contracts.yml: {sorted(ONLY - contracts.keys())}")
 run_id = time.strftime("%Y%m%d-%H%M%S")
-print(f"run {run_id}  COUNTRY_FILTER={CF}")
+print(f"run {run_id}  COUNTRY_FILTER={CF}" + (f"  BRONZE_TABLES={','.join(sorted(ONLY))}" if ONLY else ""))
 for table, c in contracts.items():
+    if ONLY and table not in ONLY: continue
     src, kind = raw_source(ROOT / "raw_csv", table)
     dst = ROOT / "bronze" / table
     if src is None:
