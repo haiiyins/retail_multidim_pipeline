@@ -99,7 +99,7 @@ models:
       - {name: lift, tests: [not_null, {dbt_utils.expression_is_true: {expression: "> 1.5"}}]}
       - {name: rank_in_sport, tests: [{dbt_utils.accepted_range: {min_value: 1, max_value: 5, inclusive: true}}]}
   - name: gld_candidates
-    description: "Up to vars.n_candidates candidate models per used anchor from sources r1 repurchase, r2 co-purchase, r3 web intent, r4 sport x offer, r5 national best-sellers (stock filter only with vars.use_stock); priority R1 > R3 > R2 > R4 > R5, then the source score. QC-4 unique (member, model, anchor); recall per source in audit.candidate_recall."
+    description: "Up to vars.n_candidates candidate models per used anchor from sources r1 repurchase, r2 co-purchase, r3 web intent, r4 sport x offer, r5 national best-sellers (stock filter only with vars.use_stock); priority R1 > R3 > R2 > R4 > R5, then the source score; only models purchasable at the anchor (in gold.anchor_model_grid). QC-4 unique (member, model, anchor); recall per source in audit.candidate_recall."
     tests:
       - dbt_utils.unique_combination_of_columns: {combination_of_columns: [member_id, anchor_date, model_code]}   # QC-4
       - dbt_utils.expression_is_true: {expression: "r1 + r2 + r3 + r4 + r5 >= 1"}
@@ -110,7 +110,32 @@ models:
       - {name: candidate_rank, tests: [{dbt_utils.accepted_range: {min_value: 1, max_value: 200, inclusive: true}}]}
       - {name: priority_source, tests: [{accepted_values: {values: [1, 2, 3, 4, 5], quote: false}}]}
   - name: gld_fs_pair
+    description: "Entity 3 — pair features for the candidates: both entities joined plus member x model interactions (history of the model, co-purchase lift with the last-90-day basket, department purchase cycle, web attention to the model), all strictly before the anchor (tests/leakage_fs_pair.sql, tests/leakage_web_identity.sql). in_stock_usual_store is NULL unless vars.use_stock."
     tests:
       - dbt_utils.unique_combination_of_columns: {combination_of_columns: [member_id, model_code, anchor_date]}   # QC-4
+    columns:
+      - {name: member_id, tests: [not_null]}
+      - {name: model_code, tests: [not_null]}
+      - {name: anchor_date, tests: [not_null]}
+      - {name: hist_buy_cnt, meta: {group: F2}, description: "member's purchases of the model before the anchor"}
+      - {name: days_since_bought, meta: {group: F2}}
+      - {name: copurchase_lift_max, meta: {group: F2}}
+      - {name: copurchase_lift_mean, meta: {group: F2}}
+      - {name: dept_overdue_ratio, meta: {group: F2}, description: "days since the member last bought in the model's department over the member's median gap in that department"}
+      - {name: price_gap_q50, meta: {group: F1}}
+      - {name: in_budget_iqr, meta: {group: F1}}
+      - {name: promo_sensitivity, meta: {group: F3}}
+      - {name: web_view_30d, meta: {group: F5}, description: "product page views of the model (product_page_viewed, product_size_selected)"}
+      - {name: web_list_30d, meta: {group: F5}, description: "list impressions containing the model (product_list_viewed)"}
+      - {name: web_cart_30d, meta: {group: F5}, description: "cart or checkout events with the model"}
+      - {name: sport_match, meta: {group: Sport}, description: "the model's department is affine to one of the member's favourite sports"}
+      - {name: in_stock_usual_store, meta: {group: Stock}}
   - name: gld_ranking_dataset
-    columns: [{name: label_30, tests: [{accepted_values: {values: [0, 1]}}]}]
+    description: "gld_fs_pair plus labels: label_30 / label_90 = non-returned purchase of the candidate in (anchor, anchor + Δ]; split and in_train_sample carried from the anchor grid."
+    tests:
+      - dbt_utils.unique_combination_of_columns: {combination_of_columns: [member_id, model_code, anchor_date]}
+      - dbt_utils.expression_is_true: {expression: "label_90 >= label_30"}
+    columns:
+      - {name: label_30, tests: [not_null, {accepted_values: {values: [0, 1], quote: false}}]}
+      - {name: label_90, tests: [not_null, {accepted_values: {values: [0, 1], quote: false}}]}
+      - {name: split, tests: [not_null, {accepted_values: {values: ['train', 'valid', 'test']}}]}

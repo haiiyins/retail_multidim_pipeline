@@ -8,6 +8,9 @@
 --                      is affine to one of the member's favourite sports (gld_sport_department_affinity)
 --   R5 best-sellers    national top-300 by buyers in the last 28 days; with vars.use_stock also available at the member's usual store
 --                      (stock is switched off, issue #21, so R5 is the national-popularity source that B0 keeps)
+-- Purchasable at t: every candidate must be in gold.anchor_model_grid for (country, anchor), i.e. the model sells in the country
+-- within ± 90 days of the anchor (the stock-based definition is off with vars.use_stock); on VN this removed 2.5 % of the pairs,
+-- none of which ever carried a positive label.
 {% set n_cand = var('n_candidates') | int %}
 {% set use_stock = var('use_stock', false) %}
 WITH g AS (SELECT member_id, country_code, anchor_date, split, in_train_sample FROM gold.anchor_grid WHERE is_used),
@@ -69,4 +72,5 @@ SELECT g.country_code, g.split, g.in_train_sample, u.member_id, u.anchor_date, u
                           ORDER BY CASE WHEN u.r1 = 1 THEN 1 WHEN u.r3 = 1 THEN 2 WHEN u.r2 = 1 THEN 3 WHEN u.r4 = 1 THEN 4 ELSE 5 END,
                                    COALESCE(u.score_r1, u.score_r3, u.score_r2, u.score_r4, u.score_r5) DESC, u.model_code) AS candidate_rank
 FROM u JOIN g USING (member_id, anchor_date)
+JOIN gold.anchor_model_grid am ON am.country_code = g.country_code AND am.anchor_date = g.anchor_date AND am.model_code = u.model_code
 QUALIFY candidate_rank <= {{ n_cand }}
