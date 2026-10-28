@@ -1,2 +1,4 @@
 country_code,calendar_days,first_day,last_day,public_holiday_days,commercial_event_days,events,mean_promo_share,max_promo_share
+SG,1461,2023-01-01,2026-12-31,53,275,23,0.0114,0.0253
+TH,1461,2023-01-01,2026-12-31,106,277,14,0.011,0.0222
 VN,1461,2023-01-01,2026-12-31,58,225,18,0.0035,0.0217

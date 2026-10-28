@@ -301,23 +301,25 @@ Every raw file (Parquet preferred, else CSV read with `all_varchar=true`) is rea
 
 **Contract key** (member_id, sport_id, event_datetime_utc): 717,786 distinct, 78,357 duplicate rows (9.8 %)
 
-## tracking_ecom_events  (1,902,820 rows, parquet-dir, 0 s)
+## tracking_ecom_events  (999,710,429 rows, parquet-dir, 160 s)
+
+_Section scanned on the server on 2026-10-28 (02:10 UTC) over the complete set of 1,774 Spark parts; the other sections of this report come from the laptop scan of the same exports (`dim_item` from the Parquet re-export of 2026-10-28), which holds only a 3-part sample of the events._
 
 | country_code | rows | min timestamp_utc | max timestamp_utc |
 |---|---:|---|---|
-| SG | 776,700 | 2025-10-10 16:00:00.193000 | 2025-10-11 15:59:59.999000 |
-| TH | 661,970 | 2025-11-09 17:00:00.155000 | 2025-11-10 16:59:59.984000 |
-| VN | 464,150 | 2025-06-05 17:00:00.468000 | 2025-06-06 16:59:59.370000 |
+| SG | 538,015,946 | 2022-12-31 16:00:02.623000 | 2026-10-25 15:59:59.883000 |
+| TH | 282,752,953 | 2023-04-25 17:00:00.798000 | 2026-10-25 16:59:59.598000 |
+| VN | 178,941,530 | 2024-04-26 17:03:55.431000 | 2026-10-25 16:59:59.918000 |
 
-**name** (13 values): `page_viewed` 751,231, `product_list_viewed` 542,235, `product_page_viewed` 286,574, `search_results_viewed` 104,682, `search_completed` 91,168, `menu_item_selected` 35,599, `product_size_selected` 33,250, `cart_viewed` 24,888, `product_added_to_cart` 18,401, `checkout_commenced` 6,040, `checkout_payment_viewed` 3,815, `checkout_shipping_viewed` 2,649, `order_completed` 2,288
+**name** (13 values): `page_viewed` 462,421,682, `product_list_viewed` 229,123,653, `product_page_viewed` 169,040,577, `search_results_viewed` 45,172,937, `search_completed` 32,869,865, `cart_viewed` 15,793,562, `menu_item_selected` 15,232,215, `product_size_selected` 12,405,128, `product_added_to_cart` 9,704,399, `checkout_commenced` 3,271,310, `checkout_payment_viewed` 1,850,612, `checkout_shipping_viewed` 1,551,874, `order_completed` 1,272,615
 
-**platform** (2 values): `web` 1,011,402, `app` 891,418
+**platform** (2 values): `web` 654,190,899, `app` 345,519,530
 
-**is_event_to_use** (1 values): `True` 1,902,820
+**is_event_to_use** (2 values): `True` 971,454,050, `False` 28,256,379
 
 | key column | digits only | min len | max len | ≈ distinct | nulls |
 |---|---:|---:|---:|---:|---:|
-| id | 0.0 % | 32 | 32 | 1,873,891 | 0 |
-| session_id | 0.0 % | 32 | 32 | 113,682 | 0 |
+| id | 0.0 % | 32 | 32 | 977,768,103 | 0 |
+| session_id | 0.0 % | 32 | 32 | 78,780,696 | 0 |
 
-**Contract key** (id): 1,902,820 distinct, 0 duplicate rows (0.0 %)
+**Contract key** (id): 999,710,429 distinct, 0 duplicate rows (0.0 %)

@@ -1,4 +1,10 @@
 country_code,split,used_anchors,anchors_with_web_signal,pct_with_web_signal,anchors_with_web_data_available
-VN,test,50000,0,0.0,0
-VN,train,50000,28,0.06,2567
-VN,valid,15000,0,0.0,0
+SG,test,50000,9381,18.76,50000
+SG,train,50000,2540,5.08,50000
+SG,valid,15000,2909,19.39,15000
+TH,test,50000,2761,5.52,50000
+TH,train,50000,896,1.79,48989
+TH,valid,15000,796,5.31,15000
+VN,test,50000,3650,7.3,50000
+VN,train,50000,1804,3.61,33050
+VN,valid,15000,1218,8.12,15000
