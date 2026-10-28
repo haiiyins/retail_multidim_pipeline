@@ -27,7 +27,7 @@ transaction identifiers:
 | `dbeaver_gates_by_country.png` | `SELECT * FROM audit.gates_by_country ORDER BY country, year;` | Go / no-go gates per country × year: member link, item match, price coverage, members with ≥ 2 transactions, decision |
 | `dbeaver_quarantine_sales_line.png` | `SELECT country_code, reason, COUNT(*) AS lines, COUNT(DISTINCT transaction_id) AS transactions FROM quarantine.qrt_sales_line GROUP BY 1, 2 ORDER BY 1, 3 DESC;` | Sales lines refused by `slv_fact_sales_line`, by country and reason (nothing is dropped silently) |
 | `dbeaver_gold_fs_member.png` | `SELECT country_code, anchor_date, split, tx_365d, days_since_last_tx, price_q50, promo_affinity, n_sports, web_sessions_30d, web_data_available FROM gold.gld_fs_member WHERE split = 'test' ORDER BY anchor_date LIMIT 20;` (no `member_id`) | Member feature entity at the anchor (one row per used anchor, point-in-time) |
-| `dbeaver_explain_asof.png` | the query in `explain_analyze_asof_price.txt`, run with DBeaver's *Explain execution plan* (or prefix `EXPLAIN ANALYZE`) | ASOF JOIN plan for the price at the anchor |
+| `dbeaver_explain_asof.png` | the query in `explain_analyze_asof_price.txt` prefixed with `EXPLAIN ANALYZE`, plan shown in the Value panel (taken 2026-10-29, laptop lakehouse, VN) | ASOF JOIN plan for the price at the anchor: 0.123 s, `Asof Join` LEFT on item, country and anchor date, median per model |
 | `dbeaver_leakage_ledger.png` | `SELECT * FROM quarantine.leakage_violations;` (expected: no rows) and `SELECT * FROM audit.stitching_coverage ORDER BY 1, 2;` | QC-6 ledger empty; stitching coverage before / after per country |
 
 Captions are in English for the report; the data screenshots show the three-country server build.
