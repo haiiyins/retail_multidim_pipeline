@@ -244,7 +244,7 @@ python evaluation/train_eval_lambdarank.py --config full --delta 90
 python evaluation/run_ablation_2axes.py --measure-cost
 ```
 
-Runs the 12 configurations in `evaluation/ablation_configs.yml` for Δ = 30 and 90. With `--measure-cost`, arms that declare `exclude_models` rerun dbt without those models before training, so processing cost is measured as well as quality.
+Runs the 12 configurations in `evaluation/ablation_configs.yml` for Δ = 30 and 90 (`--arms no_f1,no_f3 --deltas 30` to pick a subset; `--no-freeze --tag smoke` for laptop runs). With `--measure-cost`, arms that declare `exclude_models` rerun dbt without those models before training, so processing cost is measured as well as quality; dbt and training wall times go to `audit.ablation_runs`. `no_stock` is skipped while `vars.use_stock` is false (issue #21).
 
 ### 7.4 Bootstrap
 
@@ -252,7 +252,7 @@ Runs the 12 configurations in `evaluation/ablation_configs.yml` for Δ = 30 and 
 python evaluation/bootstrap_ci.py 30 && python evaluation/bootstrap_ci.py 90
 ```
 
-Member-level resampling (`BOOT_N`, default 500): 95 % CI per metric and for the paired difference Full − arm → `data/audit/ablation_results_d<Δ>.csv`.
+Member-level resampling (`BOOT_N`, default 500): 95 % CI per metric and for the paired difference arm − Full, overall, per country and per member segment (new ≤ 1 transaction in the previous year, loyal ≥ 3) → `data/audit/ablation_results_d<Δ>.csv` with a `significant` flag (`--tag smoke` reads the smoke results).
 
 ### 7.5 Cost profiler
 
@@ -260,15 +260,16 @@ Member-level resampling (`BOOT_N`, default 500): 95 % CI per metric and for the 
 python evaluation/pipeline_cost_profiler.py        # all Silver/Gold models, or pass model names
 ```
 
-Wall time, peak RSS of the dbt child process, output rows → `audit.pipeline_run_metrics`. The MT3 table joins ablation results with the cost of the excluded models.
+Each model rebuilt alone: wall time, peak RSS of the dbt process tree, output rows → `audit.pipeline_run_metrics`, plus output bytes in `audit.model_cost`. The MT3 table joins ablation results with the cost of the excluded models.
 
 ### 7.6 Scale test
 
 ```bash
-python evaluation/scale_test.py XX XX XX XX XX      # country codes in cumulative order → data/audit/scale_test.png
+python evaluation/scale_test.py VN TH SG            # countries axis, cumulative → data/audit/scale_test.png
+python evaluation/scale_test.py VN --months 3,12,36  # months axis on one country → data/audit/scale_test_months.png
 ```
 
-Add four with/without comparisons on a small country (Parquet vs CSV; column projection; ASOF vs daily explode on one month; regex extraction vs row-wise Python). Each comparison yields one measured number — these replace any unmeasured performance claims.
+Each point reruns staging / Silver / quarantine / audit with the dbt vars `scale_countries` and `sales_min_date` (macros `country_where`, `sales_date_floor`), rebuilds the anchor grid and the Gold layer, and records bronze rows, wall time per stage, peak RSS, threads and memory limit in `audit.scale_test`; the lakehouse is left at the last point, so finish with `make silver && make gold`. Add four with/without comparisons on a small country (Parquet vs CSV; column projection; ASOF vs daily explode on one month; regex extraction vs row-wise Python). Each comparison yields one measured number — these replace any unmeasured performance claims.
 
 **DoD:** `frozen_params.json` committed; 12 configurations × 2 Δ with results; `ablation_results_d*.csv` with CI; cost table per arm; scale-test chart.
 

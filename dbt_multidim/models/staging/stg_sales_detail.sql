@@ -8,3 +8,4 @@ SELECT transaction_id, transaction_num_line, customer_purchase_order_id, CAST(tr
        exchange_rate_local_to_euros AS fx_eur, transaction_link_detail, return_reason_code, return_reason_type, year, month
 FROM {{ source('bronze', 'sales_detail') }}
 WHERE {{ country_where('economical_businessunit_country_code') }}
+  AND {{ sales_date_floor('gmv_recorded_at') }}
