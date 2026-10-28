@@ -29,9 +29,9 @@ def point(label, subset, min_date, months=None):
     q = f"SELECT COUNT(*) FROM bronze.sales_detail WHERE economical_businessunit_country_code IN ({where})" + (f" AND gmv_recorded_at >= TIMESTAMP '{min_date}'" if min_date else "")
     rows = con.execute(q).fetchone()[0]; con.close()
     vars_ = "{scale_countries: [" + where + "]" + (f", sales_min_date: '{min_date}'" if min_date else "") + "}"
-    w1, m1 = timed(f"cd dbt_multidim && dbt run --select staging silver quarantine audit --exclude leakage_violations --vars \"{vars_}\"")
+    w1, m1 = timed(f"cd dbt_multidim && dbt run --select staging silver quarantine audit --exclude leakage_violations candidate_recall --vars \"{vars_}\"")
     w2, m2 = timed(f"{sys.executable} evaluation/build_anchor_grid.py")
-    w3, m3 = timed(f"cd dbt_multidim && dbt run --select gold leakage_violations --vars \"{vars_}\"")
+    w3, m3 = timed(f"cd dbt_multidim && dbt run --select gold leakage_violations candidate_recall --vars \"{vars_}\"")
     wall, peak = w1 + w2 + w3, max(m1, m2, m3)
     con = duckdb.connect(DB)
     con.execute("CREATE TABLE IF NOT EXISTS audit.scale_test(axis VARCHAR, label VARCHAR, countries VARCHAR, months INT, bronze_rows BIGINT, "
