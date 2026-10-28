@@ -5,7 +5,8 @@ predicate and the same day: tracking_ecom_events by `date` (is_event_to_use only
 the UTC day of event_datetime_utc, f_member_purchase by the day of association_datetime_utc (tech_year / tech_month / tech_day are not
 used: they hold 1970-01 and a bare day of month). Columns: n_* rows, d_* distinct business keys, h_* order-independent hash
 (SUM of a row hash, so duplicated rows do not cancel as they would under XOR), diff_* = batch - stream, ok = all three agree.
-The table is rebuilt on every run for the replayed country-month. Exit status 1 when any country × day differs.
+A run replaces only its own slice of the table (REPLAY_COUNTRY × REPLAY_MONTH, all three tables), so SG, TH and VN results can sit side
+by side. Exit status 1 when any country × day of this run differs.
 
 Env: REPLAY_COUNTRY (default XX), REPLAY_MONTH (YYYY-MM, default 2025-01), DATA_ROOT, DUCKDB_PATH.
 """
@@ -60,17 +61,17 @@ def main():
                           COALESCE(b.d, 0) AS d_batch, COALESCE(s.d, 0) AS d_stream, COALESCE(b.d, 0) - COALESCE(s.d, 0) AS diff_distinct,
                           b.h AS h_batch, s.h AS h_stream, b.h IS NOT DISTINCT FROM s.h AS hash_match
                    FROM ({b}) b FULL OUTER JOIN ({s}) s USING (country_code, day)""")
-    params = [COUNTRY, LO, HI] * 2
+    all_params = [COUNTRY, LO, HI] * (2 * len(TABLES))
     sql = " UNION ALL ".join(parts)
-    all_params = []
-    for _ in TABLES:
-        all_params += params
-    con.execute(f"CREATE OR REPLACE TABLE audit.stream_reconciliation AS "
+    con.execute(f"CREATE OR REPLACE TEMP TABLE qc7_run AS "
                 f"SELECT *, (diff_rows = 0 AND diff_distinct = 0 AND hash_match) AS ok FROM ({sql}) ORDER BY tbl, country_code, day", all_params)
+    con.execute("CREATE TABLE IF NOT EXISTS audit.stream_reconciliation AS SELECT * FROM qc7_run WHERE FALSE")
+    con.execute("DELETE FROM audit.stream_reconciliation WHERE country_code = ? AND day >= ?::DATE AND day < ?::DATE", [COUNTRY, LO, HI])
+    con.execute("INSERT INTO audit.stream_reconciliation SELECT * FROM qc7_run")
     for tbl, days, bad, nb, ns in con.execute(
-            "SELECT tbl, COUNT(*), COUNT(*) FILTER (WHERE NOT ok), SUM(n_batch), SUM(n_stream) FROM audit.stream_reconciliation GROUP BY 1 ORDER BY 1").fetchall():
+            "SELECT tbl, COUNT(*), COUNT(*) FILTER (WHERE NOT ok), SUM(n_batch), SUM(n_stream) FROM qc7_run GROUP BY 1 ORDER BY 1").fetchall():
         print(f"{tbl}: {days} country-days, {bad} differ, rows batch {nb} / stream {ns}")
-    bad_rows = con.execute("SELECT tbl, country_code, day, diff_rows, diff_distinct, hash_match FROM audit.stream_reconciliation WHERE NOT ok ORDER BY 1, 3").fetchall()
+    bad_rows = con.execute("SELECT tbl, country_code, day, diff_rows, diff_distinct, hash_match FROM qc7_run WHERE NOT ok ORDER BY 1, 3").fetchall()
     for r in bad_rows[:50]:
         print("DIFF", *r)
     con.close()
