@@ -90,7 +90,7 @@ The pipeline runs on a laptop for development (one country, without the full web
 - Python 3.11
 - DuckDB ≥ 1.1, dbt-core ≥ 1.8, dbt-duckdb ≥ 1.8
 - pyarrow, pandas, polars, pyyaml, python-dotenv
-- holidays, lightgbm, scikit-learn, psutil, matplotlib
+- holidays, lightgbm, scikit-learn, psutil, matplotlib (on macOS LightGBM needs the OpenMP runtime: `brew install libomp`)
 - confluent-kafka and Docker (optional, streaming lane only)
 - DBeaver (optional, to browse the lakehouse read-only)
 - Disk: ≥ 150 GB free for a one-country development run; for the full run, NVMe with room for the ≈ 230 GB raw set plus Bronze, Silver, Gold and DuckDB spill (the server above has 894 GB)
@@ -229,6 +229,8 @@ Step 7 writes its outputs to `data/audit/`: `ablation_results_d30.csv`, `ablatio
 | `python3.11: command not found` | Python 3.11 not installed | `uv venv --python 3.11 .venv` (uv downloads the interpreter) |
 | `accepted_values` test fails | a value not seen during profiling | check `csv_profile.md`, extend the list, note it in the report |
 | LightGBM slow or out of memory | pair table too large | raise `TRAIN_ANCHOR_STRIDE`, lower `N_CANDIDATES`, or move to the server |
+| `Library not loaded: @rpath/libomp.dylib` on `import lightgbm` (macOS) | OpenMP runtime missing | `brew install libomp` |
+| ranker smoke test on the laptop | 23 M pair rows do not fit in pandas | rebuild Gold with small caps, e.g. `TRAIN_ANCHOR_CAP=5000 VALID_ANCHOR_CAP=2000 TEST_ANCHOR_CAP=5000 make gold`, then `python evaluation/train_eval_lambdarank.py --config full --delta 30 --no-freeze --tag smoke` |
 
 More cases are covered in `docs/RUNBOOK.md`, Appendix B. For anything else, open an issue in this repository.
 

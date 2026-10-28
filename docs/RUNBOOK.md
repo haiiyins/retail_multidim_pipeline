@@ -236,7 +236,7 @@ make train                                   # --config full --delta 30 → free
 python evaluation/train_eval_lambdarank.py --config full --delta 90
 ```
 
-`train_eval_lambdarank.py` trains LightGBM LambdaRank grouped by (member, anchor); on the first `full` run it early-stops on NDCG@20 and freezes `params` and `num_boost_round`; every later run reuses them. Outputs per-member metrics (`data/audit/results_<config>_d<Δ>.parquet`) and feature importance.
+`train_eval_lambdarank.py` trains LightGBM LambdaRank grouped by (member, anchor); on the first `full` run it early-stops on NDCG@20 and freezes `params` and `num_boost_round`; every later run reuses them. Outputs per-member metrics (`data/audit/results_<config>_d<Δ>.parquet`) and feature importance. On the laptop, rebuild Gold with small caps (`TRAIN_ANCHOR_CAP=5000 VALID_ANCHOR_CAP=2000 TEST_ANCHOR_CAP=5000 make gold`) and run the script with `--no-freeze --tag smoke`: it tunes with early stopping but leaves `frozen_params.json` untouched and writes `results_<config>_d<Δ>_smoke.parquet`, so the frozen parameters always come from the full three-country run on the server.
 
 ### 7.3 Ablation matrix
 
