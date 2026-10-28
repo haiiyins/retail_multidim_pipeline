@@ -117,7 +117,7 @@ Fill in from the report:
 make bronze
 ```
 
-Notes: `nullstr=['null','']` because the Spark export writes the string `null`; `max_line_size` is raised for `tracking_ecom_events`. DuckDB 2.x keeps two reject tables per CSV scan, so both are named per table (`rej_<table>`, `rejscan_<table>`); reject counts cover the whole file, not only the selected country. Disconnect DBeaver first (§1.5).
+Notes: `nullstr=['null','']` because the Spark export writes the string `null`; `max_line_size` is raised for `tracking_ecom_events`. DuckDB 2.x keeps two reject tables per CSV scan, so both are named per table (`rej_<table>`, `rejscan_<table>`); reject counts cover the whole file, not only the selected country. Disconnect DBeaver first (§1.5). Run the loaders through `make`: its recipes raise the open-file limit (`ulimit -n`), which a partitioned `COPY` with `COUNTRY_FILTER=ALL` exceeds on Linux (`f_member_purchase` partitions by member country — 85 values — × year × month; see Appendix B). A rerun after a failed load should start from an empty `data/bronze/<table>/`: `OVERWRITE_OR_IGNORE` replaces files of the same name but keeps extra files from the previous attempt.
 
 Verification:
 
@@ -353,6 +353,7 @@ Submission checklist:
 |---|---|---|
 | `Could not set lock on file … Conflicting lock is held` on `dbt run` or a loader | another process has the database open, usually DBeaver, even read-only | disconnect DBeaver (right-click the connection → Disconnect), rerun, reconnect afterwards |
 | Out of memory on a large join | `memory_limit` too high for the machine, or the spill directory full (dbt spills to `data/lakehouse.duckdb.tmp`, the loaders to `data/duck_temp`) | set `memory_limit` to ≈ 60–70 % of RAM; make sure `temp_directory` is writable and has space |
+| `IO Error: Cannot open file "…/bronze/f_member_purchase/member_country_code=…/data_0.parquet": Too many open files` on `make bronze` | Linux default of 1 024 open files per process; the partitioned `COPY` keeps one writer per open partition per thread (85 member countries × year × month with `COUNTRY_FILTER=ALL`) | the `make` recipes raise the limit (`ulimit -n 65536`); when calling a script directly, run `ulimit -n 65536` first; if the hard limit is lower (`ulimit -Hn`), raise it in `/etc/security/limits.conf`; then `rm -rf data/bronze/<table>` and rerun |
 | Regex extraction returns mostly null | key name or spacing differs in the string | inspect five raw strings, adjust the pattern; compare null rates |
 | `ASOF JOIN` error | exactly one inequality on the time column is allowed; other conditions must be equalities | write `ON a.key = b.key AND a.ts >= b.ts` |
 | `accepted_values` test fails | a value not seen in profiling | check `csv_profile.md`, extend the list, note it in the report |
