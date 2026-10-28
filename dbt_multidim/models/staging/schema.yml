@@ -1,0 +1,6 @@
+version: 2
+models:
+  - name: stg_sales_detail
+    description: "View over bronze.sales_detail with the columns the Silver layer uses, typed timestamps and renamed keys (country_code, store_id, channel, fx_eur); filtered by vars.country_filter, vars.scale_countries and vars.sales_min_date (scale test). No dedup here."
+  - name: stg_tracking_ecom_events
+    description: "View over bronze.tracking_ecom_events with typed event timestamp and date and the raw metadata struct; filtered by vars.country_filter."

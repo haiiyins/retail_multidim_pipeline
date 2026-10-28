@@ -35,4 +35,6 @@ ablation:
 	$(NOFILE); python evaluation/run_ablation_2axes.py
 docs:
 	cd dbt_multidim && dbt docs generate && dbt docs serve
+docs-figures:
+	$(NOFILE); cd dbt_multidim && dbt docs generate && cd .. && python tools/lineage_graph.py && python tools/explain_figures.py
 all: bronze gates silver gold train ablation
