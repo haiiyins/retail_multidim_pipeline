@@ -145,7 +145,7 @@ make gates        # runs sql/gates_by_country.sql and sql/audit_checks.sql
 - `audit.price_uniformity` — store vs website price gaps; if `p95_rel_gap` < 5 %, keep the website business unit as the national reference (default); otherwise set `allow_store_prices: true`.
 - `audit.interpurchase_days` — quantiles of inter-purchase gaps (validates Δ).
 - `audit.date_span` — min/max transaction timestamps per country (drives `split.yml`).
-- `audit.volume_drift` — QC-5: rows per table (`sales_detail`, `tracking_ecom_events`) × country × day against the trailing 28-day mean of the same weekday; `flagged` when |drift| > 50 %, with a `probable_cause` hint (NO_ROWS, EXPORT_EDGE, AFTER_GAP, PUBLIC_HOLIDAY, ADJACENT_TO_HOLIDAY, UNEXPLAINED). `make gates` therefore runs `make holidays` first and prints the flagged-day count; review the UNEXPLAINED days and comment them on issue #25. Warn-level: nothing is blocked.
+- `audit.volume_drift` — QC-5: rows per table (`sales_detail`, `tracking_ecom_events`) × country × day against the trailing 28-day mean of the same weekday; `flagged` when |drift| > 50 %, with a `probable_cause` hint (NO_ROWS, EXPORT_EDGE, AFTER_GAP, PUBLIC_HOLIDAY, ADJACENT_TO_HOLIDAY, UNEXPLAINED). `make gates` therefore runs `make holidays` first and prints the flagged-day count; review the UNEXPLAINED days and comment them on issue #25. Warn-level: nothing is blocked. `distinct_lines` and `dup_factor` compare the raw rows with the distinct (transaction, line, version) keys: `DUPLICATED_EXPORT` marks days on which the export repeated rows (1 – 13 October 2023 in all three countries, factor 1.6 – 2.0), which Silver deduplicates.
 
 QC-5 regression checks run against synthetic, in-memory Bronze tables using the production SQL:
 
@@ -161,8 +161,9 @@ python tools/report_tables.py --only t20 --out data/audit/qc5_review
 
 The summary and flagged-day detail include CSV copies. Probable causes are hints, not confirmed explanations.
 A one-day web-event sample cannot validate drift or server-wide gaps. For issue #25, repeat the review on
-the server with SG, TH and VN, and obtain the data owner's explanation for the October 2023 VN spike
-before marking the issue complete.
+the server with SG, TH and VN. The October 2023 spike (1 – 13 October, all three countries) is explained: the
+export repeated those rows (`dup_factor` 1.6 – 2.0), so the check labels them `DUPLICATED_EXPORT`; the question
+left for the data owner is the February 2025 doubling of the SG and TH web events.
 
 **DoD:** six audit tables exist; decisions on price reference and gate grouping recorded in the README.
 

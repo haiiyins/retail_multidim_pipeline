@@ -23,19 +23,26 @@ class VolumeDriftTests(unittest.TestCase):
               SELECT CAST(d AS DATE) AS date_of_day
               FROM generate_series(DATE '2024-01-01', DATE '2024-04-30', INTERVAL 1 DAY) t(d);
             CREATE TABLE bronze.sales_detail (
-              economical_businessunit_country_code VARCHAR, gmv_recorded_at TIMESTAMP);
+              economical_businessunit_country_code VARCHAR, gmv_recorded_at TIMESTAMP,
+              transaction_id VARCHAR, transaction_num_line INTEGER, transaction_version_at TIMESTAMP);
             CREATE TABLE bronze.tracking_ecom_events (country_code VARCHAR, date DATE);
             CREATE TABLE ext.public_holidays (
               country_code VARCHAR, holiday_date DATE, holiday_name VARCHAR);
         """)
 
-    def load_series(self, *, table="sales_detail", country="VN", counts=None, days=70):
+    def load_series(self, *, table="sales_detail", country="VN", counts=None, days=70, copies=1):
+        """Sales rows carry a unique (transaction, line, version) key; `copies` > 1 repeats each row that many times,
+        the way the overlapping exports did (exact duplicates, same version)."""
         volumes = counts or {}
-        self.con.executemany(
-            f"INSERT INTO bronze.{table} VALUES (?, ?)",
-            [(country, START + dt.timedelta(days=i))
-             for i in range(days) for _ in range(volumes.get(i, 100))],
-        )
+        rows = [(country, START + dt.timedelta(days=i), i, k)
+                for i in range(days) for k in range(volumes.get(i, 100))]
+        if table == "sales_detail":
+            self.con.executemany(
+                "INSERT INTO bronze.sales_detail VALUES (?, ?, ?, ?, ?)",
+                [(c, d, f"{c}-{i}-{k}", 1, d) for c, d, i, k in rows for _ in range(copies)],
+            )
+        else:
+            self.con.executemany(f"INSERT INTO bronze.{table} VALUES (?, ?)", [(c, d) for c, d, _, _ in rows])
 
     def result(self, day=35, *, table="sales_detail", country="VN"):
         self.con.execute(QC5_SQL)
@@ -106,6 +113,15 @@ class VolumeDriftTests(unittest.TestCase):
         self.con.execute("INSERT INTO ext.public_holidays VALUES (?, ?, ?)",
                          ["VN", START + dt.timedelta(days=28), "Test holiday"])
         self.assertEqual(self.result()["probable_cause"], "HOLIDAY_IN_BASELINE")
+
+    def test_duplicated_export_rows_are_diagnosed(self):
+        self.load_series(counts={35: 0})
+        self.load_series(counts={i: 0 for i in range(70) if i != 35}, copies=2)
+        row = self.result()
+        self.assertEqual((row["rows"], row["distinct_lines"], row["dup_factor"]), (200, 100, 2.0))
+        self.assertTrue(row["flagged"])
+        self.assertEqual(row["probable_cause"], "DUPLICATED_EXPORT")
+        self.assertEqual(self.result(34)["dup_factor"], 1.0)
 
     def test_country_and_table_baselines_are_independent(self):
         self.load_series(counts={35: 200})
