@@ -25,6 +25,8 @@ txn AS (
          CASE WHEN SUM(gmv_amount) > 0 THEN 'SALE' WHEN SUM(gmv_amount) = 0 THEN 'CANCELLED' ELSE 'RETURN' END AS txn_status
   FROM v GROUP BY 1
 )
-SELECT n.*, t.txn_status, (dm.item_code IS NOT NULL) AS in_catalogue
+SELECT n.*, t.txn_status, (dm.item_code IS NOT NULL) AS in_catalogue, COALESCE(fx.is_fixture, false) AS is_non_merchandise
 FROM net n JOIN txn t USING (transaction_id)
 LEFT JOIN {{ ref('slv_dim_model') }} dm USING (item_code)
+LEFT JOIN (SELECT item_code, MAX(retail_univers_label = 'FIXT & FURNIT') AS is_fixture
+           FROM {{ source('bronze', 'dim_item') }} GROUP BY 1) fx USING (item_code)   -- excluded from slv_dim_model; named in quarantine

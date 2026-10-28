@@ -8,6 +8,18 @@ models:
       - {name: identity_verified_ts, tests: [not_null]}
       - {name: id_source, tests: [{accepted_values: {values: ['DIRECT', 'STITCHED']}}]}
       - {name: country_code, tests: [{accepted_values: {values: ['SG', 'TH', 'VN']}}]}
+  - name: gld_copurchase_lift
+    description: >
+      Co-purchase support, confidence and lift per (country, model_a, model_b) over baskets before vars.copurchase_cutoff
+      (2025-10-27 = valid_lo of evaluation/split.yml, so validation and test labels never contribute); pairs with at least
+      vars.copurchase_min_support common baskets; rank_in_a orders b within a by lift, pairs with at least
+      vars.copurchase_strong_support common baskets first (R2 takes rank_in_a <= 20); rank_by_support orders by common baskets.
+    tests:
+      - dbt_utils.unique_combination_of_columns: {combination_of_columns: [country_code, model_a, model_b]}
+    columns:
+      - {name: lift, tests: [not_null, {dbt_utils.expression_is_true: {expression: "> 0"}}]}
+      - {name: confidence, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}}]}
+      - {name: n_ab, tests: [{dbt_utils.expression_is_true: {expression: ">= 5"}}]}
   - name: gld_fs_member
     columns: [{name: member_id, tests: [not_null]}, {name: anchor_date, tests: [not_null]}]
     tests:

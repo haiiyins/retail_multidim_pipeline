@@ -192,7 +192,7 @@ Quarantine (schema `quarantine`, built by `make silver` together with Silver; ro
 | Table | Source model | Reasons |
 |---|---|---|
 | `rejects_<table>` | Bronze loader (CSV inputs) | DuckDB parse errors of the raw CSV (cut rows, embedded delimiters) |
-| `qrt_sales_line` | `slv_fact_sales_line` | `NET_QTY_NONPOSITIVE`, `NET_GMV_NONPOSITIVE`, `TXN_NOT_SALE`, `SERVICE_LINE`, `ITEM_NOT_IN_CATALOGUE` |
+| `qrt_sales_line` | `slv_fact_sales_line` | `NET_QTY_NONPOSITIVE`, `NET_GMV_NONPOSITIVE`, `TXN_NOT_SALE`, `SERVICE_LINE`, `NON_MERCHANDISE` (store fixtures and carrier bags, retail univers `FIXT & FURNIT`), `ITEM_NOT_IN_CATALOGUE` |
 | `qrt_price_interval` | `slv_price_sku_interval` | `ABOVE_REFERENCE`, `DEPTH_GT_0_9` |
 | `slv_identity_conflicts` | `slv_user_to_member` | cookie linked to more than one member |
 
@@ -214,7 +214,7 @@ make gold         # build_anchor_grid.py, dbt run --select gold, dbt test --sele
 ```
 
 - `evaluation/build_anchor_grid.py` creates `gold.anchor_grid` (every Monday after a member's second transaction inside the train / valid / test windows of `split.yml`, with `split`, `days_to_next_buy` and `in_train_sample` by `TRAIN_ANCHOR_STRIDE`) and `gold.anchor_model_grid`. Downstream Gold models use only `is_used` anchors: a purchase within `ANCHOR_LABEL_HORIZON` days (an anchor without one has all-zero labels, useless for LambdaRank and unscorable by HR / NDCG), the stride for train, and a per-country cap by hash rank (`TRAIN_ANCHOR_CAP`, `VALID_ANCHOR_CAP`, `TEST_ANCHOR_CAP`). The script prints anchors before and after each rule and the pair-table estimate; measured on VN (issue #29), the unrestricted grid would give 20 M train anchors and 10 M test anchors, i.e. billions of pair rows.
-- `gld_web_stitched`, `gld_copurchase_lift` (`vars.copurchase_cutoff` must precede the first test anchor), `gld_fs_member`, `gld_fs_model_country` (price via ASOF on SKU intervals, median per model), `gld_candidates` (R1–R5, capped at `n_candidates`), `gld_fs_pair`, `gld_ranking_dataset` (labels Δ = 30 / 90, returned purchases excluded).
+- `gld_web_stitched`, `gld_copurchase_lift` (support, confidence, lift per country over baskets before `vars.copurchase_cutoff` = `valid_lo` of `split.yml`, checked by `tests/copurchase_cutoff_before_validation.sql` against `gold.split_windows`), `gld_fs_member`, `gld_fs_model_country` (price via ASOF on SKU intervals, median per model), `gld_candidates` (R1–R5, capped at `n_candidates`), `gld_fs_pair`, `gld_ranking_dataset` (labels Δ = 30 / 90, returned purchases excluded).
 - Singular tests `tests/leakage_*.sql` implement QC-6 and must return zero rows.
 
 Candidate recall per source:
