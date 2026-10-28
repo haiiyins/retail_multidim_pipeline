@@ -291,7 +291,7 @@ make docs-figures     # dbt docs generate → docs/figures/lineage_*.svg|png (Gr
 ```bash
 docker compose up -d                                # Redpanda + Console (http://localhost:8080)
 REPLAY_COUNTRY=XX REPLAY_MONTH=2025-01 python ingestion/kafka_producer_replay.py
-python ingestion/kafka_consumer_to_bronze.py        # writes bronze/tracking_ecom_events_stream, rejects → quarantine
+python ingestion/kafka_consumer_to_bronze.py        # three topics → bronze/<table>_stream, rejects → quarantine.rejected_stream_events
 ```
 
 QC-7 reconciliation:
@@ -302,6 +302,16 @@ FROM (SELECT country_code, date::DATE d, COUNT(*) n FROM bronze.tracking_ecom_ev
 LEFT JOIN (SELECT country_code, date::DATE d, COUNT(*) n FROM read_parquet('data/bronze/tracking_ecom_events_stream/**/*.parquet', hive_partitioning=true) GROUP BY 1,2) s USING (country_code, d)
 WHERE s.n IS NOT NULL ORDER BY diff DESC;
 ```
+
+Consumer (`ingestion/kafka_consumer_to_bronze.py`): reads `raw.tracking`, `raw.favorite_sport` and `raw.member_purchase` from the beginning up to the offsets present at start and then exits (`STREAM_TOPICS` selects a subset, `STREAM_IDLE_TIMEOUT` = seconds without a message before it gives up, default 60). Valid messages are written to `data/bronze/<table>_stream/` (`tracking_ecom_events_stream` partitioned by `country_code, year, month` from `date`; `f_member_favorite_sport_stream` by `country_code, year`; `f_member_purchase_stream` by `member_country_code, year, month` from `association_datetime_utc`), with `metadata` and `_errors` kept as JSON. A message goes to `quarantine.rejected_stream_events(topic, kafka_partition, kafka_offset, reason, payload, rejected_at)` when it is not a JSON object (`invalid_json`, `not_a_json_object`), when a `not_null` column of the table in `ingestion/table_contracts.yml` (or its event-time column) is empty (`missing_<column>`), or, for tracking, when `is_event_to_use` is not true (`is_event_to_use_not_true`; `_errors` is not tested because the Parquet export fills it on every event). A batch whose values the declared types cannot hold is moved to the same table as `batch_write_error`. Each run first empties the stream folders and the topic's rows in the reject table, so a rerun gives the same result; it prints ok / bad per topic and the total msg/s.
+
+The consumer holds the DuckDB write lock until it exits: close DBeaver and do not run `dbt` or the loaders at the same time (Appendix B).
+
+```sql
+SELECT topic, reason, COUNT(*) FROM quarantine.rejected_stream_events GROUP BY 1, 2;
+```
+
+Malformed-message test: produce 10 records without `session_id` to `raw.tracking` and rerun the consumer; the query above must show `raw.tracking | missing_session_id | 10` and the stream Parquet must not contain them. Laptop run on VN 2025-06: 464 150 / 102 / 245 746 valid messages, 0 rejected, about 20 k msg/s in total.
 
 **DoD:** topic visible in Console; `diff = 0` for every replayed day; batch Bronze remains the source for Silver.
 
