@@ -1,5 +1,13 @@
 version: 2
 models:
+  - name: gld_web_stitched
+    description: Web / app events attributed to a member (DIRECT login or STITCHED cookie mapping within ± 90 days), with identity_verified_ts for the point-in-time rule.
+    columns:
+      - {name: event_id, tests: [not_null]}
+      - {name: member_id, tests: [not_null]}
+      - {name: identity_verified_ts, tests: [not_null]}
+      - {name: id_source, tests: [{accepted_values: {values: ['DIRECT', 'STITCHED']}}]}
+      - {name: country_code, tests: [{accepted_values: {values: ['SG', 'TH', 'VN']}}]}
   - name: gld_fs_member
     columns: [{name: member_id, tests: [not_null]}, {name: anchor_date, tests: [not_null]}]
     tests:

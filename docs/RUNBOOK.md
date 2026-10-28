@@ -176,11 +176,13 @@ Before the run: `make holidays` is executed automatically; it needs `COUNTRIES` 
 
 Manual check: pick 20 transactions that contain both `sale` and `cancel` lines in Bronze and confirm they are either absent from `slv_fact_sales_line` or keep only `qty > 0`.
 
-Stitching coverage (write to `audit.stitching_coverage`):
+Stitching coverage has two levels. Event level: `audit.stitching_coverage` (below). Anchor level, after step 6: the share of used anchors whose member has at least one attributed event in the 30 days before the anchor *and* whose attribution was already known at the anchor — the point-in-time rule that `gld_web_stitched.identity_verified_ts` exists for (WBS 3.2, issue #30):
 
 ```sql
-SELECT country_code, id_source, COUNT(*) n, ROUND(100.0*COUNT(*)/SUM(COUNT(*)) OVER (PARTITION BY country_code),2) pct
-FROM gold.gld_web_stitched GROUP BY 1,2 ORDER BY 1,2;   -- after step 6; compare with the raw 15.6 %
+WITH a AS (SELECT member_id, anchor_date, split FROM gold.anchor_grid WHERE is_used),
+w AS (SELECT DISTINCT a.member_id, a.anchor_date FROM a JOIN gold.gld_web_stitched w ON w.member_id = a.member_id
+      AND w.event_date BETWEEN a.anchor_date - 30 AND a.anchor_date - 1 AND w.identity_verified_ts <= CAST(a.anchor_date AS TIMESTAMP))
+SELECT a.split, COUNT(*) used_anchors, COUNT(w.member_id) with_web_signal FROM a LEFT JOIN w USING (member_id, anchor_date) GROUP BY 1;
 ```
 
 `audit.stitching_coverage` (dbt model in `models/audit/`, built by `make silver`): share of web events per country by identity source, DIRECT (member on the event) / STITCHED (attached within ± 90 days of `identity_verified_ts`) / ANON — the before-and-after view of stitching required by the DoD. Every `dbt run` also appends one row per model (wall time, rows, country filter) to `audit.pipeline_run_metrics` through the `on-run-end` hook `log_run_results`, the same table the Bronze loader writes.
