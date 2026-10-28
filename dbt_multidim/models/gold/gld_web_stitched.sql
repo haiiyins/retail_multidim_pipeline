@@ -5,7 +5,9 @@
 --            the mapping's identity_verified_ts (order- or login-based evidence); known from identity_verified_ts
 -- Anonymous events are dropped here; audit.stitching_coverage keeps the before / after shares per country. The product list of an
 -- attributed event is unnested here (one row per event × model_code; an event without products keeps one row with NULL), so the
--- explosion only touches the ~35 % of events that have a member.
+-- explosion only touches the ~35 % of events that have a member. The unnest is a plain UNNEST in the select list: written as
+-- LEFT JOIN UNNEST(...) ON true, DuckDB 2.0 plans a delim join with a Window over the whole attributed set, which on the full
+-- scope (~350 M events) materialised 135 GB of temp in 80 min without finishing; the select-list form streams (same rows, checked on VN).
 WITH attributed AS (
   SELECT e.event_id, e.session_id, e.user_id, e.country_code, e.platform, e.event_name, e.event_ts_utc, e.event_date,
          e.model_codes, e.search_term, e.page_type, e.web_transaction_id,
@@ -17,5 +19,6 @@ WITH attributed AS (
     ON u.user_id = e.user_id AND e.event_ts_utc BETWEEN u.identity_verified_ts - INTERVAL 90 DAY AND u.identity_verified_ts + INTERVAL 90 DAY
   WHERE COALESCE(e.member_id_direct, u.member_id) IS NOT NULL
 )
-SELECT a.* EXCLUDE (model_codes), m.model_code
-FROM attributed a LEFT JOIN UNNEST(a.model_codes) AS m(model_code) ON true
+SELECT a.* EXCLUDE (model_codes),
+       UNNEST(CASE WHEN a.model_codes IS NULL OR len(a.model_codes) = 0 THEN [NULL]::VARCHAR[] ELSE a.model_codes END) AS model_code
+FROM attributed a
