@@ -5,8 +5,9 @@
 --          orders match), and the member comes from slv_member_bridge through that transaction.
 --   LOGIN: the cookie was seen with a member_id in the event itself.
 {{ config(materialized='ephemeral') }}
-WITH e AS (
-  SELECT DISTINCT user_id, member_id_direct, web_transaction_id, event_ts_utc FROM {{ ref('slv_web_events_clean') }} WHERE user_id IS NOT NULL
+WITH e AS (   -- only the events that carry evidence: a web order id or a member id (a small subset of the 1 bn events)
+  SELECT user_id, member_id_direct, web_transaction_id, event_ts_utc FROM {{ ref('slv_web_events_clean') }}
+  WHERE user_id IS NOT NULL AND (web_transaction_id IS NOT NULL OR member_id_direct IS NOT NULL)
 ),
 po AS (
   SELECT DISTINCT customer_purchase_order_id AS purchase_order_id, transaction_id

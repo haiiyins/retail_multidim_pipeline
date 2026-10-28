@@ -161,7 +161,7 @@ Run order and purpose:
 | `slv_fact_returns` | return lines |
 | `slv_price_sku_interval` | SKU price intervals, website business unit first, `promo_kind` |
 | `slv_calendar_enriched` | public holidays + commercial events inferred from the temporary-promotion share (trailing 60-day z-score) |
-| `slv_web_events_clean` | metadata struct flattened by path, `is_event_to_use`, marketplace removed |
+| `slv_web_events_clean` | metadata struct flattened by path, one row per event with the numeric product codes as a list (unnested only in `gld_web_stitched` for attributed events), `is_event_to_use`, marketplace removed |
 | `slv_user_to_member` | order-based + login-based stitching; one member per cookie |
 | `slv_identity_conflicts` | cookies with several members (quarantine) |
 | `slv_stock_daily_model`, `slv_stock_daily_national` | stock per model × site × day with ≤ 3-day forward fill |
