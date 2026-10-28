@@ -29,6 +29,8 @@ gold:
 	$(NOFILE); cd dbt_multidim && dbt run --select gold leakage_violations && dbt test --select gold leakage_violations
 train:
 	$(NOFILE); python evaluation/train_eval_lambdarank.py --config full --delta 30
+techniques:
+	$(NOFILE); python evaluation/technique_comparisons.py --reps 3
 ablation:
 	$(NOFILE); python evaluation/run_ablation_2axes.py
 docs:
