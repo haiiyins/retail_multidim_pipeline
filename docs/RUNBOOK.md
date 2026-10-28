@@ -98,7 +98,7 @@ Fill in from the report:
 |---|---|
 | The country codes present in `sales_detail` (SG, TH, VN since the 2026-10-27 re-export; scope decision in #54) | `vars.countries` in `dbt_project.yml` and `COUNTRIES` in `.env` |
 | `item_operation_type` ∈ {sale, return, cancel}? | confirms the dedup rule in `slv_fact_sales_line` |
-| `price_type` has exactly five values? | confirms the `promo_kind` macro |
+| `price_type` values (four in the export, three in VN; promotion names are in `price_modifier_detail[].rule`) | confirms the `promo_kind` macro and the modifier extraction |
 | Nested columns are `Map(k -> v)` strings (already confirmed) | `extract_map_field` macro is used |
 | Inferred types of `item_code`, `business_unit_gln`, `site_gln` per table | `cast` entries in `table_contracts.yml` |
 | Max `gmv_recorded_at` | drives `evaluation/split.yml` in step 7 |
@@ -344,7 +344,7 @@ Submission checklist:
 | dim_business_unit | business_unit_gln | — | id, name, country, timezone, region | key type differs across tables |
 | dim_calendar | date_of_day | — | ISO weeks | no holidays |
 | all_store_selling_price | item, bu, start, price_type | country | 9 columns | overlapping intervals; 5 price types; store-level volume |
-| stock_availability_rate | site, item, date, type | country, year, month | 6 columns | `spare` default label; missing days |
+| stock_availability_rate | site, item, date, type | country, year, month | 6 columns | spare parts only (`availability_type = spare`); inventory tables `stock_pictures` / `obt_stock` not exported (issue #21) |
 | f_member_favorite_sport | member, sport, ts | country, year | 4 columns | create/delete event log |
 | sales_tender_detail | transaction_id, tender_num_line | year, month | — (out of feature scope) | — |
 | tracking_ecom_events | id | country, year, month | 10 fields extracted from metadata | `Map(k -> v)`; 15.6 % with member |

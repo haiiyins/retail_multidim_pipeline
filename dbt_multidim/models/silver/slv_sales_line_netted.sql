@@ -2,11 +2,13 @@
 -- slv_fact_sales_line, which keeps the good rows, and quarantine.qrt_sales_line, which keeps the others with a reason).
 -- (1) exact duplicate rows dropped, latest transaction_version_at per (transaction_id, transaction_num_line); rows sharing a line
 --     number but differing in quantity / amount are split lines and stay (issue #14)
--- (2) net sale − cancel per (transaction_id, item_code)   (3) transaction status from SUM(gmv_amount) over the finished lines
+-- (2) net sale − cancel per (transaction_id, item_code)   (3) transaction status from SUM(gmv_amount) over the lines
+-- No filter on transaction_status (data owner, 2026-10-28): a line counts once gmv_recorded_at is set and the status is already
+-- carried by item_operation_type (sale / cancel / return), so canceled orders net out and shipped orders count as sales.
 {{ config(materialized='ephemeral') }}
 WITH v AS (
   SELECT DISTINCT * FROM {{ ref('stg_sales_detail') }}
-  WHERE transaction_status = 'finished'
+  WHERE gmv_recorded_at IS NOT NULL
   QUALIFY transaction_version_at = MAX(transaction_version_at) OVER (PARTITION BY transaction_id, transaction_num_line)
 ),
 net AS (
