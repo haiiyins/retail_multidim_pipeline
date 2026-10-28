@@ -1,7 +1,13 @@
-# TODO: fill after audit.date_span exists. Rule: test = last 6 months minus Δ; valid = 2 months before test; gap 2 weeks (Δ=30) / 6 weeks (Δ=90)
-train_lo: "2023-01-02"
-train_hi: "2025-05-31"
-valid_lo: "2025-06-16"
-valid_hi: "2025-08-15"
-test_lo:  "2025-09-01"
-test_hi:  "2026-02-28"
+# Temporal split, drafted 2026-10-28 from audit.date_span (sales 2023-01-01 → 2026-10-26 in SG, TH and VN; issue #11).
+# Rule (DESIGN_DECISIONS §6): anchors are Mondays; test = the last six months of anchors whose Δ = 90 label window
+# closes before the export ends (2026-10-26 − 90 days → last anchor 2026-07-27); validation = the two months before
+# the test window; purge gap = six weeks (the Δ = 90 label window) between consecutive windows, which also covers Δ = 30;
+# training = the remainder from the first Monday of 2023. Anchors in the gaps or after test_hi are not used.
+train_lo: "2023-01-02"   # Monday; 142 weekly anchors, sampled with TRAIN_ANCHOR_STRIDE
+train_hi: "2025-09-15"
+valid_lo: "2025-10-27"   # 9 weekly anchors
+valid_hi: "2025-12-22"
+test_lo:  "2026-02-02"   # 26 weekly anchors
+test_hi:  "2026-07-27"
+label_deltas: [30, 90]
+purge_gap_days: 42

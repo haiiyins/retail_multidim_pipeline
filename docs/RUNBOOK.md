@@ -211,7 +211,7 @@ Warn-level tests (do not block): `discount_local >= 0` on the sales fact (negati
 make gold         # build_anchor_grid.py, dbt run --select gold, dbt test --select gold
 ```
 
-- `evaluation/build_anchor_grid.py` creates `gold.anchor_grid` (every Monday after a member's second transaction; `in_train_sample` by `TRAIN_ANCHOR_STRIDE`) and `gold.anchor_model_grid`.
+- `evaluation/build_anchor_grid.py` creates `gold.anchor_grid` (every Monday after a member's second transaction inside the train / valid / test windows of `split.yml`, with `split`, `days_to_next_buy` and `in_train_sample` by `TRAIN_ANCHOR_STRIDE`) and `gold.anchor_model_grid`. Downstream Gold models use only `is_used` anchors: a purchase within `ANCHOR_LABEL_HORIZON` days (an anchor without one has all-zero labels, useless for LambdaRank and unscorable by HR / NDCG), the stride for train, and a per-country cap by hash rank (`TRAIN_ANCHOR_CAP`, `VALID_ANCHOR_CAP`, `TEST_ANCHOR_CAP`). The script prints anchors before and after each rule and the pair-table estimate; measured on VN (issue #29), the unrestricted grid would give 20 M train anchors and 10 M test anchors, i.e. billions of pair rows.
 - `gld_web_stitched`, `gld_copurchase_lift` (`vars.copurchase_cutoff` must precede the first test anchor), `gld_fs_member`, `gld_fs_model_country` (price via ASOF on SKU intervals, median per model), `gld_candidates` (R1–R5, capped at `n_candidates`), `gld_fs_pair`, `gld_ranking_dataset` (labels Δ = 30 / 90, returned purchases excluded).
 - Singular tests `tests/leakage_*.sql` implement QC-6 and must return zero rows.
 
@@ -231,7 +231,7 @@ UNION ALL SELECT 'r2', AVG(r2) FROM gold.gld_ranking_dataset WHERE label_30 = 1
 
 ### 7.1 Temporal split
 
-From `audit.date_span`: test = last six months minus Δ; validation = two months before test; purge gap of two weeks (Δ = 30) or six weeks (Δ = 90); training = the remainder. Write the six dates to `evaluation/split.yml`.
+From `audit.date_span`: test = the last six months of Monday anchors whose Δ = 90 label window closes before the export ends; validation = two months before test; purge gap of six weeks (the Δ = 90 window, which also covers Δ = 30); training = the remainder. The six dates are in `evaluation/split.yml` (drafted 2026-10-28 for the 2023-01-01 → 2026-10-26 exports: train to 2025-09-15, valid 2025-10-27 → 2025-12-22, test 2026-02-02 → 2026-07-27; issue #11).
 
 ### 7.2 Ranker
 
