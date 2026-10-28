@@ -217,6 +217,15 @@ retail_multidim_pipeline/
 
 ## Results
 
+**Go / no-go gates (three-country run, 2026-10-28, issue #9).** `audit.gates_by_country` applies four thresholds per country × year — member-link
+rate ≥ 60 %, item match ≥ 95 %, price coverage ≥ 90 %, ≥ 20,000 members with two transactions or more
+([`docs/report/tables/t04_gates.md`](docs/report/tables/t04_gates.md)). TH and VN pass every year. SG passes 2025 only and misses the
+member-link gate in 2023, 2024 and 2026 (50.3 / 57.9 / 59.3 %), its other gates being as high as the others'. **Main evaluation set: TH + VN.
+SG is a REVIEW country**: processed end to end (Gold, training, ablation) and reported next to the main set with a caveat, but excluded from
+the headline confidence intervals — the repurchase labels exist only for member-linked transactions, so with half of the SG transactions
+unlinked, half of its repurchases are invisible to the label and its absolute metrics are biased downwards (comparisons between arms
+inside SG remain valid). Thresholds unchanged; rationale in `docs/DESIGN_DECISIONS.md` §2.
+
 Step 7 writes its outputs to `data/audit/`: `ablation_results_d30.csv`, `ablation_results_d90.csv`, `scale_test.png` and the `pipeline_run_metrics` table. The final report presents, per country and overall, the baseline against the full pipeline, the contribution and processing cost of each data source, candidate recall per source, identity-stitching coverage before and after, and the scale-test curves. This section will be updated with measured numbers once the full run on the server is complete.
 
 ## Troubleshooting

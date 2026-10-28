@@ -140,7 +140,7 @@ SELECT error_type, column_name, COUNT(*) FROM quarantine.rejects_d_member GROUP 
 make gates        # runs sql/gates_by_country.sql and sql/audit_checks.sql
 ```
 
-- `audit.gates_by_country` — per country × year: member-link rate (≥ 60 %), item match rate (≥ 95 %), price coverage (≥ 90 %), members with ≥ 2 transactions (≥ 20,000) → `PASS` / `REVIEW`. With five countries the gates **group** countries rather than select one: `PASS` countries form the main evaluation set; `REVIEW` countries are still processed and reported in an appendix. Lower the fourth threshold for small countries and record it.
+- `audit.gates_by_country` — per country × year: member-link rate (≥ 60 %), item match rate (≥ 95 %), price coverage (≥ 90 %), members with ≥ 2 transactions (≥ 20,000) → `PASS` / `REVIEW`. With several countries the gates **group** countries rather than select one: `PASS` countries form the main evaluation set; `REVIEW` countries are still processed and reported in an appendix. Lower the fourth threshold for small countries and record it. Decision of the three-country run (2026-10-28, issue #9): main set TH + VN, SG REVIEW because of its member-link rate (DESIGN §2).
 - `audit.stock_coverage` — share of sold items present in the stock table (team confirmed ≈ 100 %; rerun to keep evidence).
 - `audit.price_uniformity` — store vs website price gaps; if `p95_rel_gap` < 5 %, keep the website business unit as the national reference (default); otherwise set `allow_store_prices: true`.
 - `audit.interpurchase_days` — quantiles of inter-purchase gaps (validates Δ).

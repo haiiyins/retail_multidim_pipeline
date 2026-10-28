@@ -14,6 +14,7 @@ The **pipeline is the deliverable**. A single fixed ranking model (LightGBM Lamb
 |---|---|---|
 | Source tables | 11 (including `d_member`) | `d_member` is used only for account-exclusion flags and static attributes dated ≤ t |
 | Countries | SG, TH, VN — decision 2026-10-28 (issue #54): the three countries covered by the 2026-10-27 Parquet and web-event re-exports; PH and TW exist only in the size-capped CSV export (sales Jan–Oct 2023, no prices, no web events) and are out of scope | Country is a pipeline parameter; the pipeline loops over the three |
+| Main evaluation set | **TH + VN** — decision 2026-10-28 (issue #9) from `audit.gates_by_country` on the three-country run; **SG = REVIEW**: processed end to end and reported next to the main set with a caveat, excluded from the headline CI (§9) | SG misses the 60 % member-link gate in 2023 / 2024 / 2026 (50.3 / 57.9 / 59.3 %; 63.8 % in 2025) while its item match (99.9 %), price coverage (97.7 – 98.7 %) and repeat members (358 – 467 k) are fine. The gate protects label completeness: repurchase labels exist only for member-linked transactions, so half of the SG repurchases are invisible to the label and SG's absolute metrics are biased downwards. Thresholds kept, including 20,000 members (every country × year is between 98,698 and 467,378) |
 | Period | 2023 – 2026, all available data | No time-budget constraint; full history |
 | Recommendation unit | `model_code` | SKUs (`item_code`) split by size/colour are too sparse (701 SKUs per 1,000 lines in the sample) |
 | Eligible members | ≥ 2 transactions, not flagged as staff / business / legal entity / club / school | Personalisation needs history; non-consumer accounts distort it |
@@ -57,7 +58,7 @@ Re-checked on the whole 2026-10-27 exports and the VN Bronze on 2026-10-28 (issu
 | Gate | Check | Where | On failure |
 |---|---|---|---|
 | QC-1 | Null keys = 0 | Bronze→Silver, Silver→Gold | Block |
-| QC-2 | Referential integrity ≥ 95 / 60 / 90 % per country | Silver | Block for countries in the main evaluation set; warn otherwise |
+| QC-2 | Referential integrity ≥ 95 / 60 / 90 % per country | Silver | Block for countries in the main evaluation set (TH, VN); warn otherwise (SG, §2) |
 | QC-3 | Value domains: `promo_depth ∈ [0, 0.9]`, `price > 0`, `qty > 0` | Silver | Route rows to quarantine |
 | QC-4 | Uniqueness after version dedup and after netting; unique (member, model, t) in `fs_pair` | Silver, Gold | Block |
 | QC-5 | Volume drift ± 50 % vs the 28-day trailing mean of the same weekday (`audit.volume_drift`, probable cause attached) | Bronze | Warn |
@@ -117,7 +118,7 @@ Critical path: 0.1 → 1.1 → 2.1 → 3.1 → 3.3 → 4.1 → 4.2.
 | Risk | Control |
 |---|---|
 | Regex extraction fails for values containing commas or parentheses | Extract only simple-valued fields (ids, codes, numbers); compare post-extraction null rate with the `null` rate in the raw strings |
-| A country fails a gate | Still processed; reported in an appendix; excluded from the headline CI |
+| A country fails a gate | Still processed; reported in an appendix; excluded from the headline CI — the case of SG, whose member-link rate is 50 – 59 % in three of four years (§2) |
 | Server not available in time | The laptop run covers the full design on one or two countries |
 | Stream lane diverges from batch | QC-7 detects it; batch Bronze remains the source of truth |
 | Pair table too large at stride = 1 | Stride = 1 only as a secondary experiment on Tier 2; headline results use stride = 4 plus the label-horizon rule and the per-country anchor caps (§7) |
