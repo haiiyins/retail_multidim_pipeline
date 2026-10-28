@@ -16,6 +16,8 @@ vars:
   copurchase_min_support: 5             # minimum common baskets for a model pair
   copurchase_strong_support: 10         # pairs with at least this many common baskets rank first within a model (rank_in_a)
   allow_store_prices: false                       # enable if audit.price_uniformity shows large store-vs-website gaps
+  use_stock: false                                # decision 2026-10-28 (issue #21): the exported stock table covers spare parts only and availability
+                                                  # stays above 90 %, so stock features and candidate source R5 are switched off; set true if an inventory export arrives
   data_root: "{{ env_var('DATA_ROOT', './data') }}"
 models:
   retail_multidim:

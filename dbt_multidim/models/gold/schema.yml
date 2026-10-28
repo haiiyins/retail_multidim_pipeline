@@ -61,10 +61,36 @@ models:
       - {name: web_data_available, meta: {group: F5}, description: false when the country had no usable web data in the window (VN before 2024-08), so that absence of activity is not read as inactivity, tests: [not_null]}
       - {name: last_source_ts, description: latest source timestamp that fed the row (QC-6 bookkeeping)}
   - name: gld_fs_model_country
+    description: >
+      Entity 2 — model × country features at the anchor, one row per row of gold.anchor_model_grid (tests/fs_model_country_no_row_loss.sql).
+      Price = median over the model's SKU intervals valid on the anchor date (temporary promotion preferred over STANDARD per SKU);
+      popularity and seasonality from sales strictly before the anchor; stock columns are NULL unless vars.use_stock (issue #21).
+      QC-6: tests/leakage_fs_model_country.sql. meta.group tags F1 price, F2 popularity, F3 promotion / calendar / seasonality, Stock.
     tests:
       - dbt_utils.unique_combination_of_columns: {combination_of_columns: [model_code, country_code, anchor_date]}
     columns:
-      - {name: promo_depth, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 0.9, inclusive: true}}]}
+      - {name: model_code, tests: [not_null]}
+      - {name: country_code, tests: [not_null]}
+      - {name: anchor_date, tests: [not_null]}
+      - {name: price_local, meta: {group: F1}, description: "median selling price of the SKUs priced at the anchor (local currency); NULL when no SKU has a valid interval", tests: [{dbt_utils.expression_is_true: {expression: "> 0"}}]}
+      - {name: ref_price_local, meta: {group: F1}, description: "median reference (full) price of the same SKUs"}
+      - {name: n_sku_priced, meta: {group: F1}}
+      - {name: sku_price_coverage, meta: {group: F1}, description: "priced SKUs / SKUs of the model", tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}}]}
+      - {name: promo_kind, meta: {group: F3}, description: "most common promo kind among the priced SKUs"}
+      - {name: is_temp_promo, meta: {group: F3}, description: "at least half of the priced SKUs are on a temporary promotion"}
+      - {name: temp_promo_share, meta: {group: F3}}
+      - {name: promo_depth, meta: {group: F3}, description: "1 − price / reference price, clipped to [0, 0.9] (QC-3)", tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 0.9, inclusive: true}}]}
+      - {name: in_commercial_event, meta: {group: F3}}
+      - {name: days_to_next_holiday, meta: {group: F3}}
+      - {name: country_promo_share, meta: {group: F3}, description: "share of the country's SKUs on a temporary promotion that day (slv_calendar_enriched.promo_share)"}
+      - {name: buyers_28d, meta: {group: F2}, description: "distinct buyers in the 28 days before the anchor"}
+      - {name: qty_28d, meta: {group: F2}}
+      - {name: popularity_rank, meta: {group: F2}, description: "rank by buyers_28d within country × anchor (1 = most bought)", tests: [{dbt_utils.expression_is_true: {expression: ">= 1"}}]}
+      - {name: model_age_days, meta: {group: F2}, description: "days since the model's first sale in the country; NULL when it has not been sold before the anchor"}
+      - {name: seasonal_idx, meta: {group: F3}, description: "units sold in the same two weeks one year earlier over the weekly average of that year"}
+      - {name: avail_store_ratio, meta: {group: Stock}, description: "NULL unless vars.use_stock"}
+      - {name: stock_qty_national, meta: {group: Stock}, description: "NULL unless vars.use_stock"}
+      - {name: last_source_ts, description: "latest transaction timestamp or price interval start that fed the row (QC-6)"}
   - name: gld_fs_pair
     tests:
       - dbt_utils.unique_combination_of_columns: {combination_of_columns: [member_id, model_code, anchor_date]}   # QC-4
