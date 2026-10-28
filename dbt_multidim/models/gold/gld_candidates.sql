@@ -1,5 +1,5 @@
 -- Five candidate sources R1–R5, merged and capped at n_candidates with priority R1 > R3 > R2 > R4 > R5
-WITH g AS (SELECT member_id, country_code, anchor_date FROM gold.anchor_grid),
+WITH g AS (SELECT member_id, country_code, anchor_date FROM gold.anchor_grid WHERE is_used),  -- anchor selection rules: evaluation/build_anchor_grid.py
 fm AS (SELECT member_id, anchor_date, sport_ids, usual_store_id FROM {{ ref('gld_fs_member') }}),
 r1 AS (SELECT DISTINCT g.member_id, g.anchor_date, f.model_code FROM g JOIN {{ ref('slv_fact_sales_line') }} f
        ON f.member_id = g.member_id AND f.transaction_date < g.anchor_date),

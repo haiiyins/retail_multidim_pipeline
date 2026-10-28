@@ -84,7 +84,7 @@ Re-checked on the whole 2026-10-27 exports and the VN Bronze on 2026-10-28 (issu
 | GPU | Not required | Optional |
 | DuckDB | `memory_limit = 200GB`, `threads = 32`, `temp_directory` on NVMe | `memory_limit = 450GB`, `threads = 64` |
 
-Pair-table size ≈ members × anchors per member per year × 200. With a stride of one anchor every four weeks the training table stays within tens of millions of rows; the evaluation set uses every weekly anchor.
+Pair-table size ≈ used anchors × 200. Measured on VN (issue #29, 2026-10-28): every eligible member × Monday gives 19.9 M train, 3.0 M validation and 10.0 M test anchors, so a stride alone (one anchor in four for training) would still leave about one billion training pairs. Three rules keep the table near the target: only anchors with a non-returned purchase within the label horizon (90 days) are used, since an anchor without one carries all-zero labels that LambdaRank cannot learn from and HR / MRR / NDCG cannot score (the metrics therefore measure ranking quality given that the member buys again, not purchase propensity); training anchors are thinned by the stride; and a deterministic per-country cap by hash rank (defaults 50,000 train / 15,000 validation / 50,000 test anchors) bounds every split. With three countries that is about 30 M training pairs, 9 M validation pairs and 30 M test pairs; the caps are environment variables so the scale test can raise them.
 
 ## 8. Work-breakdown structure
 
@@ -118,4 +118,4 @@ Critical path: 0.1 → 1.1 → 2.1 → 3.1 → 3.3 → 4.1 → 4.2.
 | A country fails a gate | Still processed; reported in an appendix; excluded from the headline CI |
 | Server not available in time | The laptop run covers the full design on one or two countries |
 | Stream lane diverges from batch | QC-7 detects it; batch Bronze remains the source of truth |
-| Pair table too large at stride = 1 | Stride = 1 only as a secondary experiment on Tier 2; headline results use stride = 4 |
+| Pair table too large at stride = 1 | Stride = 1 only as a secondary experiment on Tier 2; headline results use stride = 4 plus the label-horizon rule and the per-country anchor caps (§7) |
