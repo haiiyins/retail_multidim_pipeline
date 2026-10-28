@@ -16,20 +16,24 @@ ID = ["member_id", "anchor_date", "model_code", "country_code"]
 NONFEAT = set(ID + ["label_30", "label_90", "forced_positive", "in_train_sample", "is_used", "split", "week_idx", "days_to_next_buy",
                     "last_source_ts", "sport_ids", "usual_store_id", "priority_source"])  # anchor-grid bookkeeping and label information are never features
 
-def load(lo, hi, train):
-    # only anchors with at least one positive for this Δ: a group without a positive carries no LambdaRank gradient and no
-    # HR / MRR / NDCG value, so it only costs memory (Δ = 30 keeps about a quarter of the anchors, Δ = 90 about two thirds)
-    q = f"""SELECT * FROM gold.gld_ranking_dataset WHERE anchor_date BETWEEN '{lo}' AND '{hi}' AND ({where_r})
-            {'AND in_train_sample' if train else ''}
-            QUALIFY MAX(label_{a.delta}) OVER (PARTITION BY member_id, anchor_date) = 1
-            ORDER BY member_id, anchor_date"""
-    df = con.execute(q).df()
+def load(lo, hi, train, apply_source_filter=True):
+    # Only anchors with at least one positive for this Δ (over the Full candidate set): a group without a positive carries no
+    # LambdaRank gradient and no HR / MRR / NDCG value, so it only costs memory (Δ = 30 keeps ~25 % of the anchors, Δ = 90 ~63 %).
+    # Candidate-axis arms (drop_sources): training and validation drop the rows of the removed sources; the TEST set keeps the Full
+    # candidate rows and the same anchors for every arm — removed-source candidates are made unrecommendable (score −inf) instead of
+    # deleted, so a positive reachable only through the dropped source counts as a miss rather than vanishing from the evaluation.
+    q = f"""SELECT * FROM (SELECT *, MAX(label_{a.delta}) OVER (PARTITION BY member_id, anchor_date) AS grp_pos
+                      FROM gold.gld_ranking_dataset WHERE anchor_date BETWEEN '{lo}' AND '{hi}' {'AND in_train_sample' if train else ''})
+            WHERE grp_pos = 1 AND ({where_r if apply_source_filter else 'TRUE'})
+            ORDER BY member_id, anchor_date, model_code"""   # fixed row order: bagging must see the same sample in every arm
+    df = con.execute(q).df().drop(columns=["grp_pos"])
     for c in df.columns:   # DECIMAL / HUGEINT aggregates arrive as Python objects: make every non-id column numeric
         if df[c].dtype == object and c not in NONFEAT and c not in ("promo_kind", "country_code"):
             df[c] = pd.to_numeric(df[c], errors="coerce")
     return df
 t0 = time.time()
-tr, va, te = load(split["train_lo"], split["train_hi"], True), load(split["valid_lo"], split["valid_hi"], False), load(split["test_lo"], split["test_hi"], False)
+tr, va, te = load(split["train_lo"], split["train_hi"], True), load(split["valid_lo"], split["valid_hi"], False), load(split["test_lo"], split["test_hi"], False, apply_source_filter=False)
+te_eligible = np.ones(len(te), dtype=bool) if not drop_r else np.all([te[r].values == 0 for r in drop_r], axis=0)   # recommendable under this arm
 label = f"label_{a.delta}"
 feat = [c for c in tr.columns if c not in NONFEAT and c not in drop_cols]
 for df in (tr, va, te):
@@ -48,6 +52,7 @@ else:
     assert a.config == "full" or a.no_freeze, "Run --config full first to freeze the hyper-parameters"
     params = dict(objective="lambdarank", metric="ndcg", eval_at=[10, 20], num_leaves=63, learning_rate=0.05, min_child_samples=50,
                   feature_fraction=0.8, bagging_fraction=0.8, bagging_freq=1, lambdarank_truncation_level=20, verbose=-1,
+                  deterministic=True, force_row_wise=True,   # reproducible across arms and machines at a given thread count
                   num_threads=int(os.environ.get("DUCKDB_THREADS", 6)), seed=a.seed)
     rounds = 3000; tune = True
 dtr = lgb.Dataset(tr[feat], tr[label], group=groups(tr), categorical_feature=cat_feats, free_raw_data=False)
@@ -59,6 +64,7 @@ if tune and not a.no_freeze:
 elif tune:
     print(f"(no-freeze) best_iteration={m.best_iteration}; frozen_params.json untouched")
 te["score"] = m.predict(te[feat], num_iteration=m.best_iteration if tune else None)
+te.loc[~te_eligible, "score"] = -np.inf   # candidates of a dropped source cannot be recommended; their positives count as misses
 
 def metrics(df, k):
     rows = []
@@ -80,4 +86,4 @@ imp = pd.DataFrame({"feature": feat, "gain": m.feature_importance("gain")}).sort
 imp.to_csv(f"data/audit/importance_{a.config}_d{a.delta}{tag}.csv", index=False)
 summ = res.drop(columns=["member_id", "anchor_date"]).groupby("country_code").mean(numeric_only=True).round(4)
 print(summ); print("OVERALL:", res.drop(columns=["member_id", "anchor_date", "country_code"]).mean(numeric_only=True).round(4).to_dict())
-print(f"rows train/valid/test = {len(tr):,}/{len(va):,}/{len(te):,}  feats={len(feat)}  time={time.time()-t0:.0f}s")
+print(f"rows train/valid/test = {len(tr):,}/{len(va):,}/{len(te):,}  test rows recommendable under this arm = {int(te_eligible.sum()):,}  feats={len(feat)}  time={time.time()-t0:.0f}s")
