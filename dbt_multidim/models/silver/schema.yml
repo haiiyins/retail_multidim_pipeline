@@ -22,7 +22,7 @@ models:
       - name: discount_local
         tests: [{dbt_utils.accepted_range: {min_value: 0, inclusive: true, config: {severity: warn}}}]   # VN: 1,291 negative discounts (surcharges) — reviewed, warn only
       - name: store_tz
-        tests: [{not_null: {config: {severity: warn}}}]   # missing timezone falls back to UTC in transaction_ts_utc
+        tests: [{not_null: {config: {severity: warn}}}]   # store missing from dim_business_unit; transaction_ts_utc then uses the country's zone
   - name: slv_price_sku_interval
     description: Non-overlapping SKU price intervals per country, national (website) prices, promo_kind and promo_depth (issue #16).
     columns:
