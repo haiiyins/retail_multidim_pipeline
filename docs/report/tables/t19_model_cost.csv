@@ -1,0 +1,4 @@
+layer,model_name,country_filter,wall_sec,peak_rss_GB,output_rows,output_MB
+gold,gld_fs_member,VN,5.1,1.92,115000,8.1
+gold,gld_sport_department_affinity,VN,5.7,0.31,0,0.0
+silver,slv_member_bridge,VN,7.3,1.39,2744652,2.7

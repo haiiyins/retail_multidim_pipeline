@@ -312,7 +312,7 @@ WHERE s.n IS NOT NULL ORDER BY diff DESC;
 make docs         # dbt docs generate && dbt docs serve → lineage graph
 ```
 
-Required tables and figures for the final report:
+Required tables and figures for the final report (`make report-tables` writes items 1 – 6 and 9 as Markdown + CSV into `docs/report/tables/` from the lakehouse, each with its source; the chapter drafts in `docs/report/` quote only those files):
 
 | # | Item | Source |
 |---|---|---|

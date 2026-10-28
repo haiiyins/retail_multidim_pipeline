@@ -1,0 +1,4 @@
+country_code,split,anchors,members,with_purchase_within_90d,after_train_stride,used_after_cap,members_used
+VN,train,19998412,307025,4597359,1149318,50000,41005
+VN,valid,2974199,340187,525727,525727,15000,13679
+VN,test,10024984,423678,2004187,2004187,50000,40626
