@@ -143,8 +143,9 @@ make gates        # runs sql/gates_by_country.sql and sql/audit_checks.sql
 - `audit.price_uniformity` — store vs website price gaps; if `p95_rel_gap` < 5 %, keep the website business unit as the national reference (default); otherwise set `allow_store_prices: true`.
 - `audit.interpurchase_days` — quantiles of inter-purchase gaps (validates Δ).
 - `audit.date_span` — min/max transaction timestamps per country (drives `split.yml`).
+- `audit.volume_drift` — QC-5: rows per table (`sales_detail`, `tracking_ecom_events`) × country × day against the trailing 28-day mean of the same weekday; `flagged` when |drift| > 50 %, with a `probable_cause` hint (NO_ROWS, EXPORT_EDGE, AFTER_GAP, PUBLIC_HOLIDAY, ADJACENT_TO_HOLIDAY, UNEXPLAINED). `make gates` therefore runs `make holidays` first and prints the flagged-day count; review the UNEXPLAINED days and comment them on issue #25. Warn-level: nothing is blocked.
 
-**DoD:** five audit tables exist; decisions on price reference and gate grouping recorded in the README.
+**DoD:** six audit tables exist; decisions on price reference and gate grouping recorded in the README.
 
 ---
 

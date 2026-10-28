@@ -18,8 +18,8 @@ bronze:
 	$(NOFILE); python ingestion/batch_csv_to_bronze.py
 bronze-views:
 	$(NOFILE); python ingestion/bronze_views_from_parquet.py
-gates:
-	$(NOFILE); python -c "import duckdb,os;c=duckdb.connect(os.environ['DUCKDB_PATH']);c.execute(open('sql/gates_by_country.sql').read());c.execute(open('sql/audit_checks.sql').read());print(c.execute('SELECT * FROM audit.gates_by_country').df())"
+gates: holidays
+	$(NOFILE); python -c "import duckdb,os;c=duckdb.connect(os.environ['DUCKDB_PATH']);c.execute(open('sql/gates_by_country.sql').read());c.execute(open('sql/audit_checks.sql').read());print(c.execute('SELECT * FROM audit.gates_by_country').df());print(c.execute('SELECT table_name, country_code, COUNT(*) AS days, COUNT(*) FILTER (WHERE flagged) AS flagged_days, COUNT(*) FILTER (WHERE probable_cause = \'UNEXPLAINED\') AS unexplained FROM audit.volume_drift GROUP BY 1, 2 ORDER BY 1, 2').df())"
 holidays:
 	$(NOFILE); python ingestion/holiday_commercial_builder.py
 silver: holidays
