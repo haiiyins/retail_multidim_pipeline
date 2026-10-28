@@ -213,86 +213,86 @@
 | created_at | TIMESTAMP WITH TIME ZONE | 0.0 |
 | updated_at | TIMESTAMP WITH TIME ZONE | 0.0 |
 
-## dim_item  (77 columns, csv)
+## dim_item  (77 columns, parquet)
 
 | column | type | % null |
 |---|---|---|
-| item_code | BIGINT | 0.0 |
-| model_code | BIGINT | 0.0 |
-| model_label | VARCHAR | 0.9 |
-| model | VARCHAR | 0.9 |
+| item_code | VARCHAR | 0.0 |
+| model_code | VARCHAR | 0.0 |
+| model_label | VARCHAR | 1.3 |
+| model | VARCHAR | 1.3 |
 | supermodel_code | VARCHAR | 0.0 |
-| supermodel_label | VARCHAR | 0.7 |
-| supermodel | VARCHAR | 0.7 |
-| conception_code | VARCHAR | 67.6 |
-| item_category_label | VARCHAR | 40.5 |
-| gender | VARCHAR | 58.2 |
-| item_size | VARCHAR | 30.2 |
-| age | VARCHAR | 73.9 |
-| product_nature_id | BIGINT | 41.3 |
-| product_nature_label | VARCHAR | 41.3 |
-| product_nature | VARCHAR | 41.3 |
-| product_nature_type | VARCHAR | 42.1 |
-| is_ecodesign | BOOLEAN | 94.7 |
+| supermodel_label | VARCHAR | 1.1 |
+| supermodel | VARCHAR | 1.1 |
+| conception_code | VARCHAR | 65.9 |
+| item_category_label | VARCHAR | 38.8 |
+| gender | VARCHAR[] | 55.8 |
+| item_size | VARCHAR | 30.6 |
+| age | VARCHAR | 72.7 |
+| product_nature_id | DECIMAL(20,0) | 39.8 |
+| product_nature_label | VARCHAR | 39.8 |
+| product_nature | VARCHAR | 39.8 |
+| product_nature_type | VARCHAR | 40.8 |
+| is_ecodesign | BOOLEAN | 93.0 |
 | is_repair_maintenance | BOOLEAN | 0.0 |
-| is_repairable | BOOLEAN | 20.2 |
+| is_repairable | BOOLEAN | 21.0 |
 | is_first_technical_price | BOOLEAN | 0.0 |
-| is_blue_product | BOOLEAN | 13.0 |
-| primary_color | VARCHAR | 74.2 |
-| secondary_color | VARCHAR | 89.7 |
-| pixl_id | BIGINT | 72.8 |
-| picture_url | VARCHAR | 72.8 |
-| item_business_weight | DOUBLE | 74.9 |
-| item_business_weight_unit | VARCHAR | 100.0 |
-| sku_ean_num | VARCHAR | 40.0 |
-| revamp_sku_id | VARCHAR | 49.2 |
-| retail_family_code | BIGINT | 3.2 |
-| retail_family_label | VARCHAR | 3.2 |
-| retail_family | VARCHAR | 3.2 |
-| retail_sub_department_code | BIGINT | 3.2 |
-| retail_sub_department_label | VARCHAR | 3.2 |
-| retail_sub_department | VARCHAR | 3.2 |
-| retail_department_code | BIGINT | 3.2 |
-| retail_department_label | VARCHAR | 3.2 |
-| retail_department | VARCHAR | 3.2 |
-| retail_univers_code | BIGINT | 3.2 |
-| retail_univers_label | VARCHAR | 3.2 |
-| retail_univers | VARCHAR | 3.2 |
-| sport_family_code | BIGINT | 3.2 |
-| sport_family_label | VARCHAR | 3.2 |
-| sport_family | VARCHAR | 3.2 |
-| sport_sub_department_code | BIGINT | 3.2 |
-| sport_sub_department_label | VARCHAR | 3.2 |
-| sport_sub_department | VARCHAR | 3.2 |
-| sport_department_code | BIGINT | 3.2 |
-| sport_department_label | VARCHAR | 3.2 |
-| sport_department | VARCHAR | 3.2 |
-| sport_univers_code | BIGINT | 3.2 |
-| sport_univers_label | VARCHAR | 3.2 |
-| sport_univers | VARCHAR | 3.2 |
-| industrial_process_family_code | BIGINT | 49.6 |
-| industrial_process_family_label | VARCHAR | 49.6 |
-| industrial_process_family | VARCHAR | 49.6 |
-| industrial_process_sub_department_code | BIGINT | 49.6 |
-| industrial_process_sub_department_label | VARCHAR | 49.6 |
-| industrial_process_sub_department | VARCHAR | 49.6 |
-| industrial_process_department_code | BIGINT | 49.6 |
-| industrial_process_department_label | VARCHAR | 49.6 |
-| industrial_process_department | VARCHAR | 49.6 |
-| industrial_process_univers_code | BIGINT | 49.6 |
-| industrial_process_univers_label | VARCHAR | 49.6 |
-| industrial_process_univers | VARCHAR | 49.6 |
-| has_current_hierarchy | BOOLEAN | 1.3 |
-| is_currently_available | BOOLEAN | 56.8 |
-| product_technicity_level | VARCHAR | 56.8 |
-| brand_type | VARCHAR | 8.7 |
-| brand_label | VARCHAR | 6.8 |
-| evaluation_status | VARCHAR | 56.9 |
-| product_impact | DOUBLE | 58.2 |
+| is_blue_product | BOOLEAN | 13.8 |
+| primary_color | VARCHAR | 75.1 |
+| secondary_color | VARCHAR | 89.8 |
+| pixl_id | VARCHAR | 77.2 |
+| picture_url | VARCHAR | 77.2 |
+| item_business_weight | DOUBLE | 74.2 |
+| item_business_weight_unit | VARCHAR | 74.2 |
+| sku_ean_num | VARCHAR | 39.1 |
+| revamp_sku_id | VARCHAR | 48.0 |
+| retail_family_code | INTEGER | 4.3 |
+| retail_family_label | VARCHAR | 4.3 |
+| retail_family | VARCHAR | 4.3 |
+| retail_sub_department_code | INTEGER | 4.3 |
+| retail_sub_department_label | VARCHAR | 4.3 |
+| retail_sub_department | VARCHAR | 4.3 |
+| retail_department_code | INTEGER | 4.3 |
+| retail_department_label | VARCHAR | 4.3 |
+| retail_department | VARCHAR | 4.3 |
+| retail_univers_code | INTEGER | 4.3 |
+| retail_univers_label | VARCHAR | 4.3 |
+| retail_univers | VARCHAR | 4.3 |
+| sport_family_code | INTEGER | 4.3 |
+| sport_family_label | VARCHAR | 4.3 |
+| sport_family | VARCHAR | 4.3 |
+| sport_sub_department_code | INTEGER | 4.3 |
+| sport_sub_department_label | VARCHAR | 4.3 |
+| sport_sub_department | VARCHAR | 4.3 |
+| sport_department_code | INTEGER | 4.3 |
+| sport_department_label | VARCHAR | 4.3 |
+| sport_department | VARCHAR | 4.3 |
+| sport_univers_code | INTEGER | 4.3 |
+| sport_univers_label | VARCHAR | 4.3 |
+| sport_univers | VARCHAR | 4.3 |
+| industrial_process_family_code | INTEGER | 52.2 |
+| industrial_process_family_label | VARCHAR | 52.2 |
+| industrial_process_family | VARCHAR | 52.2 |
+| industrial_process_sub_department_code | INTEGER | 52.2 |
+| industrial_process_sub_department_label | VARCHAR | 52.2 |
+| industrial_process_sub_department | VARCHAR | 52.2 |
+| industrial_process_department_code | INTEGER | 52.2 |
+| industrial_process_department_label | VARCHAR | 52.2 |
+| industrial_process_department | VARCHAR | 52.2 |
+| industrial_process_univers_code | INTEGER | 52.2 |
+| industrial_process_univers_label | VARCHAR | 52.2 |
+| industrial_process_univers | VARCHAR | 52.2 |
+| has_current_hierarchy | BOOLEAN | 2.1 |
+| is_currently_available | BOOLEAN | 55.4 |
+| product_technicity_level | VARCHAR | 55.4 |
+| brand_type | VARCHAR | 11.1 |
+| brand_label | VARCHAR | 9.0 |
+| evaluation_status | VARCHAR | 56.2 |
+| product_impact | DOUBLE | 56.4 |
 | tech_source | VARCHAR | 0.0 |
-| hierarchy_tech_source | VARCHAR | 1.3 |
-| created_at | TIMESTAMP WITH TIME ZONE | 0.0 |
-| updated_at | TIMESTAMP WITH TIME ZONE | 0.0 |
+| hierarchy_tech_source | VARCHAR | 2.1 |
+| created_at | TIMESTAMP | 0.0 |
+| updated_at | TIMESTAMP | 0.0 |
 | unique_id | VARCHAR | 0.0 |
 
 ## f_member_favorite_sport  (9 columns, csv)
@@ -554,7 +554,7 @@
 
 **country_code**: [('TH', 5612), ('SG', 5336), ('TW', 3861), ('PH', 2943), ('VN', 2248)]
 
-## tracking_ecom_events  (20 columns, csv)
+## tracking_ecom_events  (20 columns, parquet-dir)
 
 | column | type | % null |
 |---|---|---|
@@ -564,31 +564,31 @@
 | country_code | VARCHAR | 0.0 |
 | provider | VARCHAR | 0.0 |
 | platform | VARCHAR | 0.0 |
-| timestamp_utc | TIMESTAMP WITH TIME ZONE | 0.0 |
-| timestamp_local | TIMESTAMP WITH TIME ZONE | 0.0 |
+| timestamp_utc | TIMESTAMP | 0.0 |
+| timestamp_local | TIMESTAMP | 0.0 |
 | timezone_identifier | VARCHAR | 0.0 |
-| authorized_data_treatments | VARCHAR | 0.0 |
-| metadata | VARCHAR | 0.0 |
-| year | BIGINT | 0.0 |
-| month | BIGINT | 0.0 |
-| day | BIGINT | 0.0 |
-| _technical_created_at | TIMESTAMP WITH TIME ZONE | 0.0 |
-| _technical_updated_at | TIMESTAMP WITH TIME ZONE | 0.0 |
+| authorized_data_treatments | STRUCT(analytics BOOLEAN, marketing BOOLEAN, segmentation BOOLEAN, personalized_content BOOLEAN, consent_analytics_type VARCHAR) | 0.0 |
+| metadata | STRUCT(session_details STRUCT(provider_session_id VARCHAR, provider_session_start_time TIMESTAMP), page_details STRUCT(page_full_url VARCHAR, page_name VARCHAR, page_path VARCHAR, page_type VARCHAR), user_details STRUCT(user_id VARCHAR, member_id VARCHAR, provider_user_id VARCHAR), device_details STRUCT(device_type VARCHAR), traffic_source_details STRUCT(utm_campaign VARCHAR, utm_source VARCHAR, utm_medium VARCHAR, referring_domain VARCHAR, gclid VARCHAR, channel_name VARCHAR, utm_id VARCHAR), product_details STRUCT(model_code VARCHAR, item_code VARCHAR, product_quantity INTEGER, product_price_with_taxes FLOAT, availability_level VARCHAR, number_of_reviews BIGINT, product_rating DOUBLE, product_type VARCHAR, seller_name VARCHAR)[], order_details STRUCT(transaction_id VARCHAR, payment_method VARCHAR, delivery_method VARCHAR, total_price_with_taxes_and_shipping FLOAT), geo_details STRUCT(region VARCHAR, city VARCHAR, country VARCHAR), smartsize_process_details STRUCT(stage_name VARCHAR, stage_step VARCHAR, recommendation VARCHAR, recommendation_applied VARCHAR), search_details STRUCT(search_term VARCHAR, menu_item_name VARCHAR, menu_level INTEGER, menu_hierarchy VARCHAR)) | 0.0 |
+| year | INTEGER | 0.0 |
+| month | INTEGER | 0.0 |
+| day | INTEGER | 0.0 |
+| _technical_created_at | TIMESTAMP | 0.0 |
+| _technical_updated_at | TIMESTAMP | 0.0 |
 | is_event_to_use | BOOLEAN | 0.0 |
 | date | DATE | 0.0 |
-| _errors | VARCHAR | 0.0 |
-| _warnings | VARCHAR | 100.0 |
+| _errors | STRUCT("name" VARCHAR, message VARCHAR, "columns" VARCHAR[], "filter" VARCHAR, "function" VARCHAR, run_time TIMESTAMP, user_metadata MAP(VARCHAR, VARCHAR), run_id VARCHAR)[] | 0.0 |
+| _warnings | STRUCT("name" VARCHAR, message VARCHAR, "columns" VARCHAR[], "filter" VARCHAR, "function" VARCHAR, run_time TIMESTAMP, user_metadata MAP(VARCHAR, VARCHAR), run_id VARCHAR)[] | 100.0 |
 
-**name**: [('page_viewed', 8184), ('product_list_viewed', 5173), ('product_page_viewed', 2979), ('search_results_viewed', 1409), ('search_completed', 1127), ('product_size_selected', 374), ('cart_viewed', 223), ('menu_item_selected', 210), ('product_added_to_cart', 186), ('checkout_commenced', 56), ('checkout_payment_viewed', 40), ('checkout_shipping_viewed', 20), ('order_completed', 19)]
+**name**: [('page_viewed', 8023), ('product_list_viewed', 5452), ('product_page_viewed', 2738), ('search_results_viewed', 1434), ('search_completed', 1276), ('product_size_selected', 373), ('menu_item_selected', 240), ('cart_viewed', 176), ('product_added_to_cart', 144), ('checkout_commenced', 57), ('checkout_payment_viewed', 40), ('order_completed', 25), ('checkout_shipping_viewed', 22)]
 
 **country_code**: [('SG', 20000)]
 
-**platform**: [('app', 11671), ('web', 8329)]
+**platform**: [('app', 12535), ('web', 7465)]
 
 **is_event_to_use**: [(True, 20000)]
 
 **metadata** format: **JSON** (structure only, values redacted)
 
 ```
-{"session_details":{"provider_session_id":"VARCHAR","provider_session_start_time":"VARCHAR"},"page_details":{"page_full_url":"VARCHAR","page_name":"VARCHAR","page_path":"VARCHAR","page_type":"VARCHAR"},"user_details":{"user_id":"VARCHAR","member_id":"VARCHAR","provider_user_id":"VARCHAR"},"device_details":{"device_type":"VARCHAR"},"traffic_source_details":{"utm_campaign":"NULL","utm_source":"NULL","utm_medium":"NULL","referring_domain":"NULL","gclid":"NULL","channel_name":"VARCHAR","utm_id":"NULL"},"product_details":"NULL","order_details":"NULL","geo_details":{"region":"NULL","city":"VARCHAR",
+{"session_details":{"provider_session_id":"VARCHAR","provider_session_start_time":"VARCHAR"},"page_details":{"page_full_url":"VARCHAR","page_name":"NULL","page_path":"VARCHAR","page_type":"VARCHAR"},"user_details":{"user_id":"VARCHAR","member_id":"VARCHAR","provider_user_id":"VARCHAR"},"device_details":{"device_type":"VARCHAR"},"traffic_source_details":{"utm_campaign":"NULL","utm_source":"NULL","utm_medium":"NULL","referring_domain":"NULL","gclid":"NULL","channel_name":"VARCHAR","utm_id":"NULL"},"product_details":[{"model_code":"VARCHAR","item_code":"VARCHAR","product_quantity":"UBIGINT","prod
 ```

@@ -79,8 +79,8 @@ The pipeline runs on a laptop for development (one country, without the full web
 | `tracking_ecom_events` | ≈ 200 GB | 1,774 daily Parquet parts, ≈ 1.0 B events |
 | `sales_detail` | 12.2 GB | Parquet |
 | `stock_availability_rate` | 5.4 GB | CSV |
-| `dim_item` | 3.9 GB | CSV |
 | `d_member` | 2.0 GB | CSV |
+| `dim_item` | 0.7 GB | Parquet |
 | `f_member_purchase`, `sales_tender_detail`, `all_store_selling_price` | 3.8 GB together | Parquet |
 | `f_member_favorite_sport`, `dim_business_unit`, `dim_calendar` | < 0.1 GB together | CSV |
 | **Total** | **≈ 230 GB** (≈ 27 GB without web events) | |

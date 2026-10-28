@@ -1,7 +1,6 @@
 3cba2dd89387d808a2e8ed2358e4ac56  d_member.csv
 a60ea572e17b0ea472e844487e7f5f50  dim_business_unit.csv
 4159d35ef94321af98dcae1d369bd578  dim_calendar.csv
-f387f1cbde51b3f57bba0840cc4bc4e8  dim_item.csv
 ca46fc6bb7e60802056cbe53ffd6b95a  f_member_favorite_sport.csv
 ec0e7ab73fdb9b23db3b88a6b926c9c6  stock_availability_rate.csv
 cbd0e274c68c74c222f76fdd74ae1660  tracking_ecom_events.csv
@@ -9,3 +8,4 @@ d67fc0b5debe541e9c54d7b291cc8236  all_store_selling_price.parquet
 513e16ede9b2983596dd3f3ccfa6c41a  f_member_purchase.parquet
 144cde3d1d6ec84aee3805d1a1f84808  sales_detail.parquet
 08ddfb8d080901afa99613fbfe6fcb4c  sales_tender_detail.parquet
+96c7dcf92f8240e539d712a36ffc39db  dim_item.parquet
