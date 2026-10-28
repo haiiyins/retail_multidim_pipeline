@@ -294,6 +294,16 @@ REPLAY_COUNTRY=XX REPLAY_MONTH=2025-01 python ingestion/kafka_producer_replay.py
 python ingestion/kafka_consumer_to_bronze.py        # writes bronze/tracking_ecom_events_stream, rejects → quarantine
 ```
 
+The producer replays three topics, each ordered by event time and keyed as shown; every message value is the full row as JSON (`metadata` and `_errors` stay nested JSON):
+
+| Topic | Bronze table | Key | Month filter |
+|---|---|---|---|
+| `raw.tracking` | `tracking_ecom_events` | `session_id` | `date` |
+| `raw.favorite_sport` | `f_member_favorite_sport` | `member_id` | `event_datetime_utc` |
+| `raw.member_purchase` | `f_member_purchase` | `transaction_id` | `association_datetime_utc` |
+
+`f_member_purchase.tech_year` / `tech_month` are not used for the month filter: they contain 1970-01 and values that disagree with `association_datetime_utc`. `REPLAY_TOPICS=raw.tracking,raw.favorite_sport` replays a subset; the run prints sent / failed counts and msg/s per topic and exits non-zero if any message was not delivered. Laptop smoke test: `REPLAY_COUNTRY=VN REPLAY_MONTH=2025-06` (464 150 / 102 / 245 746 messages, matching the Bronze counts; ≈ 23 k msg/s for tracking).
+
 QC-7 reconciliation:
 
 ```sql
