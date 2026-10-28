@@ -4,10 +4,14 @@ retail_multidim:
     dev:
       type: duckdb
       path: "{{ env_var('DUCKDB_PATH', './data/lakehouse.duckdb') }}"
-      threads: "{{ env_var('DUCKDB_THREADS', '6') | int }}"
+      # dbt concurrency: how many models are built at the same time. They all run inside ONE DuckDB that shares memory_limit and
+      # the DuckDB threads below, so keep it small on large data: on the server 16 concurrent Gold models starved each other
+      # (a 14-second model sat 30 minutes) — DBT_THREADS=1 there, 4 on the laptop. DUCKDB_THREADS is the parallelism of each query.
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"
       extensions: [parquet, json, icu]
       settings:
         memory_limit: "{{ env_var('DUCKDB_MEMORY', '10GB') }}"
+        threads: "{{ env_var('DUCKDB_THREADS', '6') | int }}"
         # temp_directory is left at DuckDB's default (<database>.tmp next to lakehouse.duckdb): dbt-duckdb re-applies settings on
         # every connection and DuckDB 2.x refuses to switch the temp directory once it has been used (spill in a parallel model)
         max_temp_directory_size: "300GB"

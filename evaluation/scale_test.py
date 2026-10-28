@@ -35,10 +35,13 @@ def point(label, subset, min_date, months=None):
     wall, peak = w1 + w2 + w3, max(m1, m2, m3)
     con = duckdb.connect(DB)
     con.execute("CREATE TABLE IF NOT EXISTS audit.scale_test(axis VARCHAR, label VARCHAR, countries VARCHAR, months INT, bronze_rows BIGINT, "
-                "silver_sec DOUBLE, grid_sec DOUBLE, gold_sec DOUBLE, wall_time_sec DOUBLE, peak_rss_gb DOUBLE, threads INT, memory_limit VARCHAR, executed_at TIMESTAMP)")
-    con.execute("INSERT INTO audit.scale_test VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, current_timestamp)",
+                "silver_sec DOUBLE, grid_sec DOUBLE, gold_sec DOUBLE, wall_time_sec DOUBLE, peak_rss_gb DOUBLE, threads INT, memory_limit VARCHAR, "
+                "executed_at TIMESTAMP, dbt_threads INT)")
+    con.execute("ALTER TABLE audit.scale_test ADD COLUMN IF NOT EXISTS dbt_threads INT")   # tables created before the column existed
+    con.execute("INSERT INTO audit.scale_test (axis, label, countries, months, bronze_rows, silver_sec, grid_sec, gold_sec, wall_time_sec, peak_rss_gb, "
+                "threads, memory_limit, dbt_threads, executed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, current_timestamp)",
                 ["months" if min_date else "countries", label, ",".join(subset), months, rows, w1, w2, w3, wall, peak / 1e9,
-                 int(os.environ.get("DUCKDB_THREADS", 0)), os.environ.get("DUCKDB_MEMORY", "")])
+                 int(os.environ.get("DUCKDB_THREADS", 0)), os.environ.get("DUCKDB_MEMORY", ""), int(os.environ.get("DBT_THREADS", 4))])
     con.close()
     print(f"{label:14s} bronze_rows={rows:>12,}  silver {w1:6.0f}s  grid {w2:5.0f}s  gold {w3:6.0f}s  total {wall:6.0f}s  peak {peak/1e9:5.1f} GB", flush=True)
     return rows, wall

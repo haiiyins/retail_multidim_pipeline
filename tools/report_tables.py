@@ -26,7 +26,7 @@ def redact(text):
     return text
 
 
-PLAIN = {"year", "delta", "months", "threads", "reps"}   # integer columns printed without thousands separators
+PLAIN = {"year", "delta", "months", "threads", "dbt_threads", "reps"}   # integer columns printed without thousands separators
 
 
 def fmt(v, col=""):
