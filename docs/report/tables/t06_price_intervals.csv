@@ -1,2 +1,4 @@
 country_code,raw_price_rows,country_unit_rows,website_unit_rows,intervals,skus_priced,standard_intervals,daily_promo_intervals,end_of_line_intervals,drop_intervals,temp_promo_share,first_start,q_above_reference,q_depth_gt_0_9
+SG,14372792,591633,1610601,563721,187055,456131,17938,80182,9470,0.0318,2015-08-22,0,540
+TH,16770698,362172,2535273,362140,165748,278773,17093,62520,3754,0.0472,2018-12-15,0,266
 VN,11273268,536069,2144276,535805,115541,392786,16733,126286,0,0.0312,2019-03-21,0,312

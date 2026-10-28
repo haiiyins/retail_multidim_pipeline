@@ -3,7 +3,7 @@
 > The pipeline is the deliverable (DESIGN §1): a three-tier lakehouse on DuckDB and Parquet, orchestrated with dbt, that turns the
 > eleven tables into point-in-time features. This chapter follows the data through Bronze, Silver and Gold and names the technique
 > applied at each step; §3.8 maps the techniques to the course topics and §3.9 reports the four with / without measurements.
-> Numbers: VN laptop build, 2026-10-28, tables in `docs/report/tables/`.
+> Numbers: three-country server build (SG, TH, VN), 2026-10-28, tables in `docs/report/tables/`; §3.9 is still the laptop (VN) measurement.
 
 ## 3.1 Architecture and tooling
 
@@ -37,7 +37,7 @@ memory limit) develops on VN; the leased server (16 threads, 125 GB, NVMe) runs 
 Bronze partition **(t01)**. The loader resolves the raw input per table (`<table>.parquet`, else a directory of parts, else `<table>.csv`),
 reads it with DuckDB, applies the casts and writes ZSTD Parquet partitioned by (country, year, month) for the fact tables, so that a
 country run and a month window prune files instead of scanning them. CSV rows DuckDB cannot parse (cut rows, embedded delimiters) are
-kept in `quarantine.rejects_<table>` instead of being dropped silently: VN loads reject 46 `d_member`, 19 `dim_item` and 1 event row
+kept in `quarantine.rejects_<table>` instead of being dropped silently: the full load rejects 46 `d_member` and 19 `dim_item` CSV rows
 **(t11)**. Two settings matter at scale and were found on the server: the partitioned write buffers rows per thread *and* per partition
 before flushing, so the default threshold held a billion-row table in memory and spilled 112 GB; a threshold of 32,768 rows streams it.
 The open-file limit is raised in every recipe because 85 member countries × year × month exceed 1,024 files.
@@ -53,7 +53,7 @@ Bronze is exposed to dbt as views (`bronze.*`) over the Parquet folders; nothing
 | `slv_fact_sales_line` | keeps positive net lines of SALE transactions, in the catalogue, merchandise only; derives `transaction_ts_utc` through the unit's timezone, else the country's; EUR amounts through the export's rate | business filters with reasons; timezone normalisation; multi-currency |
 | `qrt_sales_line` | the rows the fact refuses, with one of six reasons **(t03)** | quarantine routing (QC-3 / QC-4) |
 | `slv_fact_returns` | return lines, linked to the original transaction when the export gives it | — |
-| `slv_member_bridge` | one member per transaction (earliest association); no VN transaction has two members | entity resolution across tables |
+| `slv_member_bridge` | one member per transaction (earliest association); the conflict count is a warn-level test | entity resolution across tables |
 | `slv_member_profile` | static attributes dated ≤ t and the non-consumer exclusion flag (staff, business, legal entity, club, school) | account exclusion |
 | `slv_dim_model` | SKU → model catalogue; drops marketplace (UUID) items, services and the fixtures univers; normalises the list-typed `gender` | schema harmonisation; semi-structured column |
 | `slv_price_sku_interval` | national price timeline per SKU: type-15 country unit first, type 50 as fallback, one interval per start date, `promo_kind` from `price_type`, depth checked | interval construction; reference-price rules; QC-3 to quarantine |
@@ -64,19 +64,22 @@ Bronze is exposed to dbt as views (`bronze.*`) over the Parquet folders; nothing
 | `slv_member_sport_asof` | favourite-sport validity intervals from add / remove events | event → state intervals |
 | `slv_member_store_daily` | running usual store per member per purchase day | as-of state table |
 
-**Deduplication and netting evidence.** In VN, 41,581 transactions contain both a sale and a cancel line; after netting 4,529 of them
-keep at least one positive line and no kept line has a non-positive quantity or amount **(t18)** — the manual 20-transaction check of
-RUNBOOK step 5, automated. The quarantine is dominated by non-merchandise (45.7 %), by lines whose net amount is zero or negative
-(27.6 %, the cancelled orders) and by transactions classified as non-sale (13.8 %) **(t03)**.
+**Deduplication and netting evidence.** 69,699 SG, 35,861 TH and 41,581 VN transactions contain both a sale and a cancel line; after
+netting 13,547, 1,449 and 4,529 of them keep at least one positive line and no kept line has a non-positive quantity or amount **(t18)**
+— the manual 20-transaction check of RUNBOOK step 5, automated. The quarantine is dominated by non-merchandise (SG 39.3 %, TH 30.3 %,
+VN 45.7 %), by lines whose net amount is zero or negative (33.8 %, 44.7 %, 27.6 %: the cancelled orders) and by transactions
+classified as non-sale (16.1 %, 8.7 %, 13.8 %) **(t03)**.
 
-**Timezone.** The online channel has 1,559,629 VN sale lines from 16 website units; 95,222 of them (6.1 %) belong to units without a
-timezone and fall back to the country's **(t15)**. Reading those local clocks as UTC had shifted them by seven hours and produced five
+**Timezone.** The online channel has 2,828,396 SG, 1,822,582 TH and 1,559,629 VN sale lines from 26, 36 and 16 website units;
+1,911,963 of them (30.2 %, 52.8 % and 6.1 %) belong to units without a timezone and fall back to the country's **(t15)**. Reading those local clocks as UTC had shifted them by seven hours and produced five
 point-in-time failures in Gold; the derivation `timezone('UTC', timezone(zone, local_ts))` yields a naive UTC value that no longer
 depends on the machine's clock, and the dbt profile pins the session to UTC.
 
-**Prices.** The 11.3 M VN price rows contain 536,069 country-unit rows and 2.1 M website rows that repeat them; the national timeline
-keeps 535,805 intervals for 115,541 SKUs — 392,786 STANDARD, 126,286 END_OF_LINE (clearance), 16,733 DAY_TO_DAY_PROMOTION, none of
-type DROP — with 3.1 % of intervals being temporary promotions; 312 intervals deeper than 90 % are quarantined **(t06)**. Intervals of
+**Prices.** The 42.4 M price rows (SG 14.4 M, TH 16.8 M, VN 11.3 M) contain 591,633 / 362,172 / 536,069 country-unit rows and
+1.6 – 2.5 M website rows per country that repeat them; the national timeline keeps 563,721 / 362,140 / 535,805 intervals for
+187,055 / 165,748 / 115,541 SKUs — in VN 392,786 STANDARD, 126,286 END_OF_LINE (clearance), 16,733 DAY_TO_DAY_PROMOTION and none of
+type DROP, which exists only in SG and TH (9,470 and 3,754 intervals) — with 3.1 – 4.7 % of intervals being temporary promotions;
+540 / 266 / 312 intervals deeper than 90 % are quarantined **(t06)**. Intervals of
 the SKUs of one model do not align, so the price of a model at a date is computed in Gold by an ASOF join on SKU intervals followed by
 a median (DESIGN §3); the `EXPLAIN ANALYZE` of that lookup is in `docs/figures/explain_analyze_asof_price.txt`.
 
@@ -88,11 +91,13 @@ array (+1 at each interval start, −1 the day after its end, running sum) — O
 170 M intermediate rows and ran out of memory. A day is a peak when the share exceeds the trailing 60-day mean by 1.5 standard
 deviations and at least 0.2 % of SKUs are on promotion; three or more consecutive peak days form an event. Events are named by
 overlap with a small dictionary the team maintains after looking at the peaks (`ingestion/commercial_event_names.csv`), otherwise
-labelled `EVENT_n`. Public holidays come from the `holidays` library (`make holidays`, 58 VN days over 2023 – 2026).
+labelled `EVENT_n`. Public holidays come from the `holidays` library (`make holidays`, 53 SG, 106 TH and 58 VN days over 2023 – 2026).
 
 In VN the method finds 18 event occurrences covering 225 days, eight distinct names, six of them from the dictionary — mid-year sale
 (five occurrences), back to school, Singles' Day, Black Friday, Labour Day, April holiday sale — and two unnamed peaks of three to
-five days **(t07, t07b)**. The promotion share itself stays low (mean 0.35 %, maximum 2.2 %), which is why the floor is needed. The
+five days; in SG it finds 23 events (275 days) and in TH 14 (277 days), all still labelled `EVENT_n` because the dictionary was
+written from the VN peaks (issue #18) **(t07, t07b)**. The promotion share itself stays low (mean 0.35 % in VN, 1.1 % in SG and TH;
+maximum 2.2 – 2.5 %), which is why the floor is needed. The
 calendar feeds three features (in commercial event, days to the next public holiday, country promotion share) and the seasonality
 index.
 
@@ -107,11 +112,13 @@ attributed to a member only within ± 90 days of that timestamp (`gld_web_stitch
 use an event only when the link was known at the anchor (`identity_verified_ts ≤ anchor_date`) — the point-in-time rule the leakage
 tests check.
 
-On the laptop's single day of VN events, 26.8 % of events carry a member directly and stitching adds 7.2 points, so 34.0 % of events
-are identified after stitching, through 2,644 cookie–member links with 8 conflicts **(t08)**. The anchor-level view — the share of used
-anchors whose member has an attributed event in the 30 days before, known at the anchor **(t09)** — is close to zero on the laptop
-because one day of events cannot cover the anchor windows; the server values with the full click-stream (usable VN events from
-2024-07) are the ones to report, together with the `web_data_available` indicator that separates "no activity" from "no data".
+Over the full click-stream, 36.1 % of SG events, 33.7 % of TH events and 29.9 % of VN events carry a member directly, and stitching
+adds 5.8, 6.3 and 7.6 points (42.0 %, 40.0 % and 37.6 % identified), through 1,295,225 cookie–member links; 945 cookies linked to
+several members are excluded **(t08)**. At anchor level — the share of used anchors whose member has an attributed event in the 30 days
+before, known at the anchor **(t09)** — the test anchors reach 18.8 % in SG, 5.5 % in TH and 7.3 % in VN, the training anchors 5.1 %,
+1.8 % and 3.6 % because most of them precede the start of the click-stream (TH 2023-04, usable VN events 2024-07); the
+`web_data_available` indicator marks the 48,989 TH and 33,050 VN training anchors whose 30-day window contains usable events, so that
+"no activity" and "no data" stay apart.
 
 ## 3.6 Gold — point-in-time feature store (overview; details in chapter 5)
 
@@ -119,8 +126,9 @@ The unit of prediction is (member, anchor date). `evaluation/build_anchor_grid.p
 second transaction inside the train / validation / test windows of `evaluation/split.yml` (train 2023-01-02 → 2025-09-15, validation
 2025-10-27 → 2025-12-22, test 2026-02-02 → 2026-07-27, purge gaps of 42 days). Three rules bound the grid: an anchor is used only when
 a non-returned purchase follows within 90 days (an anchor without one has all-zero labels), training anchors are thinned by a stride
-of four, and a deterministic per-country cap by hash rank keeps 50,000 / 15,000 / 50,000 anchors. In VN this takes 20.0 M training
-anchors to 4.6 M with a purchase, 1.15 M after the stride and 50,000 used; 10.0 M test anchors to 2.0 M and 50,000 **(t10)**.
+of four, and a deterministic per-country cap by hash rank keeps 50,000 / 15,000 / 50,000 anchors. Over the three countries this takes
+143.6 M training anchors (SG 57.9 M, TH 65.4 M, VN 20.3 M) to 46.9 M with a purchase, 11.7 M after the stride and 3 × 50,000 used;
+59.4 M test anchors to 15.3 M and 3 × 50,000 **(t10)**.
 
 Three feature entities are built for the used anchors — member (`gld_fs_member`), model × country (`gld_fs_model_country`) and the
 member–candidate pair (`gld_fs_pair`) — each reading only data strictly before the anchor and carrying `last_source_ts`, the latest

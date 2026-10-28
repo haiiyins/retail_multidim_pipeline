@@ -67,9 +67,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default="", help="comma-separated table ids, e.g. t04,t07")
     ap.add_argument("--out", default="docs/report/tables")
+    ap.add_argument("--index-only", action="store_true", help="only rebuild INDEX.md from the tables already in --out (no database access)")
     a = ap.parse_args()
     only = {t.strip() for t in a.only.split(",") if t.strip()}
     out = pathlib.Path(a.out); out.mkdir(parents=True, exist_ok=True)
+    if a.index_only:
+        write_index(out); return
     con = duckdb.connect(DB, read_only=True)
     con.execute(f"SET memory_limit='{os.environ.get('DUCKDB_MEMORY', '10GB')}'; SET threads={os.environ.get('DUCKDB_THREADS', '6')}; SET TimeZone='UTC'")
     index = []
@@ -81,16 +84,18 @@ def main():
         contracts = yaml.safe_load(open("ingestion/table_contracts.yml"))
         metrics = {r[0]: r for r in con.execute("""SELECT model_name, output_rows, output_bytes, wall_time_sec, country_filter FROM audit.pipeline_run_metrics
                                                      WHERE layer = 'bronze' QUALIFY ROW_NUMBER() OVER (PARTITION BY model_name ORDER BY executed_at DESC) = 1""").fetchall()}
+        scanned = dict(re.findall(r"^## (\w+)\s+\([\d,]+ rows, ([\w-]+),", pathlib.Path("data/audit/csv_fullscan.md").read_text(), re.M)) \
+            if pathlib.Path("data/audit/csv_fullscan.md").exists() else {}   # raw files may have been deleted after loading (server: the 187 GB of tracking parts)
         rows = []
         for t, c in contracts.items():
             _, kind = raw_source(ROOT / "raw_csv", t)
             m = metrics.get(t)
-            rows.append((t, kind or "-", ", ".join(c.get("key", [])), c.get("country_col") or (f"via {c['country_via']['table']}" if c.get("country_via") else "-"),
+            rows.append((t, kind or scanned.get(t, "-"), ", ".join(c.get("key", [])), c.get("country_col") or (f"via {c['country_via']['table']}" if c.get("country_via") else "-"),
                          ", ".join(c.get("partition", [])) or "-", m[1] if m else None, round(m[2] / 1e6, 1) if m and m[2] else None, round(m[3], 1) if m else None))
         index.append(write_table(out, "t01_source_tables", "The eleven source tables: raw format, contract key, Bronze partitioning and loaded volume",
                                  ["table", "raw_format", "contract_key", "country_column", "bronze_partition", "rows_loaded", "parquet_MB", "load_sec"], rows,
                                  "`ingestion/table_contracts.yml`, `ingestion/raw_source.py`, `audit.pipeline_run_metrics` (layer bronze, latest load per table)",
-                                 "Raw formats and full-file row counts per country are in `data/audit/csv_fullscan.md`."))
+                                 "Raw formats and full-file row counts per country are in `data/audit/csv_fullscan.md` (also the source of the format when the raw files are no longer on disk)."))
 
     # ---------------------------------------------------------------- Silver: sales-line funnel and quarantine
     if want("t02"):
@@ -189,11 +194,14 @@ def main():
                    MAX(CASE WHEN id_source = 'STITCHED' THEN pct END) AS stitched_pct,
                    MAX(CASE WHEN id_source = 'ANON' THEN pct END) AS anonymous_pct,
                    MAX(CASE WHEN id_source = 'DIRECT' THEN pct END) + COALESCE(MAX(CASE WHEN id_source = 'STITCHED' THEN pct END), 0) AS identified_after_pct,
-                   (SELECT COUNT(*) FROM silver.slv_user_to_member) AS cookie_member_links,
-                   (SELECT COUNT(*) FROM quarantine.slv_identity_conflicts) AS conflicting_cookies
-            FROM e LEFT JOIN s USING (country_code) GROUP BY ALL ORDER BY 1""")
+                   MAX(l.links) AS cookie_member_links_by_account_country,
+                   (SELECT COUNT(*) FROM quarantine.slv_identity_conflicts) AS conflicting_cookies_all_countries
+            FROM e LEFT JOIN s USING (country_code)
+            LEFT JOIN (SELECT p.country_code, COUNT(*) AS links FROM silver.slv_user_to_member u JOIN silver.slv_member_profile p USING (member_id) GROUP BY 1) l USING (country_code)
+            GROUP BY ALL ORDER BY 1""")
         index.append(write_table(out, "t08_stitching_events", "Identity stitching at event level: share of web events with a member before (DIRECT) and after (+ STITCHED)", cols, rows,
-                                 "`audit.stitching_coverage` (`models/audit/stitching_coverage.sql`), `silver.slv_web_events_clean`, `silver.slv_user_to_member`, `quarantine.slv_identity_conflicts`"))
+                                 "`audit.stitching_coverage` (`models/audit/stitching_coverage.sql`), `silver.slv_web_events_clean`, `silver.slv_user_to_member`, `quarantine.slv_identity_conflicts`",
+                                 "Cookie–member links carry no country; they are attributed to the member's account country. Conflicting cookies (several members) are counted once for all countries."))
     if want("t09"):
         cols, rows = q(con, """
             WITH a AS (SELECT member_id, country_code, anchor_date, split FROM gold.anchor_grid WHERE is_used),
@@ -297,10 +305,14 @@ def main():
                   FROM silver.slv_member_sport_asof sa JOIN silver.slv_member_profile p USING (member_id) GROUP BY 1),
             st AS (SELECT p.country_code, COUNT(DISTINCT sd.member_id) AS members_with_store_state FROM silver.slv_member_store_daily sd JOIN silver.slv_member_profile p USING (member_id) GROUP BY 1)
             SELECT p.country_code, p.member_profiles, p.excluded_accounts, b.transactions_with_member, s.members_with_sport, s.sports, st.members_with_store_state
-            FROM p LEFT JOIN b USING (country_code) LEFT JOIN s USING (country_code) LEFT JOIN st USING (country_code) ORDER BY 1""")
+            FROM p LEFT JOIN b USING (country_code) LEFT JOIN s USING (country_code) LEFT JOIN st USING (country_code)
+            WHERE p.country_code IN (SELECT UNNEST(string_split(?, ','))) ORDER BY 1""".replace("?", "'" + os.environ.get("COUNTRIES", "SG,TH,VN").replace(" ", "") + "'"))
+        other = con.execute("SELECT COUNT(*), string_agg(DISTINCT country_code, ', ' ORDER BY country_code) FROM silver.slv_member_profile WHERE country_code NOT IN (SELECT UNNEST(string_split(?, ',')))",
+                            [os.environ.get("COUNTRIES", "SG,TH,VN").replace(" ", "")]).fetchone()
         index.append(write_table(out, "t17_members", "Members: profiles, excluded accounts, favourite-sport and usual-store state", cols, rows,
                                  "`silver.slv_member_profile`, `silver.slv_member_bridge`, `silver.slv_member_sport_asof`, `silver.slv_member_store_daily`",
-                                 "Profiles, sport and store state are counted by the member's account-creation country; transactions with a member by transaction country."))
+                                 "Profiles, sport and store state are counted by the member's account-creation country; transactions with a member by transaction country. "
+                                 + (f"`d_member` also holds {other[0]:,} accounts registered in {other[1]}, outside the evaluation scope (issue #54)." if other and other[0] else "")))
     if want("t18"):
         cols, rows = q(con, """
             WITH t AS (SELECT country_code, transaction_id, COUNT(*) FILTER (WHERE item_operation_type = 'sale') AS s, COUNT(*) FILTER (WHERE item_operation_type = 'cancel') AS c
@@ -331,11 +343,24 @@ def main():
                                 FROM audit.volume_drift WHERE flagged AND probable_cause NOT LIKE 'PUBLIC_HOLIDAY%' ORDER BY 1, 2, 3""")
         index.append(write_table(out, "t20b_volume_drift_days", "QC-5 flagged days other than public holidays (to review)", cols, rows, "`audit.volume_drift`"))
 
+    write_index(out)
+
+
+def write_index(out):
+    """INDEX.md lists every table present in `out` (not only the ones of this run), with its title, source and generation stamp,
+    so that a partial run (--only) or a copy from another machine never drops entries."""
+    lines = []
+    for f in sorted(out.glob("t*.md")):
+        text = f.read_text(); title = text.splitlines()[0].lstrip("# ").strip()
+        m = re.search(r"\*Source:\* (.*?)\. \*Generated:\* (.*?) by `tools/report_tables.py`, `COUNTRY_FILTER=([A-Z]+)`", text, re.S)
+        src, when, cf = (m.group(1), m.group(2), m.group(3)) if m else ("", "", "")
+        lines.append(f"- [{title}]({f.name}) — {src} *({cf}, {when})*" if m else f"- [{title}]({f.name})")
     (out / "INDEX.md").write_text(redact("\n".join([
         "# Report tables", "",
-        f"Generated {NOW} by `tools/report_tables.py` (`make report-tables`) with `COUNTRY_FILTER={CF}`. Each file carries its source; the CSV next to it holds the same rows. "
-        "Regenerate on the server after `make gold` so that the three-country numbers replace the laptop (VN) ones.", "", *index, ""])))
-    print("→", out / "INDEX.md")
+        f"Index rebuilt {NOW} by `tools/report_tables.py` (`make report-tables`, or `--index-only`). Each file carries its source, the country filter of the build "
+        "that produced it and its generation time; the CSV next to it holds the same rows. Tables generated with `COUNTRY_FILTER=ALL` come from the three-country "
+        "server build, `VN` ones from the laptop; regenerate on the server after each pipeline stage so that the stamps converge.", "", *lines, ""])))
+    print("→", out / "INDEX.md", f"({len(lines)} tables)")
 
 
 if __name__ == "__main__":
