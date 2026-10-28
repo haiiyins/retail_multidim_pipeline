@@ -35,19 +35,23 @@ SELECT economical_businessunit_country_code country, MIN(gmv_recorded_at) min_ts
 --     from dim_calendar so a day without rows counts as 0 instead of disappearing. A day is flagged when |drift| > 50 % and at least
 --     two of the four baseline days have rows (no flags while a series starts or restarts). probable_cause is a hint for the review,
 --     not a verdict: NO_ROWS (gap), EXPORT_EDGE (last, partial day), AFTER_GAP (baseline still holds empty days), PUBLIC_HOLIDAY /
+--     DUPLICATED_EXPORT (raw rows > 1.2 × the distinct (transaction, line, version) keys: the export repeated the rows — 1 – 13 October 2023 in all
+--     three countries showed +51 to +114 % for that reason alone; Silver deduplicates, the check keeps the evidence in distinct_lines / dup_factor),
 --     ADJACENT_TO_HOLIDAY (ext.public_holidays, built by make holidays), DOUBLE_DAY_SALE (day = month: 6.6, 11.11 …, the e-commerce sale days),
 --     BLACK_FRIDAY, HOLIDAY_IN_BASELINE (a holiday depressed one of the four baseline days), else UNEXPLAINED. mean_28d (all days) is kept for reference.
+--     rows stays the raw Bronze count (the ingest volume the check watches); tracking events have no version column, so distinct_lines = rows there.
 CREATE OR REPLACE TABLE audit.volume_drift AS
 WITH daily AS (
-  SELECT 'sales_detail' AS table_name, economical_businessunit_country_code AS country_code, CAST(gmv_recorded_at AS DATE) AS d, COUNT(*) AS n
+  SELECT 'sales_detail' AS table_name, economical_businessunit_country_code AS country_code, CAST(gmv_recorded_at AS DATE) AS d,
+         COUNT(*) AS n, COUNT(DISTINCT (transaction_id, transaction_num_line, transaction_version_at)) AS nd
   FROM bronze.sales_detail GROUP BY 1, 2, 3
   UNION ALL
-  SELECT 'tracking_ecom_events', country_code, CAST(date AS DATE), COUNT(*) FROM bronze.tracking_ecom_events GROUP BY 1, 2, 3),
+  SELECT 'tracking_ecom_events', country_code, CAST(date AS DATE), COUNT(*), COUNT(*) FROM bronze.tracking_ecom_events GROUP BY 1, 2, 3),
 span AS (SELECT table_name, country_code, MIN(d) AS d_min, MAX(d) AS d_max FROM daily GROUP BY 1, 2),
 grid AS (SELECT s.table_name, s.country_code, s.d_min, s.d_max, c.d
          FROM span s JOIN (SELECT DISTINCT CAST(date_of_day AS DATE) AS d FROM bronze.dim_calendar) c ON c.d BETWEEN s.d_min AND s.d_max),
 hol AS (SELECT country_code, holiday_date, FIRST(holiday_name ORDER BY holiday_name) AS holiday_name FROM ext.public_holidays GROUP BY 1, 2),
-g AS (SELECT grid.*, COALESCE(x.n, 0) AS n, dayofweek(grid.d) AS dow, h.holiday_name
+g AS (SELECT grid.*, COALESCE(x.n, 0) AS n, COALESCE(x.nd, 0) AS nd, dayofweek(grid.d) AS dow, h.holiday_name
       FROM grid LEFT JOIN daily x USING (table_name, country_code, d) LEFT JOIN hol h ON h.country_code = grid.country_code AND h.holiday_date = grid.d),
 w AS (SELECT *,
              AVG(n) OVER wk AS mean_same_weekday_28d, COUNT(*) FILTER (WHERE n > 0) OVER wk AS baseline_days_with_rows, COUNT(*) OVER wk AS baseline_days,
@@ -57,13 +61,14 @@ w AS (SELECT *,
                    all28 AS (PARTITION BY table_name, country_code ORDER BY d ROWS BETWEEN 28 PRECEDING AND 1 PRECEDING)),
 f AS (SELECT *, n / NULLIF(mean_same_weekday_28d, 0) - 1 AS drift,
              (baseline_days = 4 AND baseline_days_with_rows >= 2 AND ABS(n / NULLIF(mean_same_weekday_28d, 0) - 1) > 0.5) AS flagged FROM w)
-SELECT f.table_name, f.country_code, f.d AS calendar_date, f.dow AS day_of_week, f.n AS rows,
+SELECT f.table_name, f.country_code, f.d AS calendar_date, f.dow AS day_of_week, f.n AS rows, f.nd AS distinct_lines, ROUND(f.n / NULLIF(f.nd, 0), 2) AS dup_factor,
        ROUND(f.mean_same_weekday_28d, 1) AS mean_same_weekday_28d, ROUND(f.mean_28d, 1) AS mean_28d, ROUND(f.drift, 3) AS drift,
        f.baseline_days_with_rows, f.baseline_holiday_days, f.flagged,
        CASE WHEN NOT f.flagged THEN NULL
             WHEN f.n = 0 THEN 'NO_ROWS'
             WHEN f.d = f.d_max THEN 'EXPORT_EDGE'
             WHEN f.baseline_days_with_rows < 4 THEN 'AFTER_GAP'
+            WHEN f.n > 1.2 * f.nd THEN 'DUPLICATED_EXPORT'
             WHEN f.holiday_name IS NOT NULL THEN 'PUBLIC_HOLIDAY: ' || f.holiday_name
             WHEN hp.holiday_name IS NOT NULL OR hn.holiday_name IS NOT NULL THEN 'ADJACENT_TO_HOLIDAY: ' || COALESCE(hp.holiday_name, hn.holiday_name)
             WHEN day(f.d) = month(f.d) THEN 'DOUBLE_DAY_SALE'
