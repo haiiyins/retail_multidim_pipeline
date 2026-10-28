@@ -12,3 +12,4 @@ retail_multidim:
         # every connection and DuckDB 2.x refuses to switch the temp directory once it has been used (spill in a parallel model)
         max_temp_directory_size: "300GB"
         preserve_insertion_order: false
+        TimeZone: "UTC"                      # casts between TIMESTAMP and TIMESTAMPTZ must not depend on the machine's zone

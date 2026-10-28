@@ -21,9 +21,45 @@ models:
       - {name: confidence, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}}]}
       - {name: n_ab, tests: [{dbt_utils.expression_is_true: {expression: ">= 5"}}]}
   - name: gld_fs_member
-    columns: [{name: member_id, tests: [not_null]}, {name: anchor_date, tests: [not_null]}]
+    description: >
+      Entity 1 — member features at (member_id, anchor_date) for the used anchors of gold.anchor_grid; every aggregate reads data
+      strictly before the anchor (QC-6, tests/leakage_fs_member.sql). meta.group tags the feature groups used by
+      evaluation/ablation_configs.yml: F0 purchase history, F1 price position, F3 promotion affinity, F5 web activity, Sport, Store.
     tests:
       - dbt_utils.unique_combination_of_columns: {combination_of_columns: [member_id, anchor_date]}
+      - dbt_utils.expression_is_true: {expression: "tx_365d >= tx_90d AND tx_90d >= tx_30d"}
+    columns:
+      - {name: member_id, tests: [not_null]}
+      - {name: anchor_date, tests: [not_null]}
+      - {name: split, description: train / valid / test window of the anchor (bookkeeping, not a feature), tests: [{accepted_values: {values: ['train', 'valid', 'test']}}]}
+      - {name: in_train_sample, description: stride sample flag (bookkeeping)}
+      - {name: tx_30d, meta: {group: F0}, description: transactions in the 30 days before the anchor}
+      - {name: tx_90d, meta: {group: F0}}
+      - {name: tx_365d, meta: {group: F0}, tests: [not_null]}
+      - {name: items_365d, meta: {group: F0}, description: units bought in 365 days}
+      - {name: models_365d, meta: {group: F0}, description: distinct models bought in 365 days}
+      - {name: days_since_last_tx, meta: {group: F0}, description: NULL when no purchase in the 365-day window}
+      - {name: gmv_eur_365d, meta: {group: F0}}
+      - {name: return_rate, meta: {group: F0}, description: returned transactions / transactions over 365 days, capped at 1, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}}]}
+      - {name: account_tenure_days, meta: {group: F0}}
+      - {name: price_q25, meta: {group: F1}, description: quartiles of the regular selling price of the items bought in 365 days (local currency)}
+      - {name: price_q50, meta: {group: F1}}
+      - {name: price_q75, meta: {group: F1}}
+      - {name: price_q50_eur, meta: {group: F1}}
+      - {name: promo_affinity, meta: {group: F3}, description: share of lines bought with a discount in 365 days, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}}]}
+      - {name: n_sports, meta: {group: Sport}, description: favourite sports valid at the anchor (slv_member_sport_asof)}
+      - {name: sport_ids, meta: {group: Sport}, description: list of sport ids, used by candidate source R4 (not a ranker feature)}
+      - {name: usual_store_id, meta: {group: Store}, description: running usual store as of the last offline purchase day before the anchor (used by R5 and the stock features)}
+      - {name: usual_store_share, meta: {group: Store}}
+      - {name: stores_visited_cum, meta: {group: Store}}
+      - {name: web_sessions_7d, meta: {group: F5}}
+      - {name: web_sessions_30d, meta: {group: F5}, description: attributed sessions in the 30 days before the anchor, attribution known at the anchor}
+      - {name: web_events_30d, meta: {group: F5}}
+      - {name: web_models_30d, meta: {group: F5}, description: distinct models viewed / carted}
+      - {name: has_web_signal, meta: {group: F5}, tests: [not_null]}
+      - {name: web_days_available_30d, meta: {group: F5}, description: days with usable web events in the country during the window}
+      - {name: web_data_available, meta: {group: F5}, description: false when the country had no usable web data in the window (VN before 2024-08), so that absence of activity is not read as inactivity, tests: [not_null]}
+      - {name: last_source_ts, description: latest source timestamp that fed the row (QC-6 bookkeeping)}
   - name: gld_fs_model_country
     tests:
       - dbt_utils.unique_combination_of_columns: {combination_of_columns: [model_code, country_code, anchor_date]}

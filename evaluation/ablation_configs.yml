@@ -2,7 +2,8 @@
 b0:
   drop_features: [price_gap_q50, in_budget_iqr, price_local, ref_price_local, price_q25, price_q50, price_q75, price_q50_eur, promo_depth, is_temp_promo, promo_kind,
                   seasonal_idx, days_to_next_holiday, in_commercial_event, promo_sensitivity, promo_affinity,
-                  web_view_7d, web_view_30d, web_cart_30d, web_sessions_30d, has_web_signal, sport_match, n_sports,
+                  web_view_7d, web_view_30d, web_cart_30d, web_sessions_7d, web_sessions_30d, web_events_30d, web_models_30d, has_web_signal,
+                  web_days_available_30d, web_data_available, sport_match, n_sports,
                   in_stock_usual_store, avail_store_ratio, stock_qty_national]
   drop_sources: [r3, r4, r5]
 full:     {drop_features: [], drop_sources: []}
@@ -10,7 +11,8 @@ no_f1:    {drop_features: [price_gap_q50, in_budget_iqr, price_local, ref_price_
            exclude_models: [slv_price_sku_interval]}
 no_f3:    {drop_features: [promo_depth, is_temp_promo, promo_kind, seasonal_idx, days_to_next_holiday, in_commercial_event, promo_sensitivity], drop_sources: [],
            exclude_models: [slv_calendar_enriched]}
-no_f5:    {drop_features: [web_view_7d, web_view_30d, web_cart_30d, web_sessions_30d, has_web_signal], drop_sources: [r3],
+no_f5:    {drop_features: [web_view_7d, web_view_30d, web_cart_30d, web_sessions_7d, web_sessions_30d, web_events_30d, web_models_30d, has_web_signal,
+                           web_days_available_30d, web_data_available], drop_sources: [r3],
            exclude_models: [slv_web_events_clean, slv_user_to_member, gld_web_stitched]}
 no_stock: {drop_features: [in_stock_usual_store, avail_store_ratio, stock_qty_national], drop_sources: [], exclude_models: [slv_stock_daily_model, slv_stock_daily_national]}
 no_sport: {drop_features: [sport_match, n_sports], drop_sources: [r4], exclude_models: [slv_member_sport_asof]}
