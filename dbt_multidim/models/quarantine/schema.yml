@@ -2,6 +2,11 @@ version: 2
 # Quarantine: rows that a Silver model refuses, kept with a reason so nothing is dropped silently (issue #24). Bronze CSV parse
 # rejects land in quarantine.rejects_<table> from the loader. Expected to be small; row counts are reported per run.
 models:
+  - name: leakage_violations
+    description: "QC-6 ledger: Gold rows whose source data postdates the anchor, with model name and rule (same predicates as tests/leakage_*.sql); expected empty, enforced by tests/leakage_violations_empty.sql (issue #36)."
+    columns:
+      - {name: model_name, tests: [not_null]}
+      - {name: rule, tests: [not_null]}
   - name: qrt_sales_line
     description: Netted (transaction, item) rows not kept by slv_fact_sales_line, with the reason.
     columns:
