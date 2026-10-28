@@ -8,7 +8,7 @@ models:
       - {name: transaction_id, tests: [not_null]}
       - {name: item_code, tests: [not_null]}
       - name: reason
-        tests: [not_null, {accepted_values: {values: ['NET_QTY_NONPOSITIVE', 'NET_GMV_NONPOSITIVE', 'TXN_NOT_SALE', 'SERVICE_LINE', 'ITEM_NOT_IN_CATALOGUE']}}]
+        tests: [not_null, {accepted_values: {values: ['NET_QTY_NONPOSITIVE', 'NET_GMV_NONPOSITIVE', 'TXN_NOT_SALE', 'SERVICE_LINE', 'NON_MERCHANDISE', 'ITEM_NOT_IN_CATALOGUE']}}]
   - name: qrt_price_interval
     description: National price rows with a promotion depth outside [0, 0.9], excluded from slv_price_sku_interval.
     columns:

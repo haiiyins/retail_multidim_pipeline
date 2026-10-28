@@ -13,4 +13,5 @@ WHERE item_code IS NOT NULL AND model_code IS NOT NULL
   AND NOT regexp_matches(item_code, '^[0-9a-fA-F]{8}-')
   AND COALESCE(LOWER(product_nature_type), '') NOT IN ('service', 'services', 'fee', 'financial')
   AND COALESCE(retail_univers_label, '') <> 'SERVICES'
+  AND COALESCE(retail_univers_label, '') <> 'FIXT & FURNIT'   -- store fixtures, carrier bags, printing, POS material: sold at the till but not merchandise (issue #31)
   AND COALESCE(retail_sub_department_label, '') NOT IN ('To empty', 'components created in TRACE')

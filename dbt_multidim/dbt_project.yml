@@ -12,6 +12,9 @@ vars:
   countries: ["SG", "TH", "VN"]      # scope decided 2026-10-28 (issue #54): the countries covered by the Parquet re-export; PH and TW exist only in the capped CSV export
   country_filter: "{{ env_var('COUNTRY_FILTER', 'ALL') }}"
   n_candidates: "{{ env_var('N_CANDIDATES', '200') }}"
+  copurchase_cutoff: "2025-10-27"       # = valid_lo in evaluation/split.yml: the lift sees no purchase that can be a validation or test label (tests/copurchase_cutoff_before_validation.sql)
+  copurchase_min_support: 5             # minimum common baskets for a model pair
+  copurchase_strong_support: 10         # pairs with at least this many common baskets rank first within a model (rank_in_a)
   allow_store_prices: false                       # enable if audit.price_uniformity shows large store-vs-website gaps
   data_root: "{{ env_var('DATA_ROOT', './data') }}"
 models:

@@ -13,6 +13,7 @@ gold.anchor_grid: one row per eligible member × Monday inside the train / valid
                     (c) a deterministic cap per country and split (TRAIN_ANCHOR_CAP / VALID_ANCHOR_CAP / TEST_ANCHOR_CAP, 0 = no cap)
                         taken by hash rank, so the pair table stays near N_CANDIDATES × cap rows.
 gold.anchor_model_grid: model × country × anchor_date for used anchors, models selling within ±90 days of the anchor.
+gold.split_windows: the six split dates and the selection settings as one row, for dbt tests (e.g. the co-purchase cutoff).
 Prints anchors per country × split before and after the rules, members, and the pair-table estimate (used anchors × N_CANDIDATES)."""
 import duckdb, os, yaml, pathlib
 from dotenv import load_dotenv
@@ -26,6 +27,10 @@ horizon = int(os.environ.get("ANCHOR_LABEL_HORIZON", 90))
 caps = {s: int(os.environ.get(f"{s.upper()}_ANCHOR_CAP", d)) for s, d in (("train", 50000), ("valid", 15000), ("test", 50000))}
 sp = yaml.safe_load(open(pathlib.Path(__file__).with_name("split.yml")))
 con.execute("CREATE SCHEMA IF NOT EXISTS gold")
+con.execute(f"""CREATE OR REPLACE TABLE gold.split_windows AS SELECT DATE '{sp["train_lo"]}' AS train_lo, DATE '{sp["train_hi"]}' AS train_hi,
+    DATE '{sp["valid_lo"]}' AS valid_lo, DATE '{sp["valid_hi"]}' AS valid_hi, DATE '{sp["test_lo"]}' AS test_lo, DATE '{sp["test_hi"]}' AS test_hi,
+    {stride} AS train_anchor_stride, {horizon} AS anchor_label_horizon, {caps["train"]} AS train_anchor_cap, {caps["valid"]} AS valid_anchor_cap,
+    {caps["test"]} AS test_anchor_cap""")  # the split as a table, so dbt tests can check vars against it
 con.execute(f"""
 CREATE OR REPLACE TABLE gold.anchor_grid AS
 WITH weeks AS (
