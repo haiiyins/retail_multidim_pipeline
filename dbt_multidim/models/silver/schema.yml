@@ -1,12 +1,16 @@
 version: 2
 models:
   - name: slv_member_bridge
+    description: "One member per transaction from f_member_purchase after exact-row dedup; transactions linked to more than one member are listed in quarantine (tests/member_bridge_conflicts.sql). Grain transaction_id."
     columns: [{name: transaction_id, tests: [not_null, unique]}, {name: member_id, tests: [not_null]}]
   - name: slv_member_profile
+    description: "Static member attributes (country of account creation, locale, creation date, creation store) and the account-exclusion flag for teammate / business / legal-entity accounts; one row per member_id."
     columns: [{name: member_id, tests: [not_null, unique]}]
   - name: slv_dim_model
+    description: "Catalogue at SKU → model level from dim_item: hierarchy codes and labels, gender_std normalised from the list column; excludes marketplace (UUID) items, services and the store-fixtures univers FIXT & FURNIT (issue #31). One row per item_code."
     columns: [{name: item_code, tests: [not_null, unique]}, {name: model_code, tests: [not_null]}]
   - name: slv_fact_sales_line
+    description: "Core sales fact: one net SALE line per (transaction, item) after exact-row dedup, latest version per line key and sale − cancel netting; physical items in the catalogue with net quantity and net gmv > 0; member through slv_member_bridge, store name and timezone from dim_business_unit, transaction_ts_utc derived through the store's or the country's zone. Rows that fail a rule go to quarantine.qrt_sales_line with a reason."
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [transaction_id, item_code]       # QC-4
@@ -45,8 +49,10 @@ models:
       - {name: return_date, tests: [not_null]}
       - {name: qty, tests: [{dbt_utils.accepted_range: {min_value: 0, inclusive: false}}]}   # QC-3, returned quantity is positive
   - name: slv_user_to_member
+    description: "One member per web cookie (user_id) from the ORDER and LOGIN evidence in slv_user_member_links; identity_verified_ts is the first moment the link became known (QC-6); cookies linked to several members are excluded and listed in quarantine.slv_identity_conflicts."
     columns: [{name: user_id, tests: [not_null, unique]}, {name: member_id, tests: [not_null]}]
   - name: slv_stock_daily_model
+    description: "Stock per model × site × day from stock_availability_rate, forward-filled up to 3 days. The exported table covers spare parts only, so this model is informational while vars.use_stock is false (issue #21)."
     columns: [{name: model_code, tests: [not_null]}]
   - name: slv_web_events_clean
     description: Web/app events flattened from the metadata struct, one row per event with the numeric product codes as a list (model_codes, unnested only in gld_web_stitched); only is_event_to_use events (issue #6).
@@ -87,3 +93,9 @@ models:
       - {name: as_of_date, tests: [not_null]}
       - {name: usual_store_id, tests: [not_null]}
       - {name: usual_store_share, tests: [{dbt_utils.accepted_range: {min_value: 0, max_value: 1, inclusive: true}}]}
+  - name: slv_stock_daily_national
+    description: "National stock view per model × day (share of sites with availability, national quantity) aggregated from slv_stock_daily_model; informational while vars.use_stock is false (issue #21)."
+  - name: slv_sales_line_netted
+    description: "Ephemeral: netted (transaction, item) lines before the business filters — exact-row dedup, latest transaction_version_at per line key, sale − cancel netting, transaction status from the net gmv, in_catalogue and is_non_merchandise flags. Shared by slv_fact_sales_line and quarantine.qrt_sales_line."
+  - name: slv_user_member_links
+    description: "Ephemeral: every (cookie, member) link with the moment it became known — ORDER (web order id matched to sales_detail.customer_purchase_order_id, member through slv_member_bridge) and LOGIN (member_id on the event). Shared by slv_user_to_member and quarantine.slv_identity_conflicts."

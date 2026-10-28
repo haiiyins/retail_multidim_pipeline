@@ -275,6 +275,16 @@ Each point reruns staging / Silver / quarantine / audit with the dbt vars `scale
 
 ---
 
+## Step 7b — Figures for the report
+
+```bash
+make docs-figures     # dbt docs generate → docs/figures/lineage_*.svg|png (Graphviz) + explain_analyze_asof_price.txt
+```
+
+`tools/lineage_graph.py` draws the model DAG from `target/manifest.json` (full, Bronze → Silver, Silver → Gold; the Python-built grid tables appear as components), `tools/explain_figures.py` saves the `EXPLAIN ANALYZE` of the ASOF price lookup. The DBeaver screenshots listed in `docs/figures/README.md` are taken by hand with the queries given there. Graphviz is required (`brew install graphviz` on macOS, `apt install graphviz` on the server).
+
+---
+
 ## Step 8 — Streaming lane (optional)
 
 ```bash
