@@ -91,6 +91,24 @@ models:
       - {name: avail_store_ratio, meta: {group: Stock}, description: "NULL unless vars.use_stock"}
       - {name: stock_qty_national, meta: {group: Stock}, description: "NULL unless vars.use_stock"}
       - {name: last_source_ts, description: "latest transaction timestamp or price interval start that fed the row (QC-6)"}
+  - name: gld_sport_department_affinity
+    description: "Learnt bridge from favourite-sport ids to catalogue sport departments (lift of P(department | sport) over P(department)) on purchases before vars.copurchase_cutoff; top 5 departments per sport and country with >= 20 lines and lift > 1.5. Input of candidate source R4."
+    tests:
+      - dbt_utils.unique_combination_of_columns: {combination_of_columns: [country_code, sport_id, sport_department_code]}
+    columns:
+      - {name: lift, tests: [not_null, {dbt_utils.expression_is_true: {expression: "> 1.5"}}]}
+      - {name: rank_in_sport, tests: [{dbt_utils.accepted_range: {min_value: 1, max_value: 5, inclusive: true}}]}
+  - name: gld_candidates
+    description: "Up to vars.n_candidates candidate models per used anchor from sources r1 repurchase, r2 co-purchase, r3 web intent, r4 sport x offer, r5 national best-sellers (stock filter only with vars.use_stock); priority R1 > R3 > R2 > R4 > R5, then the source score. QC-4 unique (member, model, anchor); recall per source in audit.candidate_recall."
+    tests:
+      - dbt_utils.unique_combination_of_columns: {combination_of_columns: [member_id, anchor_date, model_code]}   # QC-4
+      - dbt_utils.expression_is_true: {expression: "r1 + r2 + r3 + r4 + r5 >= 1"}
+    columns:
+      - {name: member_id, tests: [not_null]}
+      - {name: anchor_date, tests: [not_null]}
+      - {name: model_code, tests: [not_null]}
+      - {name: candidate_rank, tests: [{dbt_utils.accepted_range: {min_value: 1, max_value: 200, inclusive: true}}]}
+      - {name: priority_source, tests: [{accepted_values: {values: [1, 2, 3, 4, 5], quote: false}}]}
   - name: gld_fs_pair
     tests:
       - dbt_utils.unique_combination_of_columns: {combination_of_columns: [member_id, model_code, anchor_date]}   # QC-4
