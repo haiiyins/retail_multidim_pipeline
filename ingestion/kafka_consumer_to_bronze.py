@@ -80,6 +80,7 @@ def main():
     idle_limit = float(os.environ.get("STREAM_IDLE_TIMEOUT", "60"))
 
     con = duckdb.connect(os.environ["DUCKDB_PATH"])
+    con.execute("SET TimeZone = 'UTC'")  # year of the TIMESTAMPTZ partition is the UTC year, as in batch Bronze
     con.execute("CREATE SCHEMA IF NOT EXISTS quarantine")
     con.execute("CREATE TABLE IF NOT EXISTS quarantine.rejected_stream_events(topic VARCHAR, kafka_partition INTEGER, kafka_offset BIGINT, "
                 "reason VARCHAR, payload VARCHAR, rejected_at TIMESTAMP DEFAULT current_timestamp)")
@@ -105,7 +106,7 @@ def main():
     c.assign(parts)
 
     ok = {t: 0 for t in wanted}; bad = {t: 0 for t in wanted}
-    buf = {t: [] for t in wanted}; rejects = []
+    buf = {t: [] for t in wanted}; meta_buf = {t: [] for t in wanted}; rejects = []
     t0 = time.time(); last_msg = time.time()
 
     def flush_rejects():
@@ -120,10 +121,10 @@ def main():
             flush(con, TOPICS[t], buf[t])
         except Exception as e:  # a value the declared type cannot hold: keep the batch in the reject table instead of losing it
             print(f"{t}: batch of {len(buf[t])} not written ({e}); moved to quarantine", file=sys.stderr)
-            for raw in buf[t]:
-                rejects.append((t, -1, -1, "batch_write_error", raw))
+            for (part, off), raw in zip(meta_buf[t], buf[t]):
+                rejects.append((t, part, off, "batch_write_error", raw))
             ok[t] -= len(buf[t]); bad[t] += len(buf[t])
-        buf[t].clear()
+        buf[t].clear(); meta_buf[t].clear()
 
     while remaining:
         msg = c.poll(1.0)
@@ -139,7 +140,7 @@ def main():
         if reason:
             rejects.append((t, msg.partition(), msg.offset(), reason, raw)); bad[t] += 1
         else:
-            buf[t].append(raw); ok[t] += 1
+            buf[t].append(raw); meta_buf[t].append((msg.partition(), msg.offset())); ok[t] += 1
         if msg.offset() + 1 >= end[(t, msg.partition())]:
             remaining.discard((t, msg.partition()))
         if len(buf[t]) >= BATCH:

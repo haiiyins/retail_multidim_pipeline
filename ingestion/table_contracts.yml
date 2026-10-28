@@ -20,7 +20,7 @@ f_member_purchase:
   key: [transaction_id, member_id]
   country_col: member_country_code
   partition: [member_country_code, tech_year, tech_month]
-  not_null: [transaction_id, member_id]
+  not_null: [transaction_id]   # member_id is NULL on ~1.47 M memberless associations that batch Bronze keeps (dbt warn, #91): not a reject reason
 d_member:
   key: [member_id]
   country_col: member_country_code
@@ -52,7 +52,7 @@ f_member_favorite_sport:
   key: [member_id, sport_id, event_datetime_utc]
   country_col: country_code
   partition: [country_code, year]
-  not_null: [member_id, event_datetime_utc]   # checked by the stream consumer (ingestion/kafka_consumer_to_bronze.py); the batch loader does not read it
+  not_null: [member_id, sport_id, event_datetime_utc]   # same three as dbt staging/sources.yml; checked by the stream consumer (ingestion/kafka_consumer_to_bronze.py); the batch loader does not read it
 tracking_ecom_events:
   key: [id]
   country_col: country_code
