@@ -132,7 +132,7 @@ All Python dependencies are listed in `requirements.txt`.
    cp .env.example .env
    ```
 
-   Edit `.env`: `DATA_ROOT`, `DUCKDB_PATH`, `DUCKDB_MEMORY` (about 60–70 % of RAM), `DUCKDB_THREADS`, `COUNTRY_FILTER` (a single country code while developing, `ALL` for the full run) and `COUNTRIES` (`SG,TH,VN`, the evaluation scope).
+   Edit `.env`: `DATA_ROOT`, `DUCKDB_PATH`, `DUCKDB_MEMORY` (about 60–70 % of RAM), `DUCKDB_THREADS` (parallelism of each query), `DBT_THREADS` (models built concurrently: 4 on the laptop, 1 on the server, see RUNBOOK Appendix B), `COUNTRY_FILTER` (a single country code while developing, `ALL` for the full run) and `COUNTRIES` (`SG,TH,VN`, the evaluation scope).
 
    Use **absolute paths** for `DATA_ROOT` and `DUCKDB_PATH`. dbt runs from `dbt_multidim/` while the Python scripts run from the repository root, so a relative path points to two different files. `make` normalises relative paths; a plain `dbt` command does not.
 

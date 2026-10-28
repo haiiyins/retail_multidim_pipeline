@@ -28,6 +28,7 @@ Conventions: `$ROOT` is the repository root; commands assume the virtual environ
 | Free disk | ≥ 150 GB | 894 GB NVMe (raw set ≈ 230 GB) |
 | OS | macOS / Ubuntu | Linux |
 | DuckDB | `DUCKDB_MEMORY=10GB`, `DUCKDB_THREADS=6` | `DUCKDB_MEMORY=80GB`, `DUCKDB_THREADS=16` |
+| dbt concurrency | `DBT_THREADS=4` | `DBT_THREADS=1` — concurrent models share one DuckDB; 16 of them starved each other (Appendix B) |
 
 ### 1.2 Data download
 
@@ -67,7 +68,8 @@ pip install -r requirements.txt
 
 ### 1.4 Configuration
 
-- Copy `.env.example` to `.env`; set `DATA_ROOT`, `DUCKDB_PATH`, `DUCKDB_MEMORY` (≈ 60–70 % of RAM), `DUCKDB_THREADS`, `COUNTRY_FILTER`.
+- Copy `.env.example` to `.env`; set `DATA_ROOT`, `DUCKDB_PATH`, `DUCKDB_MEMORY` (≈ 60–70 % of RAM), `DUCKDB_THREADS` (parallelism of
+  each query), `DBT_THREADS` (models built concurrently: 4 on the laptop, 1 on the server), `COUNTRY_FILTER`.
 - Use **absolute paths** for `DATA_ROOT` and `DUCKDB_PATH`: dbt runs from `dbt_multidim/`, the Python scripts from the repository root. `make` normalises relative paths; a plain `dbt` command does not and would create a second database under `dbt_multidim/data/`.
 - Verify: `set -a; source .env; set +a; cd dbt_multidim && dbt deps && dbt debug`.
 - `dbt_multidim/profiles.yml` reads these variables; `dbt_multidim/dbt_project.yml` holds `vars.countries` (fill after step 2).
@@ -387,6 +389,7 @@ Submission checklist:
 | Symptom | Cause | Fix |
 |---|---|---|
 | `Could not set lock on file … Conflicting lock is held` on `dbt run` or a loader | another process has the database open, usually DBeaver, even read-only | disconnect DBeaver (right-click the connection → Disconnect), rerun, reconnect afterwards |
+| Every model of `make gold` or `make silver` crawls, a 14-second model takes 30 minutes, CPU far from saturated | too many dbt threads: the concurrent models run inside the same DuckDB and share `memory_limit` and the DuckDB threads (server 2026-10-28 with `DUCKDB_THREADS=16` driving dbt concurrency) | `DBT_THREADS=1` on the server, 4 on the laptop (`.env`); `DUCKDB_THREADS` stays the per-query parallelism |
 | Out of memory on a large join | `memory_limit` too high for the machine, or the spill directory full (dbt spills to `data/lakehouse.duckdb.tmp`, the loaders to `data/duck_temp`) | set `memory_limit` to ≈ 60–70 % of RAM; make sure `temp_directory` is writable and has space |
 | `IO Error: Cannot open file "…/bronze/f_member_purchase/member_country_code=…/data_0.parquet": Too many open files` on `make bronze` | Linux default of 1 024 open files per process; the partitioned `COPY` keeps one writer per open partition per thread (85 member countries × year × month with `COUNTRY_FILTER=ALL`) | the `make` recipes raise the limit (`ulimit -n 65536`); when calling a script directly, run `ulimit -n 65536` first; if the hard limit is lower (`ulimit -Hn`), raise it in `/etc/security/limits.conf`; then `rm -rf data/bronze/<table>` and rerun |
 | `make bronze` on a large partitioned table crawls at ~300 % CPU while `data/duck_temp` grows past the size of the output (server 2026-10-28: 112 GB of temp for 64 GB of `tracking_ecom_events` after 3 h) | a partitioned `COPY` buffers `partitioned_write_flush_threshold` rows per thread and per partition before writing; with ~120 partitions × 16 threads the default 524 288 holds the whole table and spills it | the loader sets `partitioned_write_flush_threshold = 32768` and `partitioned_write_max_open_files = 1024` (2.7× faster, no spill on a 150-partition synthetic test); if it still spills, lower the threshold or `DUCKDB_THREADS`; stop the run, `rm -rf data/bronze/<table> data/duck_temp`, `BRONZE_TABLES=<table> make bronze` |
