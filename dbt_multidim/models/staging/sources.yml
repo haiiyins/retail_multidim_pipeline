@@ -11,7 +11,9 @@ sources:
       - name: sales_detail
         description: >
           Sales lines, grain (transaction_id, transaction_num_line); 2026-10-27 Parquet re-export, SG/TH/VN, 2023-01-01 → 2026-10-26,
-          89.3 M rows of which 8.5 M duplicate the key (8.47 M exact copies, mostly 2023). Nested tax / price-modifier details are lists of structs.
+          89.3 M rows of which 8.5 M duplicate the key (8.47 M exact copies, mostly 2023; the source table has none — overlapping extracts, data owner
+          2026-10-28). transaction_status is not a filter: a line counts once gmv_recorded_at is set. Nested tax / price-modifier details are lists of
+          structs; promotion names are in price_modifier_detail[].rule (DiscountCoupon, DayToDayPromotion, CommercialGesture, EndOfLine, …).
         columns:
           - {name: transaction_id, description: Transaction identifier (30–48 chars), tests: [not_null]}
           - {name: transaction_num_line, description: Line number inside the transaction, tests: [not_null]}
@@ -41,7 +43,8 @@ sources:
       - name: f_member_purchase
         description: >
           Link transaction → member, grain (transaction_id, member_id); Parquet re-export, 63.0 M rows = 20.1 M distinct pairs
-          (42.9 M exact duplicate rows), 85 member country codes plus 1.5 M NULL, 2023-01 → 2026-10.
+          (42.9 M exact duplicate rows, an export artefact), 85 member country codes plus 1.5 M NULL, 2023-01 → 2026-10. member_country_code is the
+          account-creation country of the member, not the transaction country (that is sales_detail.economical_businessunit_country_code).
         columns:
           - {name: transaction_id, tests: [not_null]}
           - {name: member_id, description: 36-char UUID, tests: [not_null]}
@@ -64,8 +67,9 @@ sources:
           - {name: date_of_day, tests: [not_null, unique]}
       - name: all_store_selling_price
         description: >
-          Selling prices per item × store × start date × price type; Parquet re-export, 42.4 M rows, SG/TH/VN, key unique in the export.
-          Dates run from 2019 to planned prices in 2027.
+          Selling prices per item × business unit × start date × price type; Parquet re-export, 42.4 M rows, SG/TH/VN, key unique in the export.
+          Dates run from 2019 to planned prices in 2027. business_unit_third_type 15 = the COUNTRY unit (one per country, the national reference
+          price), 50 = website units (four per country, same prices), 7 = stores.
         tests:
           - dbt_utils.unique_combination_of_columns:
               combination_of_columns: [item_code, business_unit_gln_code, price_start_date, price_type]
@@ -79,8 +83,10 @@ sources:
             tests: [not_null, {accepted_values: {values: ['SG', 'TH', 'VN']}}]
       - name: stock_availability_rate
         description: >
-          Daily stock availability per site × item × availability type; CSV export, 36.7 M rows, five countries, 2024-01-04 → 2026-09-28;
-          14.5 % of rows duplicate the key.
+          Daily availability of SPARE PARTS per site × item (availability_type is always 'spare'); CSV export, 36.7 M rows, five countries,
+          2024-01-04 → 2026-09-28;
+          14.5 % of rows duplicate the key. Not an inventory table (data owner 2026-10-28): inventory lives in the unexported
+          stock_pictures (daily quantities) and core_datamart.obt_stock (weekly is_available flags from 2024-06-29); see issue #21.
         columns:
           - {name: site_gln, tests: [not_null]}
           - {name: item_code, tests: [not_null]}
@@ -97,7 +103,9 @@ sources:
       - name: tracking_ecom_events
         description: >
           Web and app analytics events, one row per event id; 2026-10-27 export as 1,774 daily Parquet parts (200 GB, 1.0 bn events,
-          SG/TH/VN, 2023-01-01 → 2026-10-25 with a gap 2023-10 → 2024-04; 34 % of events carry a member_id). Nested metadata struct.
+          SG/TH/VN, 2023-01-01 → 2026-10-25 with a gap 2023-10 → 2024-04 that is real absence: VN has no events before 2024-04-27 and only
+          Piano / GA3 events count before 2024-07-01, so usable VN data starts 2024-07; 34 % of events carry a member_id). Nested metadata
+          struct; _errors only lists empty optional fields, is_event_to_use alone decides validity.
         columns:
           - {name: id, description: 32-char event id, tests: [not_null]}
           - {name: session_id, tests: [not_null]}
