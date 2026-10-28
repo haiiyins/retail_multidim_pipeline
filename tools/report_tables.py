@@ -331,6 +331,18 @@ def main():
         index.append(write_table(out, "t19_model_cost", "Cost per dbt model rebuilt alone: wall time, peak RSS, output rows and bytes (latest profile per model)", cols, rows,
                                  "`audit.model_cost` (`evaluation/pipeline_cost_profiler.py`)"))
 
+    # ---------------------------------------------------------------- price coverage at the anchor (issue #33 criterion)
+    if want("t21") and table_exists(con, "gold", "gld_fs_model_country"):
+        cols, rows = q(con, """
+            WITH s AS (SELECT DISTINCT country_code, anchor_date, split FROM gold.anchor_grid WHERE is_used)
+            SELECT f.country_code, s.split, COUNT(*) AS model_anchor_rows,
+                   ROUND(100.0 * COUNT(f.price_local) / COUNT(*), 2) AS with_price_pct,
+                   ROUND(AVG(f.sku_price_coverage), 3) AS mean_sku_price_coverage,
+                   ROUND(100.0 * COUNT(*) FILTER (WHERE f.sku_price_coverage >= 0.999) / COUNT(*), 2) AS all_skus_priced_pct
+            FROM gold.gld_fs_model_country f JOIN s USING (country_code, anchor_date) GROUP BY 1, 2 ORDER BY 1, 2""")
+        index.append(write_table(out, "t21_price_coverage_anchor", "Price coverage at the anchor: model × anchor rows with a price and the share of priced SKUs per model (issue #33: ≥ 90 % in the main set)", cols, rows,
+                                 "`gold.gld_fs_model_country` (`price_local`, `sku_price_coverage`), `gold.anchor_grid`"))
+
     # ---------------------------------------------------------------- QC-5 volume drift
     if want("t20") and table_exists(con, "audit", "volume_drift"):
         cols, rows = q(con, """SELECT table_name, country_code, COUNT(*) AS days, COUNT(*) FILTER (WHERE rows = 0) AS days_without_rows, COUNT(*) FILTER (WHERE flagged) AS flagged_days,
