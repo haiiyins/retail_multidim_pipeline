@@ -26,7 +26,7 @@ silver: holidays
 	$(NOFILE); cd dbt_multidim && dbt deps && dbt run --select staging silver quarantine audit && dbt test --select staging silver quarantine audit
 gold:
 	$(NOFILE); python evaluation/build_anchor_grid.py
-	$(NOFILE); cd dbt_multidim && dbt run --select gold && dbt test --select gold
+	$(NOFILE); cd dbt_multidim && dbt run --select gold leakage_violations && dbt test --select gold leakage_violations
 train:
 	$(NOFILE); python evaluation/train_eval_lambdarank.py --config full --delta 30
 ablation:
