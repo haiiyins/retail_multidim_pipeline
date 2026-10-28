@@ -14,6 +14,11 @@ CF = (os.environ.get("COUNTRY_FILTER") or "ALL").strip().upper()
 con = duckdb.connect(DB)
 con.execute(f"SET memory_limit='{os.environ.get('DUCKDB_MEMORY','10GB')}'; SET threads={os.environ.get('DUCKDB_THREADS','6')}; "
             f"SET temp_directory='{ROOT}/duck_temp'; SET preserve_insertion_order=false;")
+# A partitioned COPY buffers partitioned_write_flush_threshold rows per thread AND per partition before it writes a row
+# group; with ~120 (country, year, month) partitions × 16 threads the default 524 288 holds a 1 B-row table in memory and
+# spills it to duck_temp (server 2026-10-28: 112 GB of temp for 64 GB written, 277 % CPU). 32 768 streams at ~2/3 the
+# default row-group size; max_open_files above the partition count keeps one file per partition (ulimit raised by make).
+con.execute("SET partitioned_write_flush_threshold=32768; SET partitioned_write_max_open_files=1024;")
 for ext in ("parquet", "json", "icu"):
     con.execute(f"INSTALL {ext}; LOAD {ext};")
 for s in ["bronze", "staging", "silver", "gold", "quarantine", "audit", "ext"]:
