@@ -23,7 +23,7 @@ gates:
 holidays:
 	$(NOFILE); python ingestion/holiday_commercial_builder.py
 silver: holidays
-	$(NOFILE); cd dbt_multidim && dbt deps && dbt run --select staging silver quarantine audit && dbt test --select staging silver quarantine audit
+	$(NOFILE); cd dbt_multidim && dbt deps && dbt run --select staging silver quarantine audit --exclude leakage_violations && dbt test --select staging silver quarantine audit --exclude leakage_violations
 gold:
 	$(NOFILE); python evaluation/build_anchor_grid.py
 	$(NOFILE); cd dbt_multidim && dbt run --select gold leakage_violations && dbt test --select gold leakage_violations

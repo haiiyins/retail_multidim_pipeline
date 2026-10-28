@@ -23,8 +23,9 @@ for m in models:
     schema = next((v for k, v in SCHEMA.items() if m.startswith(k)), "audit")
     try:
         rows = con.execute(f"SELECT COUNT(*) FROM {schema}.{m}").fetchone()[0]
-        size = con.execute("SELECT estimated_size FROM duckdb_tables() WHERE schema_name = ? AND table_name = ?", [schema, m]).fetchone()
-        nbytes = size[0] if size else None
+        # on-disk size: distinct storage blocks of the table × block size (duckdb_tables().estimated_size is a row estimate, not bytes)
+        blocks = con.execute(f"SELECT COUNT(DISTINCT block_id) FROM pragma_storage_info('{schema}.{m}') WHERE block_id >= 0").fetchone()[0]
+        nbytes = blocks * con.execute("SELECT block_size FROM pragma_database_size()").fetchone()[0]
     except Exception: rows, nbytes = None, None
     con.execute("INSERT INTO audit.pipeline_run_metrics VALUES (?, ?, ?, ?, ?, ?, ?, current_timestamp)",
                 [run_id, schema, m, os.environ.get("COUNTRY_FILTER", "ALL"), wall, rows, peak])
