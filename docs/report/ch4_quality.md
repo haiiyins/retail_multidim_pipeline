@@ -17,8 +17,7 @@
 | QC-7 | batch vs stream reconciliation (rows and hash per day) | Bronze | report |
 
 QC-1, QC-3 and QC-4 are dbt tests and quarantine models; QC-2 is enforced through the gates below; QC-6 through singular tests and the
-ledger (§4.6). QC-5 is specified on the Bronze load metrics and still to be wired (issue #25); QC-7 belongs to the optional streaming
-lane (RUNBOOK step 8).
+ledger (§4.6); QC-5 is the `audit.volume_drift` table of §4.8; QC-7 belongs to the optional streaming lane (RUNBOOK step 8).
 
 ## 4.2 Go / no-go gates per country × year
 
@@ -109,7 +108,21 @@ set to *warn* rather than block and each is explained in the RUNBOOK: negative `
 a missing unit timezone falls back to the country's, duplicate event ids in the raw stream, member-bridge conflicts, and the member-link
 rate (QC-2 is enforced by the gates instead).
 
-## 4.8 Inferred commercial events as evidence
+## 4.8 Volume drift (QC-5)
+
+`make gates` also writes `audit.volume_drift`: rows per day of `sales_detail` and `tracking_ecom_events`, per country, on the full
+calendar grid so that a day without rows counts as zero, compared with the trailing 28-day mean **of the same weekday**. The weekday
+restriction matters: VN Saturdays and Sundays carry 1.8 times a weekday's lines, so a plain 28-day mean flagged 221 days, 180 of them
+weekends; the same-weekday baseline flags 69 of 1,395 VN days (4.9 %) **(t20)**. Each flagged day carries a probable cause derived from
+the holiday table and simple calendar rules, as a hint for the review **(t20b)**: 31 days are public holidays (the four days of Tết at
+−58 to −94 % every year; Hung Kings', Reunification, Labour and National Day at +65 to +146 %), 12 are the e-commerce double days
+(6.6, 10.10, 11.11, 12.12, 3.3), 3 are Black Friday, 9 are days whose baseline contained a holiday, and 14 remain unexplained: the first
+half of October 2023 (eleven days at +51 to +101 % — to be asked of the data owner), 1 June 2023 (Children's Day, not a public
+holiday), two weekdays after the end-of-year peak of 2023, and Saturday 7 September 2024 (−55 %, the day typhoon Yagi made landfall
+in northern Vietnam). No day has zero rows, so the VN export has no gap; the web-event series is reviewed on the server, where the
+known 2023-10 → 2024-04 absence must appear as NO_ROWS days. The check is warn-level: it documents, it does not block.
+
+## 4.9 Inferred commercial events as evidence
 
 The calendar is itself a quality artefact: the inferred events must coincide with real commercial periods for the promotion features to
 mean anything. In VN the six dictionary names (mid-year sale, back to school, Singles' Day 11.11, Black Friday, Labour Day, April holiday

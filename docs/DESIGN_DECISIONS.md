@@ -60,7 +60,7 @@ Re-checked on the whole 2026-10-27 exports and the VN Bronze on 2026-10-28 (issu
 | QC-2 | Referential integrity ≥ 95 / 60 / 90 % per country | Silver | Block for countries in the main evaluation set; warn otherwise |
 | QC-3 | Value domains: `promo_depth ∈ [0, 0.9]`, `price > 0`, `qty > 0` | Silver | Route rows to quarantine |
 | QC-4 | Uniqueness after version dedup and after netting; unique (member, model, t) in `fs_pair` | Silver, Gold | Block |
-| QC-5 | Volume drift ± 50 % vs 28-day trailing mean | Bronze | Warn |
+| QC-5 | Volume drift ± 50 % vs the 28-day trailing mean of the same weekday (`audit.volume_drift`, probable cause attached) | Bronze | Warn |
 | QC-6 | Point-in-time: `max(source_ts) ≤ anchor_date` and `identity_verified_ts ≤ anchor_date` | Gold | Block, log to `quarantine.leakage_violations` |
 | QC-7 | Batch vs stream reconciliation (rows and hash per day) | Bronze | Report |
 
