@@ -178,6 +178,8 @@ The three event tables (web tracking, favourite sports, member–purchase links)
    python ingestion/kafka_consumer_to_bronze.py
    ```
 
+   The producer writes one topic per event table (`raw.tracking`, `raw.favorite_sport`, `raw.member_purchase`), each ordered by its event time, and prints the message count and msg/s per topic. `REPLAY_TOPICS=raw.tracking` restricts it to one topic.
+
 3. **Reconcile** the stream output with the batch Bronze tables using the SQL in `docs/RUNBOOK.md` §8. The per-day difference must be zero.
 
 ## Project Structure
