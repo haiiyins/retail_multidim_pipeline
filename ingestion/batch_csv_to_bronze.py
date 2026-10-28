@@ -37,7 +37,8 @@ for table, c in contracts.items():
         sel = "*"
     part = f"PARTITION_BY ({', '.join(c['partition'])})," if c.get("partition") else ""
     target = dst if part else dst / f"{table}.parquet"   # unpartitioned table: one file inside the table directory
-    if not part: dst.mkdir(parents=True, exist_ok=True)
+    dst.parent.mkdir(parents=True, exist_ok=True)   # a partitioned COPY creates <table>/ itself but not data/bronze/ (fresh checkout, rm -rf data/bronze)
+    if not part: dst.mkdir(exist_ok=True)
     if kind != "csv":
         reader = reader_plain = parquet_reader(src, kind)
     else:
