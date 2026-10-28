@@ -68,7 +68,7 @@ Re-checked on the whole 2026-10-27 exports and the VN Bronze on 2026-10-28 (issu
 
 - **Temporal split:** test = last six months minus Δ; validation = two months before test; purge gap of two weeks (Δ = 30) or six weeks (Δ = 90); training = the remainder from 2023-01.
 - **Baseline B0:** candidates R1 + R2 + national popularity; features F0 + F2 + F4 (purchase history only).
-- **Full:** R1–R4; F0–F5 + sport (R5 and the stock features are switched off, `vars.use_stock`, §3).
+- **Full:** R1–R5; F0–F5 + sport. R5 is the national best-seller source (top-300 by buyers in 28 days); its stock filter and the stock features are switched off (`vars.use_stock`, §3). R4 maps favourite-sport ids to catalogue departments through a learnt affinity table (`gld_sport_department_affinity`, purchases before `valid_lo`), because the two code spaces are unrelated and no dictionary was exported.
 - **Feature axis:** −F1, −F3, −F5, −Sport — each arm switches off the corresponding dbt models so that processing cost is measured, not just columns dropped. The −Stock arm is kept in `ablation_configs.yml` but not run while `use_stock` is false; the cost × gain table reports stock as "not measurable with the exported data" with the 90 % availability figure.
 - **Candidate axis:** −R1 … −R5.
 - **Co-purchase statistics:** one lift table per country over baskets before `valid_lo` (2025-10-27), so no validation or test label contributes. Training anchors earlier than the cutoff therefore see co-purchase structure from after their own date — a static-statistics approximation accepted because the lift is a candidate source and a feature, not a label, and because the test comparison between arms is unaffected; an anchor-dated variant is listed as a possible extension.

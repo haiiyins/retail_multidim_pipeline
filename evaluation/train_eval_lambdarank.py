@@ -12,7 +12,7 @@ drop_cols = set(cfg.get("drop_features", [])); drop_r = cfg.get("drop_sources", 
 where_r = " AND ".join([f"{r} = 0" for r in drop_r]) or "TRUE"
 ID = ["member_id", "anchor_date", "model_code", "country_code"]
 NONFEAT = set(ID + ["label_30", "label_90", "forced_positive", "in_train_sample", "is_used", "split", "week_idx", "days_to_next_buy",
-                    "last_source_ts", "sport_ids", "usual_store_id"])  # anchor-grid bookkeeping and label information are never features
+                    "last_source_ts", "sport_ids", "usual_store_id", "priority_source"])  # anchor-grid bookkeeping and label information are never features
 
 def load(lo, hi, train):
     q = f"""SELECT * FROM gold.gld_ranking_dataset WHERE anchor_date BETWEEN '{lo}' AND '{hi}' AND ({where_r})
