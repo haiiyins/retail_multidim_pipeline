@@ -50,7 +50,7 @@ sources:
         columns:
           - {name: member_id, tests: [not_null, unique]}
       - name: dim_item
-        description: Item (SKU) dimension, one row per item_code; CSV export, 3.85 M rows; last line of the export is cut and quarantined.
+        description: Item (SKU) dimension, one row per item_code; Parquet re-export of 2026-10-28, 4.36 M rows (the 2026-10-25 CSV had 3.85 M rows and lacked 4,569 VN item codes). `gender` is a LIST<VARCHAR>.
         columns:
           - {name: item_code, description: SKU, cast to VARCHAR in Bronze, tests: [not_null, unique]}
       - name: dim_business_unit

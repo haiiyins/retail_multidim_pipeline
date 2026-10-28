@@ -17,7 +17,7 @@ Every raw file (Parquet preferred, else CSV read with `all_varchar=true`) is rea
 | all_store_selling_price | SG, TH, VN | 0 (0.0 %) |
 | stock_availability_rate | PH, SG, TH, TW, VN | 5,320,870 (14.5 %) |
 | f_member_favorite_sport | PH, SG, TH, TW, VN | 78,357 (9.8 %) |
-| tracking_ecom_events | SG | 0 (0.0 %) |
+| tracking_ecom_events | SG, TH, VN | 0 (0.0 %) |
 
 **Union of country codes:** AE, AR, AT, AU, BE, BG, BH, BR, CA, CD, CH, CI, CL, CN, CO, CR, CY, CZ, DE, DZ, EE, EG, ES, FR, GB, GF, GH, GP, GR, HK, HR, HU, ID, IE, IL, IN, IT, JP, KE, KH, KR, KW, KZ, LB, LK, LT, LU, LV, MA, MQ, MT, MU, MX, MY, NC, NL, NZ, None, OM, PA, PF, PH, PL, PT, PY, QA, RE, RO, RS, SA, SE, SG, SI, SK, SN, TH, TN, TR, TW, UA, US, UY, VN, ZA
 
@@ -27,7 +27,7 @@ Every raw file (Parquet preferred, else CSV read with `all_varchar=true`) is rea
 | TH | 31,429,511 | 2023-01-01 00:29:36 | 2026-10-26 17:29:42 |
 | VN | 11,599,372 | 2023-01-01 00:09:13 | 2026-10-26 17:29:25 |
 
-## sales_detail  (89,321,540 rows, parquet, 11 s)
+## sales_detail  (89,321,540 rows, parquet, 6 s)
 
 | economical_businessunit_country_code | rows | min gmv_recorded_at | max gmv_recorded_at |
 |---|---:|---|---|
@@ -71,7 +71,7 @@ Every raw file (Parquet preferred, else CSV read with `all_varchar=true`) is rea
 
 **Contract key** (transaction_id, tender_num_line): 29,740,415 distinct, 0 duplicate rows (0.0 %)
 
-## f_member_purchase  (63,047,610 rows, parquet, 3 s)
+## f_member_purchase  (63,047,610 rows, parquet, 2 s)
 
 | member_country_code | rows | min association_datetime_utc | max association_datetime_utc |
 |---|---:|---|---|
@@ -193,19 +193,19 @@ Every raw file (Parquet preferred, else CSV read with `all_varchar=true`) is rea
 
 **Contract key** (member_id): 5,691,382 distinct, 0 duplicate rows (0.0 %)
 
-## dim_item  (3,847,407 rows, csv, 1 s)
+## dim_item  (4,364,106 rows, parquet, 0 s)
 
 | country | rows | min - | max - |
 |---|---:|---|---|
-| ALL | 3,847,407 | None | None |
+| ALL | 4,364,106 | None | None |
 
 | key column | digits only | min len | max len | ≈ distinct | nulls |
 |---|---:|---:|---:|---:|---:|
-| item_code | 100.0 % | 3 | 8 | 3,661,798 | 0 |
-| model_code | 100.0 % | 1 | 7 | 929,185 | 0 |
-| supermodel_code | 30.3 % | 2 | 8 | 789,798 | 0 |
+| item_code | 100.0 % | 3 | 8 | 4,121,480 | 0 |
+| model_code | 100.0 % | 1 | 7 | 1,046,886 | 0 |
+| supermodel_code | 30.6 % | 2 | 8 | 903,540 | 0 |
 
-**Contract key** (item_code): 3,847,407 distinct, 0 duplicate rows (0.0 %)
+**Contract key** (item_code): 4,364,106 distinct, 0 duplicate rows (0.0 %)
 
 ## dim_business_unit  (275 rows, csv, 0 s)
 
@@ -242,7 +242,7 @@ Every raw file (Parquet preferred, else CSV read with `all_varchar=true`) is rea
 
 **Contract key** (date_of_day): 1,461 distinct, 0 duplicate rows (0.0 %)
 
-## all_store_selling_price  (42,416,758 rows, parquet, 3 s)
+## all_store_selling_price  (42,416,758 rows, parquet, 2 s)
 
 | country_code | rows | min price_start_date | max price_start_date |
 |---|---:|---|---|
@@ -263,7 +263,7 @@ Every raw file (Parquet preferred, else CSV read with `all_varchar=true`) is rea
 
 **Contract key** (item_code, business_unit_gln_code, price_start_date, price_type): 42,416,758 distinct, 0 duplicate rows (0.0 %)
 
-## stock_availability_rate  (36,701,681 rows, csv, 6 s)
+## stock_availability_rate  (36,701,681 rows, csv, 5 s)
 
 | country_code | rows | min snapshot_date | max snapshot_date |
 |---|---:|---|---|
@@ -301,21 +301,23 @@ Every raw file (Parquet preferred, else CSV read with `all_varchar=true`) is rea
 
 **Contract key** (member_id, sport_id, event_datetime_utc): 717,786 distinct, 78,357 duplicate rows (9.8 %)
 
-## tracking_ecom_events  (844,188 rows, csv, 1 s)
+## tracking_ecom_events  (1,902,820 rows, parquet-dir, 0 s)
 
 | country_code | rows | min timestamp_utc | max timestamp_utc |
 |---|---:|---|---|
-| SG | 844,188 | 2025-11-09 16:00:00.090000 | 2025-11-12 15:59:59.826000 |
+| SG | 776,700 | 2025-10-10 16:00:00.193000 | 2025-10-11 15:59:59.999000 |
+| TH | 661,970 | 2025-11-09 17:00:00.155000 | 2025-11-10 16:59:59.984000 |
+| VN | 464,150 | 2025-06-05 17:00:00.468000 | 2025-06-06 16:59:59.370000 |
 
-**name** (13 values): `page_viewed` 343,853, `product_list_viewed` 222,597, `product_page_viewed` 121,077, `search_results_viewed` 58,530, `search_completed` 49,499, `product_size_selected` 15,623, `menu_item_selected` 9,959, `cart_viewed` 9,513, `product_added_to_cart` 7,392, `checkout_commenced` 2,652, `checkout_payment_viewed` 1,644, `order_completed` 1,060, `checkout_shipping_viewed` 789
+**name** (13 values): `page_viewed` 751,231, `product_list_viewed` 542,235, `product_page_viewed` 286,574, `search_results_viewed` 104,682, `search_completed` 91,168, `menu_item_selected` 35,599, `product_size_selected` 33,250, `cart_viewed` 24,888, `product_added_to_cart` 18,401, `checkout_commenced` 6,040, `checkout_payment_viewed` 3,815, `checkout_shipping_viewed` 2,649, `order_completed` 2,288
 
-**platform** (2 values): `app` 492,895, `web` 351,293
+**platform** (2 values): `web` 1,011,402, `app` 891,418
 
-**is_event_to_use** (1 values): `true` 844,188
+**is_event_to_use** (1 values): `True` 1,902,820
 
 | key column | digits only | min len | max len | ≈ distinct | nulls |
 |---|---:|---:|---:|---:|---:|
-| id | 0.0 % | 32 | 32 | 836,708 | 0 |
-| session_id | 0.0 % | 32 | 32 | 82,332 | 0 |
+| id | 0.0 % | 32 | 32 | 1,873,891 | 0 |
+| session_id | 0.0 % | 32 | 32 | 113,682 | 0 |
 
-**Contract key** (id): 844,188 distinct, 0 duplicate rows (0.0 %)
+**Contract key** (id): 1,902,820 distinct, 0 duplicate rows (0.0 %)
