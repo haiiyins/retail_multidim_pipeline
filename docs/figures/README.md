@@ -1,6 +1,9 @@
 # Figures for the report and the demo (WBS 5.1, issue #44)
 
-Generated files (reproducible):
+Generated files (reproducible). Lineage layout (`tools/lineage_graph.py`): columns are dependency depth — Bronze sources in the first
+column, every model one column right of its deepest input — so each column reads as one stage; colours mark the layer (legend in the
+figure); edges are orthogonal; the three Gold tables built by `evaluation/build_anchor_grid.py` appear as components with the Silver
+tables the script reads as inputs.
 
 | file | caption | how to regenerate |
 |---|---|---|
