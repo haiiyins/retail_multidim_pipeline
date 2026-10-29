@@ -2,9 +2,8 @@
 
 Drafts of the report chapters, written so that they can be pasted into the shared document. Every number is taken from a table in
 [`tables/`](tables/INDEX.md), which `make report-tables` (`tools/report_tables.py`) regenerates from the lakehouse; no number is typed
-by hand. The tables and chapters 2 – 4 carry the **three-country server build of 2026-10-28** (`COUNTRY_FILTER=ALL`, Bronze → Gold). Two tables
-still come from the laptop VN build and say so in their provenance line — `t13` (technique comparisons) and `t19` (model cost) — until
-the server runs `make techniques` and the cost profiler; `tables/INDEX.md` shows the build and time of every table.
+by hand. Every table carries the **three-country server build of 2026-10-28 – 29** (`COUNTRY_FILTER=ALL`, Bronze → Gold, experiments,
+cost profiler, scale test and technique comparisons on the same machine); `tables/INDEX.md` shows the build and time of every table.
 
 | Chapter | File | RUNBOOK §9 items | Issue |
 |---|---|---|---|

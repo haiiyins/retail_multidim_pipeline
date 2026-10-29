@@ -3,7 +3,7 @@
 > The pipeline is the deliverable (DESIGN §1): a three-tier lakehouse on DuckDB and Parquet, orchestrated with dbt, that turns the
 > eleven tables into point-in-time features. This chapter follows the data through Bronze, Silver and Gold and names the technique
 > applied at each step; §3.8 maps the techniques to the course topics and §3.9 reports the four with / without measurements.
-> Numbers: three-country server build (SG, TH, VN), 2026-10-28, tables in `docs/report/tables/`; §3.9 is still the laptop (VN) measurement.
+> Numbers: three-country server build (SG, TH, VN), 2026-10-28 – 29, tables in `docs/report/tables/`; §3.9 is measured on the server on VN.
 
 ## 3.1 Architecture and tooling
 
@@ -172,15 +172,20 @@ substituted where it differs.
 
 ## 3.9 With / without comparisons of four techniques
 
-`evaluation/technique_comparisons.py` (`make techniques`) measures four techniques against their naive alternative on VN, each
-variant in a fresh child process, three repetitions, median wall time and peak resident memory **(t13)**:
+`evaluation/technique_comparisons.py` (`make techniques`) measures four techniques against their naive alternative on VN on the
+server (16 threads, 80 GB memory limit), each variant in a fresh child process, three repetitions, median wall time and peak resident
+memory **(t13)**. Sales, prices and anchors are the full VN data; the regex comparison runs on a deterministic 1-in-36 hash sample of
+the VN web events (≈ 5.0 M of 178.9 M, `TECHNIQUE_EVENT_LIMIT`), because the row-wise Python baseline holds every row in memory:
 
 | Comparison | Baseline → technique | Rows | Wall time | Peak memory |
 |---|---|---:|---|---|
-| Parquet vs CSV | the same GROUP BY aggregate over an extract of the VN sales lines, read from CSV → from Parquet | 124 result groups | 0.36 s → 0.05 s (6.6×) | 0.46 GB → ≈ 0 |
-| Column projection | materialise the VN 2025 sales lines from the raw Parquet with all 141 columns → with the 25 staged columns | 2.8 M lines | 3.41 s → 0.51 s (6.7×) | 5.73 → 1.65 GB |
-| ASOF join vs daily explode | price of every priced SKU at every anchor Monday: explode the intervals to days and equi-join → ASOF join | 14.9 M lookups | 1.02 s → 0.77 s (1.3×) | 2.82 → 1.47 GB |
-| SQL regex vs row-wise Python | extract member, user and order ids from the JSON metadata string of the VN events: Python `re` per row → `regexp_extract` in SQL | 589 k values | 1.50 s → 0.51 s (2.9×) | 3.05 → 1.15 GB |
+| Parquet vs CSV | the same GROUP BY aggregate over an extract of the 11.6 M VN sales lines, read from CSV → from Parquet | 124 result groups | 0.71 s → 0.10 s (6.9×) | 0.99 → 0.08 GB |
+| Column projection | materialise the VN 2025 sales lines from the raw Parquet with all 141 columns → with the 25 staged columns | 2.8 M lines | 13.58 s → 1.54 s (8.8×) | 9.30 → 2.50 GB |
+| ASOF join vs daily explode | price of every priced SKU at every anchor Monday: explode the intervals to days and equi-join → ASOF join | 14.9 M lookups | 2.07 s → 1.31 s (1.6×) | 2.86 → 1.74 GB |
+| SQL regex vs row-wise Python | extract member, user and order ids from the JSON metadata string of the sampled VN events: Python `re` per row → `regexp_extract` in SQL | 6.4 M values | 44.72 s → 2.94 s (15.2×) | 21.34 → 6.62 GB |
 
-The native STRUCT path of the Parquet export (reference variant) reads the same member ids in 0.01 s, which is why the pipeline extracts
-by struct path and keeps the regex only for the CSV-era `Map` strings. The server rerun on the three countries replaces this table.
+The native STRUCT path of the Parquet export (reference variant) reads the same member ids in 0.05 s (1.47 M member ids among the
+sampled events), which is why the pipeline extracts by struct path and keeps the regex only for the CSV-era `Map` strings. The laptop
+measurement on the one-day web sample (8 threads, 15 GB: 6.6×, 6.7×, 1.3×, 2.9×) agrees on the storage-side factors; the two ratios that
+depend on threads or rows move with the machine — the ASOF join gains 1.6× instead of 1.3× on 16 threads, and the Python loop, linear in
+rows, falls 15× behind the parallel SQL regex on 5 M events where it was 2.9× behind on 464 k.
