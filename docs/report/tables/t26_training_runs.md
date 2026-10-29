@@ -25,4 +25,4 @@
 | no_r5 | 30 | 196 | 0 | 2026-10-28 19:45 |
 | no_r5 | 90 | 445 | 0 | 2026-10-28 19:52 |
 
-*Source:* `data/audit/ablation_runs.csv` (`audit.ablation_runs`, `evaluation/run_ablation_2axes.py`). *Generated:* 2026-10-29 04:32 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`. Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`. Hyper-parameters frozen by the Full Δ30 run (`evaluation/frozen_params.json`): 192 boosting rounds (early stopping on validation NDCG@20), num_leaves 63, learning_rate 0.05, feature_fraction 0.8, bagging_fraction 0.8; every arm reuses them.
+*Source:* `data/audit/ablation_runs.csv` (`audit.ablation_runs`, `evaluation/run_ablation_2axes.py`). *Generated:* 2026-10-29 08:50 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`. Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`. Hyper-parameters frozen by the Full Δ30 run (`evaluation/frozen_params.json`): 192 boosting rounds (early stopping on validation NDCG@20), num_leaves 63, learning_rate 0.05, feature_fraction 0.8, bagging_fraction 0.8; every arm reuses them.

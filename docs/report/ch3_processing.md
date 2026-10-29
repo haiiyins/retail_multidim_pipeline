@@ -95,8 +95,10 @@ labelled `EVENT_n`. Public holidays come from the `holidays` library (`make holi
 
 In VN the method finds 18 event occurrences covering 225 days, eight distinct names, six of them from the dictionary — mid-year sale
 (five occurrences), back to school, Singles' Day, Black Friday, Labour Day, April holiday sale — and two unnamed peaks of three to
-five days; in SG it finds 23 events (275 days) and in TH 14 (277 days), all still labelled `EVENT_n` because the dictionary was
-written from the VN peaks (issue #18) **(t07, t07b)**. The promotion share itself stays low (mean 0.35 % in VN, 1.1 % in SG and TH;
+five days; in SG it finds 23 occurrences (275 days) and in TH 14 (277 days). After the SG / TH naming pass (issue #18) the dictionary
+covers 11 of the 23 SG occurrences (mid-year sale ×5, Singles' Day ×3, Lunar New Year sale ×2, Labour Day) and 7 of the 14 TH
+occurrences (mid-year sale ×3, Lunar New Year sale, Singles' Day, Black Friday, Songkran sale); the other 12 SG and 7 TH peaks, almost
+all single occurrences, stay `EVENT_n` until the data owner names them **(t07, t07b)**. The promotion share itself stays low (mean 0.35 % in VN, 1.1 % in SG and TH;
 maximum 2.2 – 2.5 %), which is why the floor is needed. The
 calendar feeds three features (in commercial event, days to the next public holiday, country promotion share) and the seasonality
 index.
@@ -113,7 +115,8 @@ use an event only when the link was known at the anchor (`identity_verified_ts �
 tests check.
 
 Over the full click-stream, 36.1 % of SG events, 33.7 % of TH events and 29.9 % of VN events carry a member directly, and stitching
-adds 5.8, 6.3 and 7.6 points (42.0 %, 40.0 % and 37.6 % identified), through 1,295,225 cookie–member links; 945 cookies linked to
+adds 5.8, 6.3 and 7.6 points (42.0 %, 40.0 % and 37.6 % identified), through 274,979 / 212,098 / 203,167 cookie–member links whose member account is in SG / TH / VN (1,295,225 over every account
+country); 945 cookies linked to
 several members are excluded **(t08)**. At anchor level — the share of used anchors whose member has an attributed event in the 30 days
 before, known at the anchor **(t09)** — the test anchors reach 18.8 % in SG, 5.5 % in TH and 7.3 % in VN, the training anchors 5.1 %,
 1.8 % and 3.6 % because most of them precede the start of the click-stream (TH 2023-04, usable VN events 2024-07); the

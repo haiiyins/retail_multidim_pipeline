@@ -15,4 +15,4 @@
 | VN | 2025 | 1,038,523 | 74.83 | 100 | 99.58 | 153,569 | PASS |
 | VN | 2026 | 1,186,902 | 64.87 | 100 | 99.82 | 153,517 | PASS |
 
-*Source:* `audit.gates_by_country` (`sql/gates_by_country.sql`, `make gates`). *Generated:* 2026-10-28 15:13 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.
+*Source:* `audit.gates_by_country` (`sql/gates_by_country.sql`, `make gates`). *Generated:* 2026-10-29 07:36 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.

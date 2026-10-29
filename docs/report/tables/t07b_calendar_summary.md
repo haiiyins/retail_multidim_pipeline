@@ -6,4 +6,4 @@
 | TH | 1,461 | 2023-01-01 | 2026-12-31 | 106 | 277 | 14 | 0.011 | 0.0222 |
 | VN | 1,461 | 2023-01-01 | 2026-12-31 | 58 | 225 | 18 | 0.0035 | 0.0217 |
 
-*Source:* `silver.slv_calendar_enriched`, `ext.public_holidays` (`ingestion/holiday_commercial_builder.py`). *Generated:* 2026-10-28 15:13 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.
+*Source:* `silver.slv_calendar_enriched`, `ext.public_holidays` (`ingestion/holiday_commercial_builder.py`). *Generated:* 2026-10-29 07:36 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.

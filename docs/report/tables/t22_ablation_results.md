@@ -25,4 +25,4 @@
 | no_r4 | 90 | 0.2018 | -0.0004 | -0.0009 | 0.0001 | no | 0.3766 | -0.001 | no | 0.5419 | 0.0004 | no | 88,251 |
 | no_sport | 90 | 0.2023 | 0.0001 | -0.0004 | 0.0006 | no | 0.3775 | -0.0001 | no | 0.5428 | 0.0014 | no | 88,251 |
 
-*Source:* `data/audit/ablation_results_d30.csv`, `_d90.csv` (`evaluation/bootstrap_ci.py`, step 7.4). *Generated:* 2026-10-29 04:32 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`. Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`. `*_sig` = the CI of the difference excludes 0.
+*Source:* `data/audit/ablation_results_d30.csv`, `_d90.csv` (`evaluation/bootstrap_ci.py`, step 7.4). *Generated:* 2026-10-29 07:36 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`. Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`. `*_sig` = the CI of the difference excludes 0.

@@ -490,4 +490,4 @@
 | tracking_ecom_events | VN | 2026-09-09 | 3 | 377,895 | 237,729.0 | 0.59 | DOUBLE_DAY_SALE |
 | tracking_ecom_events | VN | 2026-10-10 | 6 | 324,334 | 208,627.0 | 0.555 | DOUBLE_DAY_SALE |
 
-*Source:* `audit.volume_drift`. *Generated:* 2026-10-28 15:55 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.
+*Source:* `audit.volume_drift`. *Generated:* 2026-10-29 07:36 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.

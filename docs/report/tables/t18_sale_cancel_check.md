@@ -6,4 +6,4 @@
 | TH | 35,861 | 1,449 | 0 |
 | VN | 41,581 | 4,529 | 0 |
 
-*Source:* `staging.stg_sales_detail`, `silver.slv_fact_sales_line` (RUNBOOK §5 manual check, automated). *Generated:* 2026-10-28 15:13 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.
+*Source:* `staging.stg_sales_detail`, `silver.slv_fact_sales_line` (RUNBOOK §5 manual check, automated). *Generated:* 2026-10-29 07:36 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.

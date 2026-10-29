@@ -1,0 +1,10 @@
+country_code,split,model_anchor_rows,with_price_pct,mean_sku_price_coverage,all_skus_priced_pct
+SG,test,267747,98.57,0.929,78.92
+SG,train,1324815,98.31,0.926,78.34
+SG,valid,95980,98.44,0.929,78.97
+TH,test,217971,99.15,0.936,80.4
+TH,train,1078280,99.18,0.94,81.1
+TH,valid,74559,99.1,0.938,81.08
+VN,test,215865,99.51,0.933,78.31
+VN,train,947980,99.16,0.931,77.64
+VN,valid,67723,99.6,0.937,78.8
