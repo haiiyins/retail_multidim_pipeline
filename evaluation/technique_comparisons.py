@@ -6,14 +6,18 @@ three repetitions, wall time and peak RSS of the child; medians go to audit.tech
   3 asof_vs_explode    price at every anchor date of the grid (176 Mondays) for every priced SKU: ASOF JOIN vs exploding the intervals
                        to one row per SKU per day over the whole span (the naive approach); an out-of-memory failure is recorded as a result
   4 regex_vs_python    member / user / order ids from the web-event metadata as a JSON string: SQL regexp_extract vs a row-wise
-                       Python re loop with the same three patterns (the struct path used in production is the reference)
-Usage: python evaluation/technique_comparisons.py [--reps 3]      temp files under $DATA_ROOT/duck_temp, removed at the end."""
+                       Python re loop with the same three patterns (the struct path used in production is the reference). The Python
+                       baseline holds every row in memory, so on a full country set TECHNIQUE_EVENT_LIMIT=<n> to take a reservoir
+                       sample of n events (seed 42) after the country filter; the laptop's one-day sample needs no limit.
+Usage: python evaluation/technique_comparisons.py [--reps 3]      temp files under $DATA_ROOT/duck_temp, removed at the end.
+Env: TECHNIQUE_COUNTRY (default VN), TECHNIQUE_EVENT_LIMIT (default none = all events of the country)."""
 import duckdb, os, sys, time, json, argparse, subprocess, pathlib, statistics, psutil
 from dotenv import load_dotenv
 load_dotenv()
 DB = os.environ["DUCKDB_PATH"]; ROOT = pathlib.Path(os.environ.get("DATA_ROOT", "./data")); TMP = ROOT / "duck_temp"
 RAW = ROOT / "raw_csv"
 COUNTRY = os.environ.get("TECHNIQUE_COUNTRY", "VN")
+EVENT_LIMIT = int(os.environ["TECHNIQUE_EVENT_LIMIT"]) if os.environ.get("TECHNIQUE_EVENT_LIMIT") else None
 STG_COLS = """transaction_id, transaction_num_line, customer_purchase_order_id, transaction_version_at, transaction_status, item_operation_type, item_type,
     item_code, model_code, economical_businessunit_country_code, economical_businessunit_id, transaction_channel_type, customer_identification_type,
     gmv_recorded_at, gmv_item_quantity, gmv_amount, gmv_amount_euros, regular_selling_price, discount_amount, exchange_rate_local_to_euros,
@@ -33,8 +37,10 @@ def prepare():
                            item_operation_type, transaction_status FROM lh.bronze.sales_detail WHERE economical_businessunit_country_code = '{COUNTRY}')
                     TO '{TMP}/tc_sales.parquet' (FORMAT PARQUET)""")
     con.execute(f"COPY (SELECT * FROM read_parquet('{TMP}/tc_sales.parquet')) TO '{TMP}/tc_sales.csv' (FORMAT CSV, HEADER)")
+    sample = f"USING SAMPLE {EVENT_LIMIT} ROWS (reservoir, 42)" if EVENT_LIMIT else ""   # DuckDB samples the FROM before WHERE, hence the subquery
     con.execute(f"""COPY (SELECT id, to_json(metadata) AS meta_json, metadata.user_details.member_id AS member_id_native
-                    FROM lh.bronze.tracking_ecom_events WHERE country_code = '{COUNTRY}') TO '{TMP}/tc_events.parquet' (FORMAT PARQUET)""")
+                    FROM (SELECT id, metadata FROM lh.bronze.tracking_ecom_events WHERE country_code = '{COUNTRY}') {sample})
+                    TO '{TMP}/tc_events.parquet' (FORMAT PARQUET)""")
     con.execute(f"COPY (SELECT item_code, eff_start, eff_end, price FROM lh.silver.slv_price_sku_interval WHERE country_code = '{COUNTRY}' AND price_scope = 'NATIONAL') TO '{TMP}/tc_prices.parquet' (FORMAT PARQUET)")
     con.execute(f"COPY (SELECT DISTINCT anchor_date FROM lh.gold.anchor_model_grid WHERE country_code = '{COUNTRY}') TO '{TMP}/tc_anchors.parquet' (FORMAT PARQUET)")
     n = {f: con.execute(f"SELECT COUNT(*) FROM read_parquet('{TMP}/{f}.parquet')").fetchone()[0] for f in ("tc_sales", "tc_events", "tc_prices")}
