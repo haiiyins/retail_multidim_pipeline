@@ -1,5 +1,8 @@
 # Data contracts for the 11 source tables: keys, Bronze partitioning, required columns, key columns cast to VARCHAR,
 # country_col = column COUNTRY_FILTER applies to (tables without one are loaded whole; country_via follows a parent table)
+# stream: (the three event tables) = the optional streaming lane of RUNBOOK §8 — topic, message key, order and event-date columns,
+#   the columns a message carries with the DuckDB type the consumer declares, the stream partition and the QC-7 hash columns;
+#   the one definition read by ingestion/stream_contracts.py for the producer, the consumer and QC-7 (#103)
 # Key formats measured on the full files (data/audit/csv_fullscan.md, 2026-10-25): every *_gln is a 13-digit number,
 # item_code is digits only (1-13 chars, sniffed VARCHAR in sales_detail and BIGINT elsewhere), model_code is 99.9 % digits,
 # transaction_id (28-48 chars) and member_id (36-char UUID) are strings -> all join keys are cast to VARCHAR.
@@ -21,6 +24,15 @@ f_member_purchase:
   country_col: member_country_code
   partition: [member_country_code, tech_year, tech_month]
   not_null: [transaction_id]   # member_id is NULL on ~1.47 M memberless associations that batch Bronze keeps (dbt warn, #91): not a reject reason
+  stream:   # tech_year / tech_month are not the event month (1970-01, disagreements), so the lane filters and partitions by association_datetime_utc
+    topic: raw.member_purchase
+    message_key: transaction_id
+    order_by: association_datetime_utc
+    event_date: association_datetime_utc
+    partition: [member_country_code, year, month]
+    columns: {transaction_id: VARCHAR, member_id: VARCHAR, association_datetime_utc: TIMESTAMP, transaction_source: VARCHAR,
+              transaction_operator: VARCHAR, member_country_code: VARCHAR}
+    hash_columns: [transaction_id, member_id, association_datetime_utc, transaction_source, transaction_operator]
 d_member:
   key: [member_id]
   country_col: member_country_code
@@ -53,8 +65,27 @@ f_member_favorite_sport:
   country_col: country_code
   partition: [country_code, year]
   not_null: [member_id, sport_id, event_datetime_utc]   # same three as dbt staging/sources.yml; checked by the stream consumer (ingestion/kafka_consumer_to_bronze.py); the batch loader does not read it
+  stream:
+    topic: raw.favorite_sport
+    message_key: member_id
+    order_by: event_datetime_utc
+    event_date: event_datetime_utc
+    partition: [country_code, year]
+    columns: {member_id: VARCHAR, sport_id: BIGINT, event_type: VARCHAR, event_datetime_utc: TIMESTAMPTZ,
+              tech_integration_datetime_utc: TIMESTAMPTZ, country_code: VARCHAR}
+    hash_columns: [member_id, sport_id, event_type, event_datetime_utc]
 tracking_ecom_events:
   key: [id]
   country_col: country_code
   partition: [country_code, year, month]
   not_null: [id, session_id, timestamp_utc, country_code]
+  stream:   # 10 of the 22 Bronze columns travel; is_event_to_use must be true on both lanes (DESIGN §3): a reject reason and the QC-7 predicate
+    topic: raw.tracking
+    message_key: session_id
+    order_by: timestamp_utc
+    event_date: date
+    require_true: is_event_to_use
+    partition: [country_code, year, month]
+    columns: {id: VARCHAR, session_id: VARCHAR, name: VARCHAR, country_code: VARCHAR, platform: VARCHAR, timestamp_utc: TIMESTAMP,
+              date: DATE, is_event_to_use: BOOLEAN, _errors: JSON, metadata: JSON}
+    hash_columns: [id, session_id, name, timestamp_utc]

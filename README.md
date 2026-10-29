@@ -186,7 +186,7 @@ The three event tables (web tracking, favourite sports, member–purchase links)
 
 ```
 retail_multidim_pipeline/
-├── ingestion/              CSV probe, batch CSV → Bronze, data contracts, holiday calendar, Kafka replay/consumer
+├── ingestion/              CSV probe, batch CSV → Bronze, data contracts, holiday calendar, Kafka replay / consumer / QC-7 reconciliation
 ├── sql/                    go/no-go gates and audit checks
 ├── dbt_multidim/           dbt-duckdb project
 │   ├── macros/             Map(k -> v) extraction, promotion kinds, country filter
