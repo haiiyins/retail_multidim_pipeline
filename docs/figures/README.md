@@ -1,16 +1,50 @@
 # Figures for the report and the demo (WBS 5.1, issue #44)
 
-Generated files (reproducible). Lineage layout (`tools/lineage_graph.py`): columns are dependency depth — Bronze sources in the first
-column, every model one column right of its deepest input — so each column reads as one stage; colours mark the layer (legend in the
-figure); edges are orthogonal; the three Gold tables built by `evaluation/build_anchor_grid.py` appear as components with the Silver
-tables the script reads as inputs.
+Generated files (reproducible). `tools/lineage_graph.py` renders seven publication-grade vector (`.svg`) and raster (`.png`, 260–300 DPI)
+diagrams using `matplotlib` directly from `dbt_multidim/target/manifest.json` (with SQL comment stripping so documentation comments never
+introduce false edges). The figure suite covers two end-to-end synthesis views (generalized and detailed) and five layer-specific / DAG
+lineage views organised into semantic domain swimlanes and dependency stages:
 
-| file | caption | how to regenerate |
-|---|---|---|
-| `lineage_full.svg` / `.png` | dbt lineage of the whole pipeline: Bronze sources → staging views → Silver → quarantine / audit → Gold; the anchor grid, model grid and split windows are built by `evaluation/build_anchor_grid.py` (component nodes) | `make docs-figures` |
-| `lineage_bronze_to_silver.svg` / `.png` | Bronze → Silver detail with the quarantine and audit tables | `make docs-figures` |
-| `lineage_silver_to_gold.svg` / `.png` | Silver → Gold detail: two feature entities, candidates, pairs, ranking dataset, leakage ledger | `make docs-figures` |
-| `explain_analyze_asof_price.txt` | `EXPLAIN ANALYZE` of the ASOF price lookup at one anchor date (DuckDB 2.0, laptop) | `make docs-figures` |
+### 1. End-to-End Synthesis Diagrams (Generalized & Detailed)
+
+| file | level | caption | how to regenerate |
+|---|---|---|---|
+| `architecture_overview.svg` / `.png` | Generalized (High-Level) | End-to-end generalized medallion lakehouse architecture: 6 macro stages from Raw Multi-Country Sources (~230 GB, 11 tables) → Bronze Lakehouse → Silver Cleansed & Reconciled → Gold Point-in-Time Feature Store (3 Entities, R1–R5, F0–F5) → Fixed LightGBM LambdaRank & Two-Axis Ablation, plus the cross-cutting Quality Gate & Observability Spine (QC-1 … QC-7) | `make docs-figures` |
+| `architecture_detailed.svg` / `.png` | Detailed (System & Data-Flow) | End-to-end detailed system and data-flow blueprint across Steps 1–7: Raw CSV/Parquet + optional Redpanda streaming lane, Bronze ZSTD Hive-partitioned Parquet & views, Silver domain swimlanes (POS netting, reference & price intervals, enriched calendar, web stitching), Gold anchor grid (`evaluation/build_anchor_grid.py`), 3 Feature Store entities (`gld_fs_member`, `gld_fs_model_country`, `gld_fs_pair`), 5 candidate sources (`R1`–`R5`), 6 feature groups (`F0`–`F5`), QC-6 leakage assertions, and evaluation outputs | `make docs-figures` |
+
+### 2. Layer-by-Layer & dbt Lineage Diagrams
+
+| file | scope | caption | how to regenerate |
+|---|---|---|---|
+| `lineage_full.svg` / `.png` | Full DAG (46 nodes, 90 edges) | Complete end-to-end lineage across 7 stages and 5 domain swimlanes: Bronze sources → Staging views → Silver core → Silver derived / Quarantine / Audit → Gold Feature Store & Candidates → Ranking Dataset & QC-6 Leakage Ledger | `make docs-figures` |
+| `lineage_ingestion_to_bronze.svg` / `.png` | Raw → Ingestion → Bronze | Detailed ingestion and Bronze layer architecture: 11 raw sources, batch loader (`batch_csv_to_bronze.py`) with `table_contracts.yml` & streaming threshold (`32,768` rows), optional Redpanda replay + consumer (`kafka_consumer_to_bronze.py`), Hive-partitioned ZSTD Parquet + `bronze.*` views, `quarantine.rejects_*`, `quarantine.rejected_stream_events`, and QC-7 reconciliation (`audit.stream_reconciliation`) | `make docs-figures` |
+| `lineage_bronze_to_silver.svg` / `.png` | Bronze → Staging → Silver (33 nodes, 35 edges) | Detailed Bronze-to-Silver lineage across 5 stages and 4 swimlanes (Sales/Returns/Member, Catalogue/Price/Store/Stock, Calendar/Sports, Web Clickstream/Identity Stitching) with quarantine (`qrt_*`) and audit (`gates_by_country`, `stitching_coverage`, `volume_drift`) outputs | `make docs-figures` |
+| `lineage_silver_to_gold.svg` / `.png` | Silver → Gold → Ranking (23 nodes, 56 edges) | Detailed Silver-to-Gold feature store and candidate generation lineage across 6 stages and 4 swimlanes: Silver inputs → Python anchor/model grids (`build_anchor_grid.py`) & `gld_web_stitched` → `gld_fs_member`, `gld_fs_model_country`, `gld_candidates`, `gld_labels` → `gld_fs_pair` → `gld_ranking_dataset` & `quarantine.leakage_violations` | `make docs-figures` |
+| `lineage_gold_to_evaluation.svg` / `.png` | Gold → LambdaRank → Ablation | Detailed Gold-to-Evaluation architecture: 5 candidate sources (`R1`–`R5`, cap 200) and 6 feature groups (`F0`–`F5` across 3 entities) → `gld_ranking_dataset` with temporal split & 42-day purge gaps → fixed LightGBM LambdaRank (`train_ranker.py`) → 12-configuration two-axis ablation (`ablation_runner.py`), 1,000× member-level bootstrap CI, cost × gain (`pipeline_run_metrics`), and scale/technique benchmarks | `make docs-figures` |
+| `explain_analyze_asof_price.txt` | Query plan | `EXPLAIN ANALYZE` of the ASOF price lookup at one anchor date (DuckDB 2.0, laptop) | `make docs-figures` |
+
+### Visual Previews
+
+#### Generalized End-to-End Architecture (`architecture_overview.png`)
+![Generalized End-to-End Architecture](architecture_overview.png)
+
+#### Detailed End-to-End System & Data-Flow Architecture (`architecture_detailed.png`)
+![Detailed End-to-End Architecture](architecture_detailed.png)
+
+#### Layer 1 — Raw Ingestion, Streaming Replay & Bronze Lakehouse (`lineage_ingestion_to_bronze.png`)
+![Ingestion to Bronze Lineage](lineage_ingestion_to_bronze.png)
+
+#### Layer 2 — Bronze → Staging → Silver, Quarantine & Quality Gates (`lineage_bronze_to_silver.png`)
+![Bronze to Silver Lineage](lineage_bronze_to_silver.png)
+
+#### Layer 3 — Silver → Gold Point-in-Time Feature Store & Candidates (`lineage_silver_to_gold.png`)
+![Silver to Gold Lineage](lineage_silver_to_gold.png)
+
+#### Layer 4 — Gold → Fixed LightGBM LambdaRank & Two-Axis Ablation (`lineage_gold_to_evaluation.png`)
+![Gold to Evaluation Lineage](lineage_gold_to_evaluation.png)
+
+#### Complete End-to-End dbt + Python Lineage DAG (`lineage_full.png`)
+![Full Pipeline Lineage](lineage_full.png)
 
 Terminal evidence (screenshots of the server log, prompt line cropped so that no host or account name appears):
 

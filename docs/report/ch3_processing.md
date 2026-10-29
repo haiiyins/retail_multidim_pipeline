@@ -26,10 +26,16 @@ EVALUATION  fixed LightGBM LambdaRank · temporal split with purge gaps · B0 vs
 
 DuckDB (2.0) executes every transformation as SQL on a single machine; Parquet is the storage format of Bronze and the
 `lakehouse.duckdb` file holds Silver and Gold. dbt (1.12, `dbt-duckdb`) gives the dependency graph (`docs/figures/lineage_full.png`,
-45 nodes), the tests and the documentation; 31 models are organised in five folders (2 staging views, 15 Silver, 4 quarantine, 2 audit,
-8 Gold) **(t14)**. Every `dbt run` appends wall time and rows per model to `audit.pipeline_run_metrics` through an `on-run-end` hook, the
+46 nodes across 7 stages and 5 domain swimlanes), the tests and the documentation; 32 models are organised in five folders (2 staging views, 15 Silver, 4 quarantine, 3 audit,
+8 Gold) **(t14)**. In addition to the full lineage DAG, `docs/figures/` provides two end-to-end synthesis diagrams for the report — a generalized overview (`docs/figures/architecture_overview.png`) and a detailed system blueprint (`docs/figures/architecture_detailed.png`) — together with four layer-specific diagrams (`lineage_ingestion_to_bronze.png`, `lineage_bronze_to_silver.png`, `lineage_silver_to_gold.png`, and `lineage_gold_to_evaluation.png`). Every `dbt run` appends wall time and rows per model to `audit.pipeline_run_metrics` through an `on-run-end` hook, the
 same table the Bronze loader writes, so the cost of each step is a by-product of running it. The laptop (M-series, 8 threads, 15 GB
 memory limit) develops on VN; the leased server (16 threads, 125 GB, NVMe) runs the three countries with the same `make` targets.
+
+![Generalized End-to-End Architecture](../figures/architecture_overview.png)
+
+![Detailed End-to-End System & Data-Flow Architecture](../figures/architecture_detailed.png)
+
+![Complete End-to-End Lineage DAG](../figures/lineage_full.png)
 
 ## 3.2 Bronze — contracts, partitioning, rejects
 
@@ -42,9 +48,13 @@ kept in `quarantine.rejects_<table>` instead of being dropped silently: the full
 before flushing, so the default threshold held a billion-row table in memory and spilled 112 GB; a threshold of 32,768 rows streams it.
 The open-file limit is raised in every recipe because 85 member countries × year × month exceed 1,024 files.
 
-Bronze is exposed to dbt as views (`bronze.*`) over the Parquet folders; nothing is copied into the database at this layer.
+Bronze is exposed to dbt as views (`bronze.*`) over the Parquet folders; nothing is copied into the database at this layer (`docs/figures/lineage_ingestion_to_bronze.png`).
+
+![Layer 1 — Ingestion, Streaming Replay & Bronze Lakehouse](../figures/lineage_ingestion_to_bronze.png)
 
 ## 3.3 Silver — one technique per model
+
+![Layer 2 — Bronze to Silver Lineage, Quarantine & Audits](../figures/lineage_bronze_to_silver.png)
 
 | Model | What it does | Technique |
 |---|---|---|
@@ -135,7 +145,11 @@ member–candidate pair (`gld_fs_pair`) — each reading only data strictly befo
 source timestamp that fed the row. Candidates come from five sources (repurchase, co-purchase partners, web intent, sport × offer,
 national best-sellers), capped at 200 per anchor; labels are the non-returned purchases within 30 and 90 days. Six singular tests
 (`tests/leakage_*.sql`) assert the point-in-time rules and a ledger (`quarantine.leakage_violations`) materialises any violation with
-the model and rule — it has 0 rows **(t14)**. Chapter 5 describes the entities, the candidate sources and their recall **(t12)**.
+the model and rule — it has 0 rows **(t14)**. Chapter 5 describes the entities, the candidate sources and their recall **(t12)** (`docs/figures/lineage_silver_to_gold.png` and `docs/figures/lineage_gold_to_evaluation.png`).
+
+![Layer 3 — Silver to Gold Feature Store & Candidates](../figures/lineage_silver_to_gold.png)
+
+![Layer 4 — Gold to LambdaRank & Two-Axis Ablation](../figures/lineage_gold_to_evaluation.png)
 
 ## 3.7 Orchestration and reproducibility
 

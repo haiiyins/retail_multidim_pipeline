@@ -17,7 +17,9 @@ Conventions used in the drafts:
 
 - A table reference such as **(t04)** points to `tables/t04_gates.md`; the Markdown table can be pasted as is, the CSV next to it feeds a
   spreadsheet or a plot.
-- Figures: `docs/figures/` holds the dbt lineage graphs (`lineage_full.png`, `lineage_bronze_to_silver.png`, `lineage_silver_to_gold.png`),
+- Figures: `docs/figures/` holds the two end-to-end synthesis architecture diagrams (`architecture_overview.png` at the generalized level and
+  `architecture_detailed.png` at the system/data-flow level), the five layer and lineage diagrams (`lineage_full.png`,
+  `lineage_ingestion_to_bronze.png`, `lineage_bronze_to_silver.png`, `lineage_silver_to_gold.png`, `lineage_gold_to_evaluation.png`),
   the `EXPLAIN ANALYZE` of the ASOF price lookup, and the list of DBeaver screenshots to take (`docs/figures/README.md`).
 - Design rationale is quoted from `docs/DESIGN_DECISIONS.md` (§ numbers) and the procedure from `docs/RUNBOOK.md` (step numbers), so the
   report never contradicts the repository.
