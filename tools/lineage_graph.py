@@ -219,6 +219,33 @@ def draw_rounded_box(ax, x, y, w, h, fill="#FFFFFF", border="#CBD5E1", lw=1.2, r
     return box
 
 
+FIT_FLOOR = 0.62  # never shrink below this share of the requested size
+FIT_FAILS = []
+
+
+def fit_text(ax, x, y, s, maxw, **kw):
+    """ax.text that shrinks its font until the rendered width is <= maxw (data units).
+
+    Anything still too wide at FIT_FLOOR is recorded in FIT_FAILS so the caller can shorten the copy."""
+    t = ax.text(x, y, s, **kw)
+    fig = ax.figure
+    rend = fig.canvas.get_renderer()
+    inv = ax.transData.inverted()
+    fs0 = t.get_fontsize()
+
+    def width():
+        bb = t.get_window_extent(rend)
+        return inv.transform((bb.x1, 0))[0] - inv.transform((bb.x0, 0))[0]
+
+    fs = fs0
+    while width() > maxw and fs > fs0 * FIT_FLOOR:
+        fs -= 0.1
+        t.set_fontsize(fs)
+    if width() > maxw + 1e-6:
+        FIT_FAILS.append((ax.get_figure().get_label() or "fig", s, round(width() - maxw, 2)))
+    return t
+
+
 def draw_node_card(ax, cx, cy, w, h, name, kind, custom_badge=None, title_fs=8.5, sub_fs=6.8, zorder=4):
     """Draw a rich node card centered at (cx, cy) with accent bar, badge on the meta1 row, and zero text overlap."""
     pal = PALETTE[kind]
@@ -244,7 +271,7 @@ def draw_node_card(ax, cx, cy, w, h, name, kind, custom_badge=None, title_fs=8.5
     elif name in ("gld_fs_member", "gld_fs_model_country", "gld_fs_pair"):
         badge_txt = "FEATURE ENTITY"
 
-    bw = max(0.76, len(badge_txt) * 0.068 + 0.14)
+    bw = max(0.76, len(badge_txt) * 0.078 + 0.16)
     bh = 0.165
     bx = x + w - bw - 0.060
     by = y + h * (0.74 if h >= 0.90 else 0.75) - bh / 2.0
@@ -269,21 +296,23 @@ def draw_node_card(ax, cx, cy, w, h, name, kind, custom_badge=None, title_fs=8.5
     else:
         eff_title_fs = title_fs
 
+    tmax = bx - tx - 0.06
+    mmax = x + w - tx - 0.08
     if meta1 and meta2:
-        ax.text(tx, y + h * (0.74 if h >= 0.90 else 0.75), name, ha="left", va="center",
-                fontsize=eff_title_fs, fontweight="bold", color=pal["title"], zorder=zorder + 0.5)
-        ax.text(tx, y + h * (0.43 if h >= 0.90 else 0.44), meta1, ha="left", va="center",
-                fontsize=sub_fs - 0.25, fontweight="bold", color=pal["accent"], zorder=zorder + 0.5)
-        ax.text(tx, y + h * (0.18 if h >= 0.90 else 0.17), meta2, ha="left", va="center",
-                fontsize=sub_fs - 0.85, color=pal["sub"], zorder=zorder + 0.5)
+        fit_text(ax, tx, y + h * (0.74 if h >= 0.90 else 0.75), name, tmax, ha="left", va="center",
+                 fontsize=eff_title_fs, fontweight="bold", color=pal["title"], zorder=zorder + 0.5)
+        fit_text(ax, tx, y + h * (0.43 if h >= 0.90 else 0.44), meta1, mmax, ha="left", va="center",
+                 fontsize=sub_fs - 0.25, fontweight="bold", color=pal["accent"], zorder=zorder + 0.5)
+        fit_text(ax, tx, y + h * (0.18 if h >= 0.90 else 0.17), meta2, mmax, ha="left", va="center",
+                 fontsize=sub_fs - 0.85, color=pal["sub"], zorder=zorder + 0.5)
     elif meta1:
-        ax.text(tx, y + h * 0.68, name, ha="left", va="center",
-                fontsize=eff_title_fs, fontweight="bold", color=pal["title"], zorder=zorder + 0.5)
-        ax.text(tx, y + h * 0.26, meta1, ha="left", va="center",
-                fontsize=sub_fs, color=pal["sub"], zorder=zorder + 0.5)
+        fit_text(ax, tx, y + h * 0.68, name, tmax, ha="left", va="center",
+                 fontsize=eff_title_fs, fontweight="bold", color=pal["title"], zorder=zorder + 0.5)
+        fit_text(ax, tx, y + h * 0.26, meta1, mmax, ha="left", va="center",
+                 fontsize=sub_fs, color=pal["sub"], zorder=zorder + 0.5)
     else:
-        ax.text(tx, cy, name, ha="left", va="center",
-                fontsize=eff_title_fs, fontweight="bold", color=pal["title"], zorder=zorder + 0.5)
+        fit_text(ax, tx, cy, name, tmax, ha="left", va="center",
+                 fontsize=eff_title_fs, fontweight="bold", color=pal["title"], zorder=zorder + 0.5)
 
 
 def draw_arrowhead(ax, x_tip, y_tip, dx, dy, color, size=0.11, zorder=3.6):
@@ -459,9 +488,9 @@ def render_dag_figure(
         draw_rounded_box(ax, sl_x + 0.10, y_lo + 0.12, lbl_w, (y_hi - y_lo) - 0.24,
                          fill="#FFFFFF", border=sl_border, lw=1.1, radius=0.10, shadow=False, alpha=0.96, zorder=1.2)
         ym = (y_lo + y_hi) / 2.0
-        ax.text(sl_x + 0.10 + lbl_w / 2.0, ym + 0.26, sl_title, ha="center", va="center",
+        fit_text(ax, sl_x + 0.10 + lbl_w / 2.0, ym + 0.26, sl_title, lbl_w - 0.2, ha="center", va="center",
                 fontsize=8.0, fontweight="bold", color=sl_fg, zorder=1.5)
-        ax.text(sl_x + 0.10 + lbl_w / 2.0, ym - 0.26, sl_sub, ha="center", va="center",
+        fit_text(ax, sl_x + 0.10 + lbl_w / 2.0, ym - 0.26, sl_sub, lbl_w - 0.2, ha="center", va="center",
                 fontsize=6.6, color="#475569", zorder=1.5)
 
     # Draw Stage Column headers & subtle vertical guides
@@ -478,9 +507,9 @@ def render_dag_figure(
         hdr_y = col_top - hdr_h
         draw_rounded_box(ax, cx - cw / 2.0, hdr_y, cw, hdr_h,
                          fill=c_bg, border=c_color, lw=1.25, radius=0.09, shadow=False, zorder=2.0)
-        ax.text(cx, hdr_y + hdr_h * 0.65, c_title, ha="center", va="center",
+        fit_text(ax, cx, hdr_y + hdr_h * 0.65, c_title, cw - 0.2, ha="center", va="center",
                 fontsize=8.4, fontweight="bold", color=c_color, zorder=2.5)
-        ax.text(cx, hdr_y + hdr_h * 0.24, c_sub, ha="center", va="center",
+        fit_text(ax, cx, hdr_y + hdr_h * 0.24, c_sub, cw - 0.2, ha="center", va="center",
                 fontsize=6.8, color="#334155", zorder=2.5)
 
     # Compute node coordinates and draw node cards
@@ -599,6 +628,9 @@ def render_dag_figure(
         out_path = OUT / f"{filename}.{fmt}"
         fig.savefig(out_path, dpi=260 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.22, facecolor="#FFFFFF")
     plt.close(fig)
+    for f in FIT_FAILS:
+        print("  overflow:", f)
+    FIT_FAILS.clear()
     print(f"→ docs/figures/{filename}.svg / .png  ({len(node_positions)} nodes, {len(sorted_edges)} edges, {n_cols} stages)")
 
 
@@ -889,16 +921,18 @@ def build_architecture_overview():
     for sx, sw, stitle, ssub, scol, sbg, sborder in stages:
         draw_rounded_box(ax, sx, col_bot, sw, col_h, fill=sbg, border=sborder, lw=1.4, radius=0.16, shadow=True, zorder=1.0)
         draw_rounded_box(ax, sx, col_top - 0.82, sw, 0.82, fill=scol, border=scol, lw=1.0, radius=0.14, shadow=False, zorder=2.0)
-        ax.text(sx + sw / 2.0, col_top - 0.28, stitle, ha="center", va="center", fontsize=10.5, fontweight="bold", color="#FFFFFF", zorder=2.5)
-        ax.text(sx + sw / 2.0, col_top - 0.60, ssub, ha="center", va="center", fontsize=7.6, color="#E2E8F0", zorder=2.5)
+        fit_text(ax, sx + sw / 2.0, col_top - 0.28, stitle, sw - 0.3, ha="center", va="center", fontsize=10.5, fontweight="bold", color="#FFFFFF", zorder=2.5)
+        fit_text(ax, sx + sw / 2.0, col_top - 0.60, ssub, sw - 0.3, ha="center", va="center", fontsize=7.6, color="#E2E8F0", zorder=2.5)
 
     def add_card(x, y, w, h, title, bullets, accent="#2563EB", bg="#FFFFFF", border="#CBD5E1", badge=None):
         draw_rounded_box(ax, x, y, w, h, fill=bg, border=border, lw=1.15, radius=0.10, shadow=True, zorder=3.0)
+        tmax = w - 0.30
         bar = FancyBboxPatch((x + 0.015, y + 0.025), 0.075, h - 0.05,
                              boxstyle="round,pad=0,rounding_size=0.04", facecolor=accent, edgecolor="none", zorder=3.2)
         ax.add_patch(bar)
         if badge:
-            bw = max(0.62, len(badge) * 0.062 + 0.12)
+            bw = max(0.62, len(badge) * 0.080 + 0.14)
+            tmax = w - bw - 0.07 - 0.14 - 0.22
             bh = 0.18
             bp = FancyBboxPatch((x + w - bw - 0.07, y + h - bh - 0.05), bw, bh,
                                 boxstyle="round,pad=0,rounding_size=0.05", facecolor=accent, edgecolor="none", alpha=0.14, zorder=3.3)
@@ -906,11 +940,11 @@ def build_architecture_overview():
             ax.text(x + w - bw / 2.0 - 0.07, y + h - bh / 2.0 - 0.05, badge,
                     ha="center", va="center", fontsize=5.8, fontweight="bold", color=accent, zorder=3.4)
         t_fs = 7.9 if len(title) > 26 else 8.3
-        ax.text(x + 0.14, y + h - 0.16, title, ha="left", va="center", fontsize=t_fs, fontweight="bold", color="#0F172A", zorder=3.5)
+        fit_text(ax, x + 0.14, y + h - 0.16, title, tmax, ha="left", va="center", fontsize=t_fs, fontweight="bold", color="#0F172A", zorder=3.5)
         n_b = len(bullets)
         for idx, btxt in enumerate(bullets):
             by = y + h - 0.40 - idx * ((h - 0.48) / max(1, n_b))
-            ax.text(x + 0.16, by, f"• {btxt}", ha="left", va="center", fontsize=6.95, color="#334155", zorder=3.5)
+            fit_text(ax, x + 0.16, by, f"• {btxt}", w - 0.16 - 0.12, ha="left", va="center", fontsize=6.95, color="#334155", zorder=3.5)
 
     # Stage 1 cards
     add_card(0.50, 6.40, 2.85, 1.62, "Batch Retail Exports", [
@@ -1018,7 +1052,7 @@ def build_architecture_overview():
     ], accent="#BE123C", badge="QC-6 = 0")
 
     # Stage 5 cards
-    add_card(15.30, 6.45, 2.70, 1.58, "Fixed Measuring Instrument", [
+    add_card(15.30, 6.45, 2.70, 1.58, "Fixed Ranking Instrument", [
         "LightGBM LambdaRank (NDCG@20)",
         "Hyper-parameters tuned once on",
         "  Full, frozen across all arms",
@@ -1032,13 +1066,13 @@ def build_architecture_overview():
         "  keeps identical test positives)"
     ], accent="#0D9488", badge="10 ARMS")
 
-    add_card(15.30, 2.95, 2.70, 1.42, "Statistical & Cost Analysis", [
+    add_card(15.30, 2.95, 2.70, 1.42, "Statistics & Cost Analysis", [
         "HR, MRR, NDCG@10/20, Recall@50",
         "500× Member-level Bootstrap 95% CI",
         "Cost × Gain via pipeline_run_metrics"
     ], accent="#0891B2", badge="COST × GAIN")
 
-    add_card(15.30, 1.80, 2.70, 0.98, "Scale & Technique Benchmarks", [
+    add_card(15.30, 1.80, 2.70, 0.98, "Scale & Technique Tests", [
         "1→2→3 countries · 3→12→36 months",
         "Parquet, Projection, ASOF, SQL Regex"
     ], accent="#4F46E5", badge="SCALE TEST")
@@ -1075,6 +1109,9 @@ def build_architecture_overview():
     for fmt in ("svg", "png"):
         fig.savefig(OUT / f"architecture_overview.{fmt}", dpi=260 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.20, facecolor="#FFFFFF")
     plt.close(fig)
+    for f in FIT_FAILS:
+        print("  overflow:", f)
+    FIT_FAILS.clear()
     print("→ docs/figures/architecture_overview.svg / .png  (generalized end-to-end architecture)")
 
 
@@ -1111,8 +1148,8 @@ def build_architecture_detailed():
     for tx, tw, ttitle, tsub, tcol, tbg, tborder in tiers:
         draw_rounded_box(ax, tx, t_bot, tw, t_h, fill=tbg, border=tborder, lw=1.4, radius=0.16, shadow=True, zorder=1.0)
         draw_rounded_box(ax, tx, t_top - 0.78, tw, 0.78, fill=tcol, border=tcol, lw=1.0, radius=0.14, shadow=False, zorder=2.0)
-        ax.text(tx + tw / 2.0, t_top - 0.26, ttitle, ha="center", va="center", fontsize=9.8, fontweight="bold", color="#FFFFFF", zorder=2.5)
-        ax.text(tx + tw / 2.0, t_top - 0.56, tsub, ha="center", va="center", fontsize=7.4, color="#E2E8F0", zorder=2.5)
+        fit_text(ax, tx + tw / 2.0, t_top - 0.26, ttitle, tw - 0.3, ha="center", va="center", fontsize=9.8, fontweight="bold", color="#FFFFFF", zorder=2.5)
+        fit_text(ax, tx + tw / 2.0, t_top - 0.56, tsub, tw - 0.3, ha="center", va="center", fontsize=7.4, color="#E2E8F0", zorder=2.5)
 
     def detail_box(x, y, w, h, header, subheader, lines, accent="#1D4ED8", bg="#FFFFFF", border="#CBD5E1", tag=None):
         draw_rounded_box(ax, x, y, w, h, fill=bg, border=border, lw=1.15, radius=0.10, shadow=True, zorder=3.0)
@@ -1121,10 +1158,13 @@ def build_architecture_detailed():
                              boxstyle="round,pad=0,rounding_size=0.03", facecolor=accent, edgecolor="none", zorder=3.2)
         ax.add_patch(bar)
         h_fs = 7.7 if len(header) > 34 else 8.1
-        ax.text(x + 0.14, y + h - 0.14, header, ha="left", va="center", fontsize=h_fs, fontweight="bold", color="#0F172A", zorder=3.5)
-        ax.text(x + 0.14, y + h - 0.35, subheader, ha="left", va="center", fontsize=6.35, fontweight="bold", color=accent, zorder=3.5)
+        hmax = w - 0.14 - 0.10
         if tag:
-            tw = max(0.60, len(tag) * 0.058 + 0.12)
+            hmax -= max(0.60, len(tag) * 0.078 + 0.14) + 0.10
+        fit_text(ax, x + 0.14, y + h - 0.14, header, hmax, ha="left", va="center", fontsize=h_fs, fontweight="bold", color="#0F172A", zorder=3.5)
+        fit_text(ax, x + 0.14, y + h - 0.35, subheader, w - 0.14 - 0.10, ha="left", va="center", fontsize=6.35, fontweight="bold", color=accent, zorder=3.5)
+        if tag:
+            tw = max(0.60, len(tag) * 0.078 + 0.14)
             bp = FancyBboxPatch((x + w - tw - 0.06, y + h - 0.24), tw, 0.19,
                                 boxstyle="round,pad=0,rounding_size=0.04", facecolor=accent, edgecolor="none", zorder=3.4)
             ax.add_patch(bp)
@@ -1133,7 +1173,7 @@ def build_architecture_detailed():
         n = len(lines)
         for i, ln in enumerate(lines):
             ly = y + h - 0.62 - i * (body_h / max(1, n))
-            ax.text(x + 0.14, ly, ln, ha="left", va="center", fontsize=6.65, color="#1E293B", zorder=3.5)
+            fit_text(ax, x + 0.14, ly, ln, w - 0.14 - 0.12, ha="left", va="center", fontsize=6.65, color="#1E293B", zorder=3.5)
 
     # ── TIER 1: INGESTION & STREAMING ──
     detail_box(0.45, 9.55, 3.55, 1.85, "1.1 Raw Profiling & Resolution", "raw_source.py · probe_csv_format.py · probe_full_scan.py", [
@@ -1337,6 +1377,9 @@ def build_architecture_detailed():
     for fmt in ("svg", "png"):
         fig.savefig(OUT / f"architecture_detailed.{fmt}", dpi=260 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.20, facecolor="#FFFFFF")
     plt.close(fig)
+    for f in FIT_FAILS:
+        print("  overflow:", f)
+    FIT_FAILS.clear()
     print("→ docs/figures/architecture_detailed.svg / .png  (detailed system & data-flow architecture)")
 
 
@@ -1368,8 +1411,8 @@ def build_lineage_ingestion_to_bronze():
         cx = xs[idx]
         draw_rounded_box(ax, cx, 0.35, w, 8.20, fill="#F8FAFC", border="#CBD5E1", lw=1.0, radius=0.14, shadow=False, ls="--", zorder=0.8)
         draw_rounded_box(ax, cx, 7.95, w, 0.60, fill=cbg, border=ccol, lw=1.3, radius=0.10, shadow=False, zorder=2.0)
-        ax.text(cx + w / 2.0, 8.35, ctitle, ha="center", va="center", fontsize=8.6, fontweight="bold", color=ccol, zorder=2.5)
-        ax.text(cx + w / 2.0, 8.10, csub, ha="center", va="center", fontsize=7.0, color="#334155", zorder=2.5)
+        fit_text(ax, cx + w / 2.0, 8.35, ctitle, w - 0.25, ha="center", va="center", fontsize=8.6, fontweight="bold", color=ccol, zorder=2.5)
+        fit_text(ax, cx + w / 2.0, 8.10, csub, w - 0.25, ha="center", va="center", fontsize=7.0, color="#334155", zorder=2.5)
 
     def bcard(col_i, y, h, title, sub1, sub2, kind="source", badge=None):
         cx = xs[col_i] + w / 2.0
@@ -1428,6 +1471,9 @@ def build_lineage_ingestion_to_bronze():
     for fmt in ("svg", "png"):
         fig.savefig(OUT / f"lineage_ingestion_to_bronze.{fmt}", dpi=260 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.20, facecolor="#FFFFFF")
     plt.close(fig)
+    for f in FIT_FAILS:
+        print("  overflow:", f)
+    FIT_FAILS.clear()
     print("→ docs/figures/lineage_ingestion_to_bronze.svg / .png  (Ingestion & Bronze layer detail)")
 
 
@@ -1459,8 +1505,8 @@ def build_lineage_gold_to_evaluation():
         cx = xs[idx]
         draw_rounded_box(ax, cx, 0.35, w, 8.20, fill="#F8FAFC", border="#CBD5E1", lw=1.0, radius=0.14, shadow=False, ls="--", zorder=0.8)
         draw_rounded_box(ax, cx, 7.95, w, 0.60, fill=cbg, border=ccol, lw=1.3, radius=0.10, shadow=False, zorder=2.0)
-        ax.text(cx + w / 2.0, 8.35, ctitle, ha="center", va="center", fontsize=8.6, fontweight="bold", color=ccol, zorder=2.5)
-        ax.text(cx + w / 2.0, 8.10, csub, ha="center", va="center", fontsize=7.0, color="#334155", zorder=2.5)
+        fit_text(ax, cx + w / 2.0, 8.35, ctitle, w - 0.25, ha="center", va="center", fontsize=8.6, fontweight="bold", color=ccol, zorder=2.5)
+        fit_text(ax, cx + w / 2.0, 8.10, csub, w - 0.25, ha="center", va="center", fontsize=7.0, color="#334155", zorder=2.5)
 
     def ecard(col_i, y, h, title, sub1, sub2, kind="gold", badge=None):
         cx = xs[col_i] + w / 2.0
@@ -1492,7 +1538,7 @@ def build_lineage_gold_to_evaluation():
     # Col 3: Evaluation Metrics & Report Tables
     o1 = ecard(3, 6.20, 1.35, "Ranking Quality & Bootstrap CI", "HR@10/20, MRR@10/20, NDCG@10/20, Recall@50", "500× member-level bootstrap 95% CI on Δ(Full−Arm)", "audit", "METRICS & CI")
     o2 = ecard(3, 4.45, 1.40, "Cost × Benefit Trade-Off (MT3)", "pipeline_cost_profiler.py + pipeline_run_metrics", "Wall time, peak RSS & output rows per ΔNDCG@20", "audit", "COST × GAIN")
-    o3 = ecard(3, 2.65, 1.45, "Scale & Technique Benchmarks", "scale_test.py (1→3 countries, 3→36 months)", "technique_comparisons.py (Parquet, Pushdown, ASOF)", "python", "SCALE & A/B")
+    o3 = ecard(3, 2.65, 1.45, "Scale & Technique Tests", "scale_test.py (1→3 countries, 3→36 months)", "technique_comparisons.py (Parquet, Pushdown, ASOF)", "python", "SCALE & A/B")
     o4 = ecard(3, 0.65, 1.60, "Reproducible Report Tables", "tools/report_tables.py → docs/report/tables/t01..t21", "Zero hand-typed numbers; REDACT_TERMS enforced", "silver", "REPORT TABLES")
 
     links = [
@@ -1511,6 +1557,9 @@ def build_lineage_gold_to_evaluation():
     for fmt in ("svg", "png"):
         fig.savefig(OUT / f"lineage_gold_to_evaluation.{fmt}", dpi=260 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.20, facecolor="#FFFFFF")
     plt.close(fig)
+    for f in FIT_FAILS:
+        print("  overflow:", f)
+    FIT_FAILS.clear()
     print("→ docs/figures/lineage_gold_to_evaluation.svg / .png  (Gold → Evaluation & Ablation detail)")
 
 
