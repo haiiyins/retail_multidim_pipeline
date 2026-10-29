@@ -7,8 +7,10 @@ three repetitions, wall time and peak RSS of the child; medians go to audit.tech
                        to one row per SKU per day over the whole span (the naive approach); an out-of-memory failure is recorded as a result
   4 regex_vs_python    member / user / order ids from the web-event metadata as a JSON string: SQL regexp_extract vs a row-wise
                        Python re loop with the same three patterns (the struct path used in production is the reference). The Python
-                       baseline holds every row in memory, so on a full country set TECHNIQUE_EVENT_LIMIT=<n> to take a reservoir
-                       sample of n events (seed 42) after the country filter; the laptop's one-day sample needs no limit.
+                       baseline holds every row in memory, so on a full country set TECHNIQUE_EVENT_LIMIT=<n> to keep about n events:
+                       a hash-modulo filter on the event id (hash(id) % k = 0, k = country rows / n), deterministic, parallel and streaming.
+                       Not USING SAMPLE … (reservoir): a reservoir sink makes the whole scan single-threaded (one core for ~170 M
+                       events on the server, file written only at the end). The laptop's one-day sample needs no limit.
 Usage: python evaluation/technique_comparisons.py [--reps 3]      temp files under $DATA_ROOT/duck_temp, removed at the end.
 Env: TECHNIQUE_COUNTRY (default VN), TECHNIQUE_EVENT_LIMIT (default none = all events of the country)."""
 import duckdb, os, sys, time, json, argparse, subprocess, pathlib, statistics, psutil
@@ -37,10 +39,13 @@ def prepare():
                            item_operation_type, transaction_status FROM lh.bronze.sales_detail WHERE economical_businessunit_country_code = '{COUNTRY}')
                     TO '{TMP}/tc_sales.parquet' (FORMAT PARQUET)""")
     con.execute(f"COPY (SELECT * FROM read_parquet('{TMP}/tc_sales.parquet')) TO '{TMP}/tc_sales.csv' (FORMAT CSV, HEADER)")
-    sample = f"USING SAMPLE {EVENT_LIMIT} ROWS (reservoir, 42)" if EVENT_LIMIT else ""   # DuckDB samples the FROM before WHERE, hence the subquery
+    keep = ""
+    if EVENT_LIMIT:
+        total = con.execute(f"SELECT COUNT(*) FROM lh.bronze.tracking_ecom_events WHERE country_code = '{COUNTRY}'").fetchone()[0]
+        k = max(1, round(total / EVENT_LIMIT)); keep = f" AND hash(id) % {k} = 0"
+        print(f"events: {total:,} in {COUNTRY}, keeping about 1 in {k} (hash(id) % {k} = 0) for TECHNIQUE_EVENT_LIMIT={EVENT_LIMIT:,}", flush=True)
     con.execute(f"""COPY (SELECT id, to_json(metadata) AS meta_json, metadata.user_details.member_id AS member_id_native
-                    FROM (SELECT id, metadata FROM lh.bronze.tracking_ecom_events WHERE country_code = '{COUNTRY}') {sample})
-                    TO '{TMP}/tc_events.parquet' (FORMAT PARQUET)""")
+                    FROM lh.bronze.tracking_ecom_events WHERE country_code = '{COUNTRY}'{keep}) TO '{TMP}/tc_events.parquet' (FORMAT PARQUET)""")
     con.execute(f"COPY (SELECT item_code, eff_start, eff_end, price FROM lh.silver.slv_price_sku_interval WHERE country_code = '{COUNTRY}' AND price_scope = 'NATIONAL') TO '{TMP}/tc_prices.parquet' (FORMAT PARQUET)")
     con.execute(f"COPY (SELECT DISTINCT anchor_date FROM lh.gold.anchor_model_grid WHERE country_code = '{COUNTRY}') TO '{TMP}/tc_anchors.parquet' (FORMAT PARQUET)")
     n = {f: con.execute(f"SELECT COUNT(*) FROM read_parquet('{TMP}/{f}.parquet')").fetchone()[0] for f in ("tc_sales", "tc_events", "tc_prices")}
