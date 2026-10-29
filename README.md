@@ -37,6 +37,26 @@ This repository builds that missing layer. It implements a three-tier **local la
 
 ## Architecture
 
+![Generalized End-to-End Architecture](docs/figures/architecture_overview.png)
+
+<details>
+<summary><b>Detailed End-to-End System & Data-Flow Blueprint & Layer Lineage Diagrams</b> (click to expand)</summary>
+
+### Detailed System & Data-Flow Architecture
+![Detailed End-to-End Architecture](docs/figures/architecture_detailed.png)
+
+### Complete End-to-End Lineage DAG (`Bronze → Silver → Gold`)
+![Full Pipeline Lineage](docs/figures/lineage_full.png)
+
+### Layer-by-Layer Diagrams
+- **Layer 1 — Ingestion, Streaming & Bronze:** [`docs/figures/lineage_ingestion_to_bronze.png`](docs/figures/lineage_ingestion_to_bronze.png)
+- **Layer 2 — Bronze → Staging → Silver & Quality Gates:** [`docs/figures/lineage_bronze_to_silver.png`](docs/figures/lineage_bronze_to_silver.png)
+- **Layer 3 — Silver → Gold Feature Store & Candidates:** [`docs/figures/lineage_silver_to_gold.png`](docs/figures/lineage_silver_to_gold.png)
+- **Layer 4 — Gold → Fixed LightGBM LambdaRank & Two-Axis Ablation:** [`docs/figures/lineage_gold_to_evaluation.png`](docs/figures/lineage_gold_to_evaluation.png)
+
+See [`docs/figures/README.md`](docs/figures/README.md) for captions and regeneration instructions (`make docs-figures`).
+</details>
+
 ```
 Raw CSV + Parquet (11 tables, ~230 GB)
    │  batch loader (DuckDB)                  optional: Redpanda replay of the 3 event tables
