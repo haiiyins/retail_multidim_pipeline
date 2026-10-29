@@ -246,7 +246,7 @@ def fit_text(ax, x, y, s, maxw, **kw):
     return t
 
 
-def draw_node_card(ax, cx, cy, w, h, name, kind, custom_badge=None, title_fs=8.5, sub_fs=6.8, zorder=4):
+def draw_node_card(ax, cx, cy, w, h, name, kind, custom_badge=None, title_fs=9.6, sub_fs=7.8, zorder=4):
     """Draw a rich node card centered at (cx, cy) with accent bar, badge on the meta1 row, and zero text overlap."""
     pal = PALETTE[kind]
     x = cx - w / 2.0
@@ -285,7 +285,8 @@ def draw_node_card(ax, cx, cy, w, h, name, kind, custom_badge=None, title_fs=8.5
             ha="center", va="center", fontsize=4.8, fontweight="bold", color=pal["badge_fg"], zorder=zorder + 0.4)
 
     # Node name & subtitle lines (meta1 and meta2 have the full card width unobstructed)
-    meta1, meta2 = NODE_META.get(name, ("", ""))
+    meta1, _ = NODE_META.get(name, ("", ""))
+    meta2 = ""  # one subtitle line only: the second line made the cards dense
     tx = x + accent_w + 0.090
     if len(name) > 25:
         eff_title_fs = title_fs - 1.35
@@ -892,500 +893,230 @@ def build_lineage_full():
 # 4. SYNTHESIS DIAGRAM — HIGH-LEVEL / GENERALIZED ARCHITECTURE OVERVIEW
 #    (docs/figures/architecture_overview.{svg,png})
 # ══════════════════════════════════════════════════════════════════════════════
-def build_architecture_overview():
-    fig, ax = plt.subplots(figsize=(18.5, 10.2))
-    ax.set_xlim(0, 18.5)
-    ax.set_ylim(0, 10.2)
-    ax.axis("off")
-    fig.patch.set_facecolor("#FFFFFF")
+# ── Architecture views (block diagrams: short labels, numbered stages, dashed lakehouse boundary) ──────────────
+LAYER = {
+    "src":    {"main": "#475569", "tint": "#F1F5F9", "edge": "#CBD5E1"},
+    "bronze": {"main": "#B45309", "tint": "#FFF7ED", "edge": "#FDBA74"},
+    "silver": {"main": "#2563EB", "tint": "#EFF6FF", "edge": "#93C5FD"},
+    "gold":   {"main": "#A16207", "tint": "#FEFCE8", "edge": "#FDE047"},
+    "eval":   {"main": "#0F766E", "tint": "#F0FDFA", "edge": "#5EEAD4"},
+    "qc":     {"main": "#BE123C", "tint": "#FFF1F2", "edge": "#FDA4AF"},
+}
 
-    # Header
-    ax.text(0.35, 9.78, "Multi-Signal Retail Lakehouse & Personalized Recommendation Pipeline — Architecture Overview",
-            ha="left", va="center", fontsize=15.5, fontweight="bold", color="#0F172A")
-    ax.text(0.35, 9.40, "Three-Tier Medallion Lakehouse (Bronze → Silver → Gold) on DuckDB & ZSTD Parquet + Fixed LightGBM LambdaRank Evaluation Instrument (SG · TH · VN, 2023–2026)",
-            ha="left", va="center", fontsize=9.6, color="#475569")
 
-    # 5 Macro Stage Columns
-    stages = [
-        (0.35, 3.15, "1. DATA SOURCES", "11 Raw Tables (~230 GB)\n+ Streaming & External", "#334155", "#F8FAFC", "#CBD5E1"),
-        (3.85, 3.15, "2. BRONZE LAYER", "Partitioned ZSTD Parquet\nContracts & Quarantine", "#475569", "#F1F5F9", "#94A3B8"),
-        (7.35, 3.55, "3. SILVER LAYER", "Cleaned, Harmonised &\nIntegrated Domain Models", "#1D4ED8", "#EFF6FF", "#93C5FD"),
-        (11.25, 3.55, "4. GOLD LAYER", "Point-in-Time Feature Store\n& Candidate Engine (R1–R5)", "#A16207", "#FEFCE8", "#FDE047"),
-        (15.15, 3.00, "5. EVALUATION", "Fixed LambdaRank & 2-Axis\nCost × Benefit Ablation", "#0F766E", "#F0FDFA", "#5EEAD4"),
-    ]
+def _flow_arrow(ax, x1, y1, x2, y2, color="#334155", lw=2.4):
+    ax.annotate("", xy=(x2, y2), xytext=(x1, y1), zorder=6,
+                arrowprops=dict(arrowstyle="-|>", color=color, lw=lw, shrinkA=0, shrinkB=0, mutation_scale=18))
 
-    col_bot = 1.65
-    col_top = 9.05
-    col_h = col_top - col_bot
 
-    for sx, sw, stitle, ssub, scol, sbg, sborder in stages:
-        draw_rounded_box(ax, sx, col_bot, sw, col_h, fill=sbg, border=sborder, lw=1.4, radius=0.16, shadow=True, zorder=1.0)
-        draw_rounded_box(ax, sx, col_top - 0.82, sw, 0.82, fill=scol, border=scol, lw=1.0, radius=0.14, shadow=False, zorder=2.0)
-        fit_text(ax, sx + sw / 2.0, col_top - 0.28, stitle, sw - 0.3, ha="center", va="center", fontsize=10.5, fontweight="bold", color="#FFFFFF", zorder=2.5)
-        fit_text(ax, sx + sw / 2.0, col_top - 0.60, ssub, sw - 0.3, ha="center", va="center", fontsize=7.6, color="#E2E8F0", zorder=2.5)
+def _number_dot(ax, x, y, label, color, r=0.21, fs=11):
+    ax.add_patch(Circle((x, y), r, facecolor="#FFFFFF", edgecolor="none", zorder=4.0))
+    ax.text(x, y, label, ha="center", va="center", fontsize=fs, fontweight="bold", color=color, zorder=4.2)
 
-    def add_card(x, y, w, h, title, bullets, accent="#2563EB", bg="#FFFFFF", border="#CBD5E1", badge=None):
-        draw_rounded_box(ax, x, y, w, h, fill=bg, border=border, lw=1.15, radius=0.10, shadow=True, zorder=3.0)
-        tmax = w - 0.30
-        bar = FancyBboxPatch((x + 0.015, y + 0.025), 0.075, h - 0.05,
-                             boxstyle="round,pad=0,rounding_size=0.04", facecolor=accent, edgecolor="none", zorder=3.2)
-        ax.add_patch(bar)
-        if badge:
-            bw = max(0.62, len(badge) * 0.080 + 0.14)
-            tmax = w - bw - 0.07 - 0.14 - 0.22
-            bh = 0.18
-            bp = FancyBboxPatch((x + w - bw - 0.07, y + h - bh - 0.05), bw, bh,
-                                boxstyle="round,pad=0,rounding_size=0.05", facecolor=accent, edgecolor="none", alpha=0.14, zorder=3.3)
-            ax.add_patch(bp)
-            ax.text(x + w - bw / 2.0 - 0.07, y + h - bh / 2.0 - 0.05, badge,
-                    ha="center", va="center", fontsize=5.8, fontweight="bold", color=accent, zorder=3.4)
-        t_fs = 7.9 if len(title) > 26 else 8.3
-        fit_text(ax, x + 0.14, y + h - 0.16, title, tmax, ha="left", va="center", fontsize=t_fs, fontweight="bold", color="#0F172A", zorder=3.5)
-        n_b = len(bullets)
-        for idx, btxt in enumerate(bullets):
-            by = y + h - 0.40 - idx * ((h - 0.48) / max(1, n_b))
-            fit_text(ax, x + 0.16, by, f"• {btxt}", w - 0.16 - 0.12, ha="left", va="center", fontsize=6.95, color="#334155", zorder=3.5)
 
-    # Stage 1 cards
-    add_card(0.50, 6.40, 2.85, 1.62, "Batch Retail Exports", [
-        "POS & Online Sales (89.3M lines)",
-        "Catalogue (4.36M SKUs) & Prices (42.4M)",
-        "Members (2.0 GB), Purchase Bridge, Sport",
-        "Business Units, Calendar & Daily Stock"
-    ], accent="#334155", badge="CSV / PARQUET")
+def _tag(ax, x_right, y_mid, text, color, fs=7.8):
+    tw = len(text) * 0.085 + 0.26
+    ax.add_patch(FancyBboxPatch((x_right - tw, y_mid - 0.14), tw, 0.28, boxstyle="round,pad=0,rounding_size=0.08",
+                                facecolor=color, edgecolor="none", alpha=0.14, zorder=4.2))
+    ax.text(x_right - tw / 2.0, y_mid, text, ha="center", va="center", fontsize=fs, fontweight="bold", color=color, zorder=4.4)
+    return tw
 
-    add_card(0.50, 4.55, 2.85, 1.62, "Web & App Clickstream", [
-        "tracking_ecom_events (~200 GB)",
-        "1,774 Spark Parquet parts · 1.0B events",
-        "Nested STRUCT & LIST<STRUCT> schemas",
-        "33.9% direct member_id · 100% user_id"
-    ], accent="#475569", badge="1.0B EVENTS")
 
-    add_card(0.50, 3.05, 2.85, 1.28, "Optional Streaming Lane", [
-        "Redpanda replay of 3 event tables",
-        "Consumer applies contracts + DLQ",
-        "Reconciled daily vs batch (QC-7)"
-    ], accent="#0284C7", badge="REDPANDA")
+def _title_block(ax, x, y_title, title, subtitle, t_fs=21, s_fs=12):
+    ax.text(x, y_title, title, ha="left", va="center", fontsize=t_fs, fontweight="bold", color="#0F172A")
+    ax.text(x, y_title - 0.50, subtitle, ha="left", va="center", fontsize=s_fs, color="#475569")
 
-    add_card(0.50, 1.85, 2.85, 1.00, "Self-Built External Data", [
-        "Public holidays (holidays library)",
-        "Commercial event dictionary (ext.*)"
-    ], accent="#7E22CE", badge="EXT SOURCES")
 
-    # Stage 2 cards
-    add_card(4.00, 6.40, 2.85, 1.62, "Data Contracts & Loader", [
-        "table_contracts.yml & stream_contracts.py",
-        "Key columns cast to VARCHAR",
-        "Required-column & schema validation",
-        "Streaming 32k-row partition flush"
-    ], accent="#475569", badge="DUCKDB 2.0")
-
-    add_card(4.00, 4.55, 2.85, 1.62, "Partitioned Parquet Lake", [
-        "ZSTD compressed Parquet files",
-        "Hive-partitioned (country / year / month)",
-        "Partition pruning & projection pushdown",
-        "Exposed as zero-copy bronze.* views"
-    ], accent="#334155", badge="HIVE ZSTD")
-
-    add_card(4.00, 3.05, 2.85, 1.28, "Rejects & Go/No-Go Gates", [
-        "Malformed CSV → quarantine.rejects_*",
-        "4 Go/No-Go gates per country × year",
-        "TH + VN = PASS (main), SG = REVIEW"
-    ], accent="#E11D48", badge="QUARANTINE")
-
-    add_card(4.00, 1.85, 2.85, 1.00, "Bronze Observability", [
-        "QC-5 Volume drift (±50% vs 28d mean)",
-        "QC-7 Batch vs Stream hash match"
-    ], accent="#D97706", badge="QC-5 / QC-7")
-
-    # Stage 3 cards
-    add_card(7.50, 6.72, 3.25, 1.32, "Sales Netting & Returns", [
-        "Exact dedup + latest transaction_version_at",
-        "Signed sale − cancel netting per (tx, item)",
-        "Local → naive UTC tz; EUR conversion"
-    ], accent="#1D4ED8", badge="FACT SALES")
-
-    add_card(7.50, 5.25, 3.25, 1.32, "Catalogue & Price Timeline", [
-        "SKU → model_code (excl. UUID & fixtures)",
-        "National SKU price intervals (type 15 > 50)",
-        "4 price types → promo_kind; depth ≤ 90%"
-    ], accent="#2563EB", badge="MODEL & PRICE")
-
-    add_card(7.50, 3.92, 3.25, 1.18, "Inferred Commercial Calendar", [
-        "O(N+D) difference-array daily promo share",
-        "Peaks ≥ 1.5σ & ≥ 3 days + public holidays"
-    ], accent="#0284C7", badge="SELF-BUILT")
-
-    add_card(7.50, 2.60, 3.25, 1.18, "Web Parsing & Identity Stitching", [
-        "STRUCT/LIST flatten; numeric model filter",
-        "2-tier cookie→member (ORDER, LOGIN ±90d)"
-    ], accent="#7E22CE", badge="STITCHING")
-
-    add_card(7.50, 1.80, 3.25, 0.68, "Member State & Quarantine Routing", [
-        "Consumer filter, ASOF sport/store · qrt_sales_line"
-    ], accent="#BE123C", badge="QC-1..4")
-
-    # Stage 4 cards
-    add_card(11.40, 6.72, 3.25, 1.32, "Temporal Anchor Grid (Python)", [
-        "Weekly Mondays after member's 2nd tx",
-        "Train / Valid / Test with 42-day purge gaps",
-        "90d purchase filter, 4× stride, 50k/15k/50k cap"
-    ], accent="#4338CA", badge="ANCHOR GRID")
-
-    add_card(11.40, 4.95, 3.25, 1.62, "3 Point-in-Time Feature Entities", [
-        "Entity 1 (gld_fs_member): F0 RFM, F1 price, F3 web",
-        "Entity 2 (gld_fs_model_country): ASOF median price,",
-        "  promo depth, calendar events & 28d popularity",
-        "Entity 3 (gld_fs_pair): F2 rhythm, F4 lift, F5 fit"
-    ], accent="#CA8A04", badge="AS-OF ≤ t")
-
-    add_card(11.40, 3.25, 3.25, 1.55, "5 Candidate Generators (Top 200)", [
-        "R1 Repurchase history · R2 Basket co-purchase lift",
-        "R3 Web intent (30d) · R4 Sport × Dept affinity",
-        "R5 National 28d best-sellers (priority R1>R3>R2>R4>R5)"
-    ], accent="#D97706", badge="R1 – R5")
-
-    add_card(11.40, 1.80, 3.25, 1.30, "Ranking Dataset & QC-6 Ledger", [
-        "gld_ranking_dataset: non-returned Δ = 30d & 90d",
-        "QC-6 asserts last_source_ts ≤ anchor_date (0 rows)",
-        "audit.candidate_recall per source R1–R5"
-    ], accent="#BE123C", badge="QC-6 = 0")
-
-    # Stage 5 cards
-    add_card(15.30, 6.45, 2.70, 1.58, "Fixed Ranking Instrument", [
-        "LightGBM LambdaRank (NDCG@20)",
-        "Hyper-parameters tuned once on",
-        "  Full, frozen across all arms",
-        "Isolates data value from model tuning"
-    ], accent="#0F766E", badge="LAMBDARANK")
-
-    add_card(15.30, 4.55, 2.70, 1.72, "Two-Axis Ablation Study", [
-        "Baseline B0 vs Full configuration",
-        "Feature axis: −F1, −F3, −F5, −Sport",
-        "Candidate axis: −R1 … −R5 (−∞ mask",
-        "  keeps identical test positives)"
-    ], accent="#0D9488", badge="10 ARMS")
-
-    add_card(15.30, 2.95, 2.70, 1.42, "Statistics & Cost Analysis", [
-        "HR, MRR, NDCG@10/20, Recall@50",
-        "500× Member-level Bootstrap 95% CI",
-        "Cost × Gain via pipeline_run_metrics"
-    ], accent="#0891B2", badge="COST × GAIN")
-
-    add_card(15.30, 1.80, 2.70, 0.98, "Scale & Technique Tests", [
-        "1→2→3 countries · 3→12→36 months",
-        "Parquet, Projection, ASOF, SQL Regex"
-    ], accent="#4F46E5", badge="SCALE TEST")
-
-    # Inter-stage flow arrows
-    arrow_xs = [(3.50, 3.85), (7.00, 7.35), (10.90, 11.25), (14.80, 15.15)]
-    for x1, x2 in arrow_xs:
-        for ay in (7.15, 5.10, 3.15):
-            ax.plot([x1, x2 - 0.08], [ay, ay], color="#334155", lw=2.2, zorder=4)
-            draw_arrowhead(ax, x2, ay, 1.0, 0.0, "#334155", size=0.14, zorder=4.2)
-
-    # Bottom Cross-Cutting Governance & Observability Bar
-    draw_rounded_box(ax, 0.35, 0.22, 17.80, 1.18, fill="#0F172A", border="#334155", lw=1.4, radius=0.14, shadow=True, zorder=2.0)
-    ax.text(0.60, 1.12, "CROSS-CUTTING DATA QUALITY GATES (QC-1 … QC-7) & PIPELINE OBSERVABILITY (64 dbt Tests · audit.pipeline_run_metrics)",
-            ha="left", va="center", fontsize=8.8, fontweight="bold", color="#F8FAFC", zorder=3.0)
-
-    qc_badges = [
-        ("QC-1 · Null Keys = 0", "Block at Bronze→Silver & Gold", "#38BDF8"),
-        ("QC-2 · Referential Integrity", "≥95/60/90% · TH,VN Pass, SG Review", "#4ADE80"),
-        ("QC-3 · Value Domains", "Route bad price/qty to Quarantine", "#FB7185"),
-        ("QC-4 · Key Uniqueness", "Block after dedup, net & fs_pair", "#A78BFA"),
-        ("QC-5 · Volume Drift", "±50% vs 28d weekday mean", "#FBBF24"),
-        ("QC-6 · Point-in-Time", "source_ts & verified_ts ≤ anchor", "#F43F5E"),
-        ("QC-7 · Stream Reconcile", "Batch vs Redpanda row/hash match", "#2DD4BF"),
-    ]
-    qx = 0.58
-    qw = 2.42
-    for qtitle, qsub, qcol in qc_badges:
-        draw_rounded_box(ax, qx, 0.34, qw, 0.58, fill="#1E293B", border=qcol, lw=1.0, radius=0.08, shadow=False, zorder=3.0)
-        ax.text(qx + qw / 2.0, 0.72, qtitle, ha="center", va="center", fontsize=7.1, fontweight="bold", color=qcol, zorder=3.5)
-        ax.text(qx + qw / 2.0, 0.48, qsub, ha="center", va="center", fontsize=6.2, color="#CBD5E1", zorder=3.5)
-        qx += qw + 0.08
-
+def _save(fig, name):
     for fmt in ("svg", "png"):
-        fig.savefig(OUT / f"architecture_overview.{fmt}", dpi=260 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.20, facecolor="#FFFFFF")
+        fig.savefig(OUT / f"{name}.{fmt}", dpi=240 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.25, facecolor="#FFFFFF")
     plt.close(fig)
     for f in FIT_FAILS:
         print("  overflow:", f)
     FIT_FAILS.clear()
+
+
+def _simple_card(ax, x, y, w, h, title, sub, col):
+    draw_rounded_box(ax, x, y, w, h, fill="#FFFFFF", border=col["main"], lw=1.5, radius=0.12, shadow=True, zorder=3.0)
+    ax.add_patch(FancyBboxPatch((x + 0.03, y + 0.05), 0.11, h - 0.10, boxstyle="round,pad=0,rounding_size=0.05",
+                                facecolor=col["main"], edgecolor="none", zorder=3.2))
+    fit_text(ax, x + 0.30, y + h * 0.64, title, w - 0.45, ha="left", va="center", fontsize=12.5, fontweight="bold", color="#0F172A", zorder=3.5)
+    fit_text(ax, x + 0.30, y + h * 0.30, sub, w - 0.45, ha="left", va="center", fontsize=10, color="#475569", zorder=3.5)
+
+
+def build_architecture_overview():
+    W, H = 20.0, 11.4
+    fig, ax = plt.subplots(figsize=(W, H))
+    ax.set_xlim(0, W)
+    ax.set_ylim(0, H)
+    ax.axis("off")
+
+    _title_block(ax, 0.40, 10.85, "Architecture Overview — Multi-Signal Retail Recommendation Pipeline",
+                 "Raw files → Bronze → Silver → Gold → fixed LambdaRank evaluation, with quality gates throughout")
+
+    top, bot = 9.55, 2.95
+    cols = [
+        ("1", "Data sources", "11 tables · ~230 GB", "src", 0.40, 3.10, [
+            ("Retail exports", "POS · catalogue · members"),
+            ("Web clickstream", "1.0 B events"),
+            ("Stream lane", "optional Redpanda replay"),
+            ("External data", "holidays · event names"),
+        ]),
+        ("2", "Bronze", "raw, partitioned", "bronze", 4.62, 3.10, [
+            ("Contract loader", "typed keys · schema checks"),
+            ("Partitioned Parquet", "ZSTD · country / year / month"),
+            ("Quarantine", "rejects · dead letters"),
+            ("Go / No-Go gates", "per country × year"),
+        ]),
+        ("3", "Silver", "clean & harmonised", "silver", 8.22, 3.10, [
+            ("Sales & returns", "dedup · netting · EUR"),
+            ("Catalogue & prices", "SKU → model · intervals"),
+            ("Web & identity", "cookie → member"),
+            ("Calendar & members", "promo peaks · sport state"),
+        ]),
+        ("4", "Gold", "point-in-time features", "gold", 11.82, 3.10, [
+            ("Anchor grid", "weekly · purge gaps"),
+            ("Feature entities", "member · model · pair"),
+            ("Candidates R1–R5", "top 200 per anchor"),
+            ("Ranking dataset", "labels at 30 d and 90 d"),
+        ]),
+        ("5", "Evaluation", "frozen model, two axes", "eval", 16.05, 3.55, [
+            ("LambdaRank", "hyper-parameters fixed"),
+            ("Ablation", "features × candidates"),
+            ("Bootstrap CI", "500× member-level"),
+            ("Cost × gain", "wall time · memory"),
+        ]),
+    ]
+    # dashed lakehouse boundary around Bronze, Silver, Gold
+    ax.add_patch(FancyBboxPatch((4.40, bot - 0.15), 10.70, top - bot + 0.30, boxstyle="round,pad=0,rounding_size=0.2",
+                                facecolor="none", edgecolor="#DC2626", linewidth=1.6, linestyle=(0, (6, 4)), zorder=0.6))
+    ax.text(4.62, top + 0.38, "LAKEHOUSE · DuckDB + ZSTD Parquet", ha="left", va="center", fontsize=10.5,
+            fontweight="bold", color="#DC2626", zorder=1)
+
+    gap = 0.24
+    card_h = (top - bot - 0.95 - 0.25 - 0.20 - 3 * gap) / 4.0
+    for num, name, sub, key, x, w, cards in cols:
+        c = LAYER[key]
+        draw_rounded_box(ax, x, bot, w, top - bot, fill=c["tint"], border=c["edge"], lw=1.4, radius=0.18, shadow=False, zorder=1.0)
+        draw_rounded_box(ax, x, top - 0.95, w, 0.95, fill=c["main"], border=c["main"], lw=1.0, radius=0.16, shadow=False, zorder=2.0)
+        _number_dot(ax, x + 0.42, top - 0.475, num, c["main"])
+        fit_text(ax, x + 0.78, top - 0.34, name, w - 0.95, ha="left", va="center", fontsize=16, fontweight="bold", color="#FFFFFF", zorder=2.5)
+        fit_text(ax, x + 0.78, top - 0.69, sub, w - 0.95, ha="left", va="center", fontsize=10.5, color="#F1F5F9", zorder=2.5)
+        cy = top - 0.95 - 0.25 - card_h
+        for t, s in cards:
+            _simple_card(ax, x + 0.20, cy, w - 0.40, card_h, t, s, c)
+            cy -= card_h + gap
+
+    mid = (top + bot) / 2.0 - 0.45
+    for xa, xb in ((3.55, 4.38), (7.78, 8.20), (11.38, 11.80), (15.12, 16.02)):
+        _flow_arrow(ax, xa, mid, xb, mid)
+
+    # quality gates strip
+    qy, qh = 0.45, 1.85
+    draw_rounded_box(ax, 0.40, qy, 19.2, qh, fill=LAYER["qc"]["tint"], border=LAYER["qc"]["edge"], lw=1.4, radius=0.16, shadow=False, zorder=1.0)
+    ax.text(0.70, qy + qh - 0.36, "Quality gates across every layer", ha="left", va="center", fontsize=13.5, fontweight="bold", color=LAYER["qc"]["main"])
+    ax.text(19.30, qy + qh - 0.36, "64 dbt tests · audit.pipeline_run_metrics", ha="right", va="center", fontsize=10.5, color="#9F1239")
+    qcs = [("QC-1", "Null keys"), ("QC-2", "Referential"), ("QC-3", "Value domains"), ("QC-4", "Uniqueness"),
+           ("QC-5", "Volume drift"), ("QC-6", "Point-in-time"), ("QC-7", "Stream match")]
+    pw = (18.6 - 6 * 0.18) / 7.0
+    for i, (q, d) in enumerate(qcs):
+        px = 0.70 + i * (pw + 0.18)
+        draw_rounded_box(ax, px, qy + 0.25, pw, 0.88, fill="#FFFFFF", border=LAYER["qc"]["main"], lw=1.3, radius=0.10, shadow=False, zorder=2.0)
+        ax.text(px + pw / 2.0, qy + 0.84, q, ha="center", va="center", fontsize=12, fontweight="bold", color=LAYER["qc"]["main"], zorder=3)
+        fit_text(ax, px + pw / 2.0, qy + 0.48, d, pw - 0.2, ha="center", va="center", fontsize=10, color="#334155", zorder=3)
+    _save(fig, "architecture_overview")
     print("→ docs/figures/architecture_overview.svg / .png  (generalized end-to-end architecture)")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 5. SYNTHESIS DIAGRAM — DETAILED SYSTEM & DATA-FLOW ARCHITECTURE
-#    (docs/figures/architecture_detailed.{svg,png})
-# ══════════════════════════════════════════════════════════════════════════════
 def build_architecture_detailed():
-    fig, ax = plt.subplots(figsize=(22.0, 13.5))
-    ax.set_xlim(0, 22.0)
-    ax.set_ylim(0, 13.5)
+    W, H = 22.0, 12.6
+    fig, ax = plt.subplots(figsize=(W, H))
+    ax.set_xlim(0, W)
+    ax.set_ylim(0, H)
     ax.axis("off")
-    fig.patch.set_facecolor("#FFFFFF")
 
-    # Title banner
-    ax.text(0.35, 13.08, "Detailed System & Data-Flow Architecture — Multi-Dimensional Retail Recommendation Pipeline",
-            ha="left", va="center", fontsize=16.0, fontweight="bold", color="#0F172A")
-    ax.text(0.35, 12.70, "End-to-End Execution Blueprint: Ingestion & Streaming Contracts → Bronze Lakehouse & Audits → Silver Domain Models → Gold Feature Entities (F0–F5) & Candidates (R1–R5) → Evaluation",
-            ha="left", va="center", fontsize=9.8, color="#475569")
+    _title_block(ax, 0.35, 12.05, "Detailed Architecture — Scripts, Tables and Quality Gates by Tier",
+                 "Each card names the step, the script or table behind it, and what it guarantees")
 
-    # 5 Detailed Tier Bands (Left to Right)
     tiers = [
-        (0.30, 3.85, "TIER 1 · INGESTION & STREAMING", "ingestion/*.py · table_contracts.yml", "#334155", "#F8FAFC", "#CBD5E1"),
-        (4.45, 3.85, "TIER 2 · BRONZE & PROFILING GATES", "data/bronze/* · sql/*.sql · QC-5 & QC-7", "#475569", "#F1F5F9", "#94A3B8"),
-        (8.60, 4.35, "TIER 3 · SILVER DOMAIN LAYER (dbt)", "models/staging & models/silver · QC-1..4", "#1D4ED8", "#EFF6FF", "#93C5FD"),
-        (13.25, 4.55, "TIER 4 · GOLD FEATURE STORE & CANDIDATES", "build_anchor_grid.py · models/gold · QC-6", "#A16207", "#FEFCE8", "#FDE047"),
-        (18.10, 3.60, "TIER 5 · RANKING, ABLATION & METRICS", "evaluation/*.py · LightGBM LambdaRank", "#0F766E", "#F0FDFA", "#5EEAD4"),
+        ("1", "Ingestion", "ingestion/*.py", "src", [
+            ("Profile raw files", "raw_source.py · probe_csv_format.py", ["Resolve parquet / csv paths", "Probe schema and nested types", "Verify MD5 checksums"], None),
+            ("Batch contract loader", "batch_csv_to_bronze.py", ["11 tables, ~230 GB", "Join keys cast to VARCHAR", "Run metrics logged"], None),
+            ("Streaming replay", "kafka_producer_replay.py", ["Redpanda, 3 event tables", "Consumer applies contracts", "Invalid events → dead letters"], "OPTIONAL"),
+            ("External sources", "holiday_commercial_builder.py", ["Public holidays SG · TH · VN", "Commercial event names"], None),
+        ]),
+        ("2", "Bronze", "data/bronze · sql/*.sql", "bronze", [
+            ("Partitioned Parquet", "data/bronze/<table>", ["Hive: country / year / month", "ZSTD, 32,768-row flush", "Pruning and pushdown"], None),
+            ("Bronze views", "bronze_views_from_parquet.py", ["Zero-copy bronze.* views", "48 dbt source tests"], None),
+            ("Row quarantine", "quarantine.rejects_<table>", ["Unparseable CSV lines kept", "Nothing dropped silently"], None),
+            ("Go / No-Go gates", "audit.gates_by_country", ["Link ≥ 60% · item ≥ 95%", "Price ≥ 90% · ≥ 20k members", "TH, VN pass · SG review"], None),
+            ("Drift & reconcile", "audit.volume_drift · stream_reconciliation", ["±50% vs 28-day mean", "Batch vs stream hash match"], "QC-5 · QC-7"),
+        ]),
+        ("3", "Silver", "dbt · models/staging, silver", "silver", [
+            ("Sales & returns", "stg_sales_detail → slv_fact_sales_line", ["Dedup, latest version", "Sale − cancel netting", "Local time → UTC, EUR"], None),
+            ("Catalogue & prices", "slv_dim_model · slv_price_sku_interval", ["SKU → model_code", "National price intervals", "Daily promo share, holidays"], None),
+            ("Web & identity", "slv_web_events_clean · slv_user_to_member", ["Flatten STRUCT / LIST", "Cookie → member, 1:1"], None),
+            ("Member state", "slv_member_profile · slv_member_sport_asof", ["Eligible consumers only", "As-of sport and usual store"], None),
+            ("Quarantine & tests", "qrt_* · slv_identity_conflicts", ["Refused lines keep a reason", "Null, RI, domain, key tests"], "QC-1…4"),
+        ]),
+        ("4", "Gold", "build_anchor_grid.py · models/gold", "gold", [
+            ("Anchor grid", "build_anchor_grid.py", ["Weekly Monday anchors", "Train / valid / test, 42-day purge", "50k / 15k / 50k anchors"], None),
+            ("Feature entities 1 & 2", "gld_fs_member · gld_fs_model_country", ["Member: RFM, price, web", "Model: price, promo, calendar", "Every feature as of t"], None),
+            ("Candidates R1–R5", "gld_candidates", ["Repurchase · co-purchase", "Web intent · sport affinity", "National best-sellers, top 200"], None),
+            ("Pairs & ranking set", "gld_fs_pair → gld_ranking_dataset", ["Member × model features", "Labels at 30 d and 90 d"], None),
+            ("Point-in-time ledger", "quarantine.leakage_violations", ["last_source_ts ≤ anchor", "0 violations · recall per source"], "QC-6"),
+        ]),
+        ("5", "Evaluation", "evaluation/*.py", "eval", [
+            ("Fixed LambdaRank", "train_eval_lambdarank.py", ["LightGBM, grouped by member", "Tuned once, then frozen", "Early stop on NDCG@20"], None),
+            ("Two-axis ablation", "run_ablation_2axes.py", ["Axis 1: drop feature groups", "Axis 2: drop candidate sources"], None),
+            ("Bootstrap & cost", "bootstrap_ci.py · pipeline_cost_profiler.py", ["500× member-level 95% CI", "Cost × gain per arm"], None),
+            ("Scale & techniques", "scale_test.py · technique_comparisons.py", ["1→3 countries, 3→36 months", "Parquet, pushdown, ASOF A/B"], None),
+            ("Report packaging", "report_tables.py · lineage_graph.py", ["21 tables, t01–t21", "Figures from the dbt manifest"], None),
+        ]),
     ]
 
-    t_bot = 0.35
-    t_top = 12.35
-    t_h = t_top - t_bot
-
-    for tx, tw, ttitle, tsub, tcol, tbg, tborder in tiers:
-        draw_rounded_box(ax, tx, t_bot, tw, t_h, fill=tbg, border=tborder, lw=1.4, radius=0.16, shadow=True, zorder=1.0)
-        draw_rounded_box(ax, tx, t_top - 0.78, tw, 0.78, fill=tcol, border=tcol, lw=1.0, radius=0.14, shadow=False, zorder=2.0)
-        fit_text(ax, tx + tw / 2.0, t_top - 0.26, ttitle, tw - 0.3, ha="center", va="center", fontsize=9.8, fontweight="bold", color="#FFFFFF", zorder=2.5)
-        fit_text(ax, tx + tw / 2.0, t_top - 0.56, tsub, tw - 0.3, ha="center", va="center", fontsize=7.4, color="#E2E8F0", zorder=2.5)
-
-    def detail_box(x, y, w, h, header, subheader, lines, accent="#1D4ED8", bg="#FFFFFF", border="#CBD5E1", tag=None):
-        draw_rounded_box(ax, x, y, w, h, fill=bg, border=border, lw=1.15, radius=0.10, shadow=True, zorder=3.0)
-        draw_rounded_box(ax, x, y + h - 0.46, w, 0.46, fill=accent, border=accent, lw=0.8, radius=0.09, shadow=False, alpha=0.12, zorder=3.1)
-        bar = FancyBboxPatch((x + 0.015, y + 0.02), 0.07, h - 0.04,
-                             boxstyle="round,pad=0,rounding_size=0.03", facecolor=accent, edgecolor="none", zorder=3.2)
-        ax.add_patch(bar)
-        h_fs = 7.7 if len(header) > 34 else 8.1
-        hmax = w - 0.14 - 0.10
-        if tag:
-            hmax -= max(0.60, len(tag) * 0.078 + 0.14) + 0.10
-        fit_text(ax, x + 0.14, y + h - 0.14, header, hmax, ha="left", va="center", fontsize=h_fs, fontweight="bold", color="#0F172A", zorder=3.5)
-        fit_text(ax, x + 0.14, y + h - 0.35, subheader, w - 0.14 - 0.10, ha="left", va="center", fontsize=6.35, fontweight="bold", color=accent, zorder=3.5)
-        if tag:
-            tw = max(0.60, len(tag) * 0.078 + 0.14)
-            bp = FancyBboxPatch((x + w - tw - 0.06, y + h - 0.24), tw, 0.19,
-                                boxstyle="round,pad=0,rounding_size=0.04", facecolor=accent, edgecolor="none", zorder=3.4)
-            ax.add_patch(bp)
-            ax.text(x + w - tw / 2.0 - 0.06, y + h - 0.145, tag, ha="center", va="center", fontsize=5.6, fontweight="bold", color="#FFFFFF", zorder=3.5)
-        body_h = h - 0.52
-        n = len(lines)
-        for i, ln in enumerate(lines):
-            ly = y + h - 0.62 - i * (body_h / max(1, n))
-            fit_text(ax, x + 0.14, ly, ln, w - 0.14 - 0.12, ha="left", va="center", fontsize=6.65, color="#1E293B", zorder=3.5)
-
-    # ── TIER 1: INGESTION & STREAMING ──
-    detail_box(0.45, 9.55, 3.55, 1.85, "1.1 Raw Profiling & Resolution", "raw_source.py · probe_csv_format.py · probe_full_scan.py", [
-        "• Resolves <table>.parquet → <table>/*.parquet → .csv",
-        "• 20k-row schema/nested probe → data/audit/csv_profile.md",
-        "• Full scan country × date span → data/audit/csv_fullscan.md",
-        "• Checksum verification via data/raw_csv_md5.txt"
-    ], accent="#334155", tag="STEP 2")
-
-    detail_box(0.45, 6.75, 3.55, 2.60, "1.2 Batch Contract Loader", "batch_csv_to_bronze.py · table_contracts.yml", [
-        "• 11 tables (~230 GB across SG, TH, VN, 2023–2026):",
-        "  - Fact Parquet: sales_detail (12.2 GB), f_member_purchase,",
-        "    sales_tender_detail, all_store_selling_price",
-        "  - Event Parts: tracking_ecom_events (1,774 parts, ~200 GB)",
-        "  - CSV Tables: stock_availability_rate (5.4 GB), d_member",
-        "    (2.0 GB), dim_item (Parquet 0.7 GB), dim_business_unit,",
-        "    dim_calendar, f_member_favorite_sport",
-        "• Casts join keys to VARCHAR; logs pipeline_run_metrics"
-    ], accent="#475569", tag="STEP 3")
-
-    detail_box(0.45, 3.95, 3.55, 2.60, "1.3 Optional Streaming Replay Lane", "stream_contracts.py · kafka_producer / consumer", [
-        "• Redpanda broker (docker-compose.yml)",
-        "• Replay producer streams 3 event tables:",
-        "  sales_detail, f_member_purchase, tracking_ecom_events",
-        "• Consumer enforces stream: block of table_contracts.yml",
-        "• Invalid payloads routed to Dead-Letter Queue (DLQ)",
-        "• Valid micro-batches written to partitioned Bronze stream"
-    ], accent="#0284C7", tag="STEP 8")
-
-    detail_box(0.45, 1.95, 3.55, 1.80, "1.4 Self-Built External Sources", "holiday_commercial_builder.py · commercial_event_names.csv", [
-        "• Generates ext.public_holidays via Python holidays lib",
-        "  (53 SG, 106 TH, 58 VN official holidays 2023–2026)",
-        "• Loads curated ext.commercial_event_names dictionary",
-        "  for naming inferred promotion peaks in Silver"
-    ], accent="#7E22CE", tag="EXT DATA")
-
-    detail_box(0.45, 0.55, 3.55, 1.20, "1.5 Zero-Copy Bronze View Binder", "bronze_views_from_parquet.py", [
-        "• Registers bronze.<table> views in lakehouse.duckdb",
-        "• Reads Hive-partitioned Parquet folders without copying"
-    ], accent="#334155", tag="VIEWS")
-
-    # ── TIER 2: BRONZE & PROFILING GATES ──
-    detail_box(4.60, 9.15, 3.55, 2.25, "2.1 Partitioned Bronze Lakehouse", "data/bronze/<table>/ · ZSTD Parquet", [
-        "• Fact tables Hive-partitioned by (country, year, month)",
-        "• Partitioned COPY flush threshold = 32,768 rows",
-        "  (prevents 112 GB spill on 85-country member tables)",
-        "• Enables partition pruning & column projection (6.7×)",
-        "• 48 dbt source schema tests on bronze.* & ext.*"
-    ], accent="#334155", tag="BRONZE")
-
-    detail_box(4.60, 7.15, 3.55, 1.80, "2.2 Malformed Row Quarantine", "quarantine.rejects_<table> (DuckDB reject_errors)", [
-        "• Captures unparseable CSV rows (cut lines, delimiters)",
-        "• Zero silent drops: 46 d_member & 19 dim_item rows",
-        "  quarantined with raw line & error message (t11)"
-    ], accent="#E11D48", bg="#FFF1F2", border="#FDA4AF", tag="REJECTS")
-
-    detail_box(4.60, 4.55, 3.55, 2.40, "2.3 Go / No-Go Quality Gates", "sql/gates_by_country.sql → audit.gates_by_country", [
-        "• Evaluated per (country × year) before Silver build:",
-        "  - Gate 1: Member link rate ≥ 60% of sale lines",
-        "  - Gate 2: Catalogue item match ≥ 95% (99.9%+)",
-        "  - Gate 3: National price coverage ≥ 90% (97.7%+)",
-        "  - Gate 4: Eligible repeat members ≥ 20,000",
-        "• Decision: TH & VN = PASS (main set); SG = REVIEW"
-    ], accent="#D97706", bg="#FFFBEB", border="#FCD34D", tag="STEP 4")
-
-    detail_box(4.60, 2.30, 3.55, 2.05, "2.4 Domain & Drift Audits (QC-5)", "sql/audit_checks.sql → audit.*", [
-        "• audit.volume_drift (QC-5): flags daily count ±50% vs",
-        "  28d trailing same-weekday mean + holiday cause",
-        "• audit.price_uniformity: store (type 7) vs country (15)",
-        "• audit.stock_coverage & audit.interpurchase_gap (Δ=30,90)"
-    ], accent="#B45309", bg="#FFFBEB", border="#FCD34D", tag="QC-5")
-
-    detail_box(4.60, 0.55, 3.55, 1.55, "2.5 Stream Reconciliation (QC-7)", "qc7_stream_reconciliation.py → audit.stream_reconciliation", [
-        "• Reconciles batch vs stream Bronze per (table, country, day)",
-        "• Verifies exact row_count match & ordered key/payload hash"
-    ], accent="#0D9488", bg="#F0FDFA", border="#99F6E4", tag="QC-7")
-
-    # ── TIER 3: SILVER DOMAIN LAYER ──
-    detail_box(8.75, 9.25, 4.05, 2.15, "3.1 Transactions, Netting & Returns", "stg_sales_detail → slv_sales_line_netted → slv_fact_sales_line", [
-        "• stg_sales_detail: projects 25/141 cols, applies country/date vars",
-        "• slv_sales_line_netted: exact dedup + latest version_at + signed",
-        "  sale − cancel netting per (transaction_id, item_code)",
-        "• slv_fact_sales_line: positive SALE lines, merchandise in catalogue,",
-        "  store/country timezone → naive UTC, local → EUR conversion",
-        "• slv_fact_returns: return lines matched to original sale tx"
-    ], accent="#1D4ED8", tag="SALES & TZ")
-
-    detail_box(8.75, 7.00, 4.05, 2.05, "3.2 Catalogue, Pricing & Enriched Calendar", "slv_dim_model · slv_price_sku_interval · slv_calendar_enriched", [
-        "• slv_dim_model: SKU→model_code; drops UUIDs, services & FIXT & FURNIT",
-        "• slv_price_sku_interval: national SKU intervals (type 15, fallback 50),",
-        "  maps 4 price_types → promo_kind; depth > 90% → qrt_price_interval",
-        "• slv_calendar_enriched: O(N+D) difference-array promo share; ≥3 peak",
-        "  days (≥1.5σ & ≥0.2% floor) named via dictionary + public holidays"
-    ], accent="#2563EB", tag="CAT & CAL")
-
-    detail_box(8.75, 4.75, 4.05, 2.05, "3.3 Web Clickstream & Identity Stitching", "stg_tracking_ecom_events → slv_web_events_clean → slv_user_to_member", [
-        "• slv_web_events_clean: extracts STRUCT/LIST paths, keeps numeric model",
-        "  codes, filters is_event_to_use = true (1.0B raw → clean product events)",
-        "• slv_user_member_links: Tier 1 ORDER match + Tier 2 LOGIN event",
-        "• slv_user_to_member: keeps 1:1 cookies with earliest identity_verified_ts;",
-        "  multi-member cookies → slv_identity_conflicts; audit.stitching_coverage"
-    ], accent="#7E22CE", tag="STITCHING")
-
-    detail_box(8.75, 2.55, 4.05, 2.00, "3.4 Member State, Sport & Daily Stock", "slv_member_bridge · slv_member_profile · slv_member_sport_asof · store_daily", [
-        "• slv_member_bridge: earliest member_id per tx; slv_member_profile: consumer",
-        "  accounts only (excludes staff, B2B, legal entity, club, school)",
-        "• slv_member_sport_asof: add/remove events → [valid_from, valid_to) intervals",
-        "• slv_member_store_daily: running modal store per member × purchase day",
-        "• slv_stock_daily_model / _national: ≤3d forward-fill (behind vars.use_stock)"
-    ], accent="#0284C7", tag="STATE ASOF")
-
-    detail_box(8.75, 0.55, 4.05, 1.80, "3.5 Silver Quarantine & Gates (QC-1 … QC-4)", "qrt_sales_line · qrt_price_interval · slv_identity_conflicts", [
-        "• qrt_sales_line routes refused lines with 6 explicit reasons (NON_MERCHANDISE,",
-        "  NET_ZERO_OR_NEGATIVE, NON_SALE_TX, UNMAPPED_ITEM…)",
-        "• Block tests on null keys (QC-1), RI (QC-2), domains (QC-3), unique keys (QC-4)"
-    ], accent="#E11D48", bg="#FFF1F2", border="#FDA4AF", tag="QC-1..4")
-
-    # ── TIER 4: GOLD FEATURE STORE & CANDIDATES ──
-    detail_box(13.40, 9.55, 4.25, 1.85, "4.1 Temporal Anchor Grid & Aux Tables", "build_anchor_grid.py · gld_web_stitched · gld_copurchase_lift · sport_affinity", [
-        "• anchor_grid: eligible (member, Monday) in split.yml (42d purge gaps),",
-        "  requires non-returned purchase in 90d, 4× train stride, 50k/15k/50k cap",
-        "• anchor_model_grid: active models (±90d) per (country, anchor_date)",
-        "• Pre-validation (< valid_lo) gld_copurchase_lift & gld_sport_department_affinity"
-    ], accent="#4338CA", tag="STEP 6A")
-
-    detail_box(13.40, 7.15, 4.25, 2.20, "4.2 Entity 1 & Entity 2 Feature Stores (< t)", "gld_fs_member (Entity 1) · gld_fs_model_country (Entity 2)", [
-        "• gld_fs_member (member, anchor): F0 purchase RFM (30/90/365d, return_rate),",
-        "  F1 price quantiles (q25/q50/q75, promo_affinity), F3 web sessions/models",
-        "  (verified_ts ≤ t, web_data_available flag), ASOF sport & usual store",
-        "• gld_fs_model_country (model, country, anchor): ASOF SKU median price,",
-        "  promo_depth, calendar (in_commercial_event, holiday gap), 28d popularity"
-    ], accent="#CA8A04", tag="ENTITIES 1 & 2")
-
-    detail_box(13.40, 4.85, 4.25, 2.10, "4.3 Candidate Generation (Top 200 / Anchor)", "gld_candidates (filtered to anchor_model_grid, priority R1 > R3 > R2 > R4 > R5)", [
-        "• R1 Repurchase: member's past models prior to anchor_date",
-        "• R2 Co-purchase: top lift partners of member's last-90d basket",
-        "• R3 Web Intent: models viewed/carted in last 30d (verified_ts ≤ anchor)",
-        "• R4 Sport × Offer: active favourite sports → top affinity depts → popular models",
-        "• R5 National Best-Sellers: top-300 models by buyers in trailing 28 days"
-    ], accent="#D97706", tag="R1 – R5")
-
-    detail_box(13.40, 2.55, 4.25, 2.10, "4.4 Entity 3 Pair Features & Ranking Set", "gld_fs_pair (Entity 3) → gld_ranking_dataset", [
-        "• gld_fs_pair (member, model, anchor): joins Entity 1 + Entity 2 + pair",
-        "  signals: F2 model repurchase count/recency & ASOF dept purchase cycle,",
-        "  F4 basket co-purchase lift max/mean, F5 member-to-model price ratio,",
-        "  F3 model web views/carts (7d/30d), Sport×Dept affinity score",
-        "• gld_ranking_dataset: attaches non-returned labels label_30 & label_90"
-    ], accent="#A16207", tag="ENTITY 3 & LABELS")
-
-    detail_box(13.40, 0.55, 4.25, 1.80, "4.5 Point-in-Time Ledger (QC-6) & Recall", "quarantine.leakage_violations · audit.candidate_recall · 6 singular tests", [
-        "• Every Gold entity tracks last_source_ts; QC-6 asserts last_source_ts ≤ anchor",
-        "  and identity_verified_ts ≤ anchor across all Gold tables (0 violations, 64 PASS)",
-        "• audit.candidate_recall measures Recall@K per source R1–R5 & union@200"
-    ], accent="#BE123C", bg="#FFF1F2", border="#FDA4AF", tag="QC-6 LEDGER")
-
-    # ── TIER 5: EVALUATION & ABLATION ──
-    detail_box(18.25, 9.25, 3.30, 2.15, "5.1 Fixed LambdaRank Instrument", "train_eval_lambdarank.py · split.yml", [
-        "• LightGBM LambdaRank grouped by (member, anchor)",
-        "• Early stopping on Validation NDCG@20",
-        "• Hyper-parameters tuned once on Full config,",
-        "  then frozen across all ablation arms",
-        "• Primary horizon Δ = 30d; secondary Δ = 90d"
-    ], accent="#0F766E", tag="STEP 7A")
-
-    detail_box(18.25, 6.45, 3.30, 2.60, "5.2 Two-Axis Ablation Engine", "run_ablation_2axes.py · ablation_configs.yml", [
-        "• Baseline B0 (R1+R2+Pop, F0+F2+F4) vs Full",
-        "• Axis 1 — Feature Groups (dbt rebuilds):",
-        "  −F1 (Price), −F3 (Web), −F5 (Price/Calendar), −Sport",
-        "• Axis 2 — Candidate Sources (−R1 … −R5):",
-        "  Removed source candidates kept in test pool",
-        "  with score = −∞ (prevents denominator inflation)"
-    ], accent="#0D9488", tag="STEP 7B")
-
-    detail_box(18.25, 4.10, 3.30, 2.15, "5.3 Bootstrap CI & Cost × Gain", "bootstrap_ci.py · pipeline_cost_profiler.py", [
-        "• Metrics: HR@10/20, MRR@10/20, NDCG@10/20,",
-        "  Recall@50, Catalog Coverage",
-        "• 500× member-clustered bootstrap 95% CI on",
-        "  paired Δ(Full − Arm) for TH+VN and SG",
-        "• Joins ΔNDCG@20 with wall-time & RSS cost"
-    ], accent="#0891B2", tag="MT3 COST×GAIN")
-
-    detail_box(18.25, 2.15, 3.30, 1.75, "5.4 Scale & Technique Comparisons", "scale_test.py · technique_comparisons.py", [
-        "• Scale: 1→2→3 countries; 3→12→36 months",
-        "• 4 A/B benchmarks: Parquet vs CSV (6.6×),",
-        "  Projection (6.7×), ASOF vs Explode (1.3×, ½ RAM),",
-        "  SQL Regex vs Python UDF (2.9×)"
-    ], accent="#4F46E5", tag="BENCHMARKS")
-
-    detail_box(18.25, 0.55, 3.30, 1.40, "5.5 Automated Report Packaging", "tools/report_tables.py · tools/lineage_graph.py", [
-        "• Generates 21 Markdown/CSV tables (t01–t21)",
-        "• Applies REDACT_TERMS privacy check"
-    ], accent="#334155", tag="STEP 9")
-
-    # Tier-to-tier connectors
-    connectors = [(4.15, 4.45), (8.30, 8.60), (12.95, 13.25), (17.80, 18.10)]
-    for x1, x2 in connectors:
-        for cy in (10.3, 7.8, 5.4, 3.1, 1.3):
-            ax.plot([x1, x2 - 0.08], [cy, cy], color="#334155", lw=2.0, zorder=4)
-            draw_arrowhead(ax, x2, cy, 1.0, 0.0, "#334155", size=0.13, zorder=4.2)
-
-    for fmt in ("svg", "png"):
-        fig.savefig(OUT / f"architecture_detailed.{fmt}", dpi=260 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.20, facecolor="#FFFFFF")
-    plt.close(fig)
-    for f in FIT_FAILS:
-        print("  overflow:", f)
-    FIT_FAILS.clear()
+    pitch, tw = 4.30, 3.90
+    top, bot = 11.20, 0.40
+    gap = 0.20
+    for ti, (num, name, sub, key, cards) in enumerate(tiers):
+        c = LAYER[key]
+        x = 0.30 + ti * pitch
+        draw_rounded_box(ax, x, bot, tw, top - bot, fill=c["tint"], border=c["edge"], lw=1.4, radius=0.18, shadow=False, zorder=1.0)
+        draw_rounded_box(ax, x, top - 0.95, tw, 0.95, fill=c["main"], border=c["main"], lw=1.0, radius=0.16, shadow=False, zorder=2.0)
+        _number_dot(ax, x + 0.40, top - 0.475, num, c["main"])
+        fit_text(ax, x + 0.76, top - 0.34, name, tw - 0.9, ha="left", va="center", fontsize=15.5, fontweight="bold", color="#FFFFFF", zorder=2.5)
+        fit_text(ax, x + 0.76, top - 0.68, sub, tw - 0.9, ha="left", va="center", fontsize=9.5, color="#F1F5F9", zorder=2.5)
+        n = len(cards)
+        avail = top - 0.95 - 0.20 - (bot + 0.20)
+        ch = (avail - (n - 1) * gap) / n
+        cy = top - 0.95 - 0.20 - ch
+        for si, (title, file_, bullets, tag) in enumerate(cards):
+            cx = x + 0.18
+            cw = tw - 0.36
+            draw_rounded_box(ax, cx, cy, cw, ch, fill="#FFFFFF", border=c["main"], lw=1.4, radius=0.10, shadow=True, zorder=3.0)
+            ax.add_patch(FancyBboxPatch((cx + 0.03, cy + 0.05), 0.09, ch - 0.10, boxstyle="round,pad=0,rounding_size=0.04",
+                                        facecolor=c["main"], edgecolor="none", zorder=3.2))
+            tmax = cw - 0.40
+            if tag:
+                tmax -= len(tag) * 0.085 + 0.40
+                _tag(ax, cx + cw - 0.12, cy + ch - 0.28, tag, c["main"])
+            fit_text(ax, cx + 0.28, cy + ch - 0.28, f"{num}.{si + 1}  {title}", tmax, ha="left", va="center",
+                     fontsize=11, fontweight="bold", color="#0F172A", zorder=3.5)
+            fit_text(ax, cx + 0.28, cy + ch - 0.56, file_, cw - 0.40, ha="left", va="center",
+                     fontsize=8.4, fontweight="bold", color=c["main"], zorder=3.5)
+            step = min((ch - 0.84) / max(len(bullets), 1), 0.34)
+            for bi, b in enumerate(bullets):
+                fit_text(ax, cx + 0.28, cy + ch - 0.90 - bi * step - 0.05, f"• {b}", cw - 0.40, ha="left", va="center",
+                         fontsize=9.2, color="#334155", zorder=3.5)
+            cy -= ch + gap
+        if ti < 4:
+            ym = (top + bot) / 2.0 - 0.4
+            _flow_arrow(ax, x + tw + 0.02, ym, x + pitch - 0.02, ym, lw=2.6)
+    _save(fig, "architecture_detailed")
     print("→ docs/figures/architecture_detailed.svg / .png  (detailed system & data-flow architecture)")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 6. INGESTION & BRONZE LAYER DIAGRAM (lineage_ingestion_to_bronze.{svg,png})
-# ══════════════════════════════════════════════════════════════════════════════
+
 def build_lineage_ingestion_to_bronze():
     col_defs = [
         ("STAGE 1 · RAW DATA & EXTERNAL", "11 Raw tables (~230 GB) + Python Holidays", "#334155", "#F1F5F9"),
