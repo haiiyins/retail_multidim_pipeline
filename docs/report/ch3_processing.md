@@ -26,7 +26,7 @@ EVALUATION  fixed LightGBM LambdaRank · temporal split with purge gaps · B0 vs
 
 DuckDB (2.0) executes every transformation as SQL on a single machine; Parquet is the storage format of Bronze and the
 `lakehouse.duckdb` file holds Silver and Gold. dbt (1.12, `dbt-duckdb`) gives the dependency graph (`docs/figures/lineage_full.png`,
-46 nodes across 7 stages and 5 domain swimlanes), the tests and the documentation; 32 models are organised in five folders (2 staging views, 15 Silver, 4 quarantine, 3 audit,
+46 nodes across 7 stages and 5 domain swimlanes), the tests and the documentation; 31 models are organised in five folders (2 staging views, 15 Silver, 4 quarantine, 2 audit,
 8 Gold) **(t14)**. In addition to the full lineage DAG, `docs/figures/` provides two end-to-end synthesis diagrams for the report — a generalized overview (`docs/figures/architecture_overview.png`) and a detailed system blueprint (`docs/figures/architecture_detailed.png`) — together with four layer-specific diagrams (`lineage_ingestion_to_bronze.png`, `lineage_bronze_to_silver.png`, `lineage_silver_to_gold.png`, and `lineage_gold_to_evaluation.png`). Every `dbt run` appends wall time and rows per model to `audit.pipeline_run_metrics` through an `on-run-end` hook, the
 same table the Bronze loader writes, so the cost of each step is a by-product of running it. The laptop (M-series, 8 threads, 15 GB
 memory limit) develops on VN; the leased server (16 threads, 125 GB, NVMe) runs the three countries with the same `make` targets.

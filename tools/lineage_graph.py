@@ -157,9 +157,10 @@ def node_layer(uid: str) -> str:
         return "source"
     if uid.startswith("python."):
         return "python"
-    path = man["nodes"][uid].get("original_file_path", "")
+    # dbt writes original_file_path with the OS separator (models\silver\… on Windows): compare path parts, not "/silver/"
+    parts = pathlib.PurePath(man["nodes"][uid].get("original_file_path", "")).parts
     for l in ("staging", "silver", "quarantine", "audit", "gold"):
-        if f"/{l}/" in path or path.startswith(f"models/{l}/"):
+        if l in parts:
             return l
     return "gold"
 
@@ -198,6 +199,13 @@ for py, inputs in PY_INPUTS.items():
         src = i if i.startswith("python.") else models_by_name.get(i.split(".", 1)[1])
         if src:
             edges.add((src, py))
+
+# Counts quoted on the architecture figures come from the same manifest and the report tables folder, so they cannot go stale
+# (t14 counts tests the same way: a test with no model dependency is a source test)
+_tests = [n for n in man["nodes"].values() if n["resource_type"] == "test"]
+N_TESTS = len(_tests)
+N_SOURCE_TESTS = sum(1 for n in _tests if not any(d.startswith("model.") for d in n["depends_on"].get("nodes", [])))
+N_TABLES = max([int(m.group(1)) for p in pathlib.Path("docs/report/tables").glob("t*.md") if (m := re.match(r"t(\d+)", p.stem))] or [0])
 
 
 # ── Drawing primitives ────────────────────────────────────────────────────────
@@ -246,7 +254,7 @@ def fit_text(ax, x, y, s, maxw, **kw):
     return t
 
 
-def draw_node_card(ax, cx, cy, w, h, name, kind, custom_badge=None, title_fs=9.6, sub_fs=7.8, zorder=4):
+def draw_node_card(ax, cx, cy, w, h, name, kind, custom_badge=None, title_fs=9.6, sub_fs=7.8, zorder=4, meta1=None):
     """Draw a rich node card centered at (cx, cy) with accent bar, badge on the meta1 row, and zero text overlap."""
     pal = PALETTE[kind]
     x = cx - w / 2.0
@@ -285,7 +293,8 @@ def draw_node_card(ax, cx, cy, w, h, name, kind, custom_badge=None, title_fs=9.6
             ha="center", va="center", fontsize=4.8, fontweight="bold", color=pal["badge_fg"], zorder=zorder + 0.4)
 
     # Node name & subtitle lines (meta1 and meta2 have the full card width unobstructed)
-    meta1, _ = NODE_META.get(name, ("", ""))
+    if meta1 is None:
+        meta1 = NODE_META.get(name, ("", ""))[0]
     meta2 = ""  # one subtitle line only: the second line made the cards dense
     tx = x + accent_w + 0.090
     if len(name) > 25:
@@ -873,6 +882,10 @@ def build_lineage_full():
         "candidate_recall":              (6, 2.25),
     }
 
+    # the layout is placed by hand: a model added to dbt must be given a place here instead of vanishing from the figure
+    missing = sorted(set(models_by_name) - set(pos))
+    assert not missing, f"models in the manifest without a place in lineage_full: {missing}"
+
     corridors = [11.40, 10.15, 8.05, 6.90, 5.75, 4.50, 3.30, 1.85, 0.30, -1.10, -1.75, -3.20]
     kept = [(node_label(a), node_label(b)) for a, b in edges if node_label(a) in pos and node_label(b) in pos]
 
@@ -1017,7 +1030,7 @@ def build_architecture_overview():
     qy, qh = 0.45, 1.85
     draw_rounded_box(ax, 0.40, qy, 19.2, qh, fill=LAYER["qc"]["tint"], border=LAYER["qc"]["edge"], lw=1.4, radius=0.16, shadow=False, zorder=1.0)
     ax.text(0.70, qy + qh - 0.36, "Quality gates across every layer", ha="left", va="center", fontsize=13.5, fontweight="bold", color=LAYER["qc"]["main"])
-    ax.text(19.30, qy + qh - 0.36, "64 dbt tests · audit.pipeline_run_metrics", ha="right", va="center", fontsize=10.5, color="#9F1239")
+    ax.text(19.30, qy + qh - 0.36, f"{N_TESTS} dbt tests · audit.pipeline_run_metrics", ha="right", va="center", fontsize=10.5, color="#9F1239")
     qcs = [("QC-1", "Null keys"), ("QC-2", "Referential"), ("QC-3", "Value domains"), ("QC-4", "Uniqueness"),
            ("QC-5", "Volume drift"), ("QC-6", "Point-in-time"), ("QC-7", "Stream match")]
     pw = (18.6 - 6 * 0.18) / 7.0
@@ -1042,14 +1055,14 @@ def build_architecture_detailed():
 
     tiers = [
         ("1", "Ingestion", "ingestion/*.py", "src", [
-            ("Profile raw files", "raw_source.py · probe_csv_format.py", ["Resolve parquet / csv paths", "Probe schema and nested types", "Verify MD5 checksums"], None),
+            ("Profile raw files", "raw_source.py · probe_csv_format.py", ["Resolve parquet / csv paths", "Probe schema and nested types", "MD5 list of the raw files (step 1)"], None),
             ("Batch contract loader", "batch_csv_to_bronze.py", ["11 tables, ~230 GB", "Join keys cast to VARCHAR", "Run metrics logged"], None),
             ("Streaming replay", "kafka_producer_replay.py", ["Redpanda, 3 event tables", "Consumer applies contracts", "Invalid events → dead letters"], "OPTIONAL"),
             ("External sources", "holiday_commercial_builder.py", ["Public holidays SG · TH · VN", "Commercial event names"], None),
         ]),
         ("2", "Bronze", "data/bronze · sql/*.sql", "bronze", [
             ("Partitioned Parquet", "data/bronze/<table>", ["Hive: country / year / month", "ZSTD, 32,768-row flush", "Pruning and pushdown"], None),
-            ("Bronze views", "bronze_views_from_parquet.py", ["Zero-copy bronze.* views", "48 dbt source tests"], None),
+            ("Bronze views", "bronze_views_from_parquet.py", ["Zero-copy bronze.* views", f"{N_SOURCE_TESTS} dbt source tests"], None),
             ("Row quarantine", "quarantine.rejects_<table>", ["Unparseable CSV lines kept", "Nothing dropped silently"], None),
             ("Go / No-Go gates", "audit.gates_by_country", ["Link ≥ 60% · item ≥ 95%", "Price ≥ 90% · ≥ 20k members", "TH, VN pass · SG review"], None),
             ("Drift & reconcile", "audit.volume_drift · stream_reconciliation", ["±50% vs 28-day mean", "Batch vs stream hash match"], "QC-5 · QC-7"),
@@ -1073,7 +1086,7 @@ def build_architecture_detailed():
             ("Two-axis ablation", "run_ablation_2axes.py", ["Axis 1: drop feature groups", "Axis 2: drop candidate sources"], None),
             ("Bootstrap & cost", "bootstrap_ci.py · pipeline_cost_profiler.py", ["500× member-level 95% CI", "Cost × gain per arm"], None),
             ("Scale & techniques", "scale_test.py · technique_comparisons.py", ["1→3 countries, 3→36 months", "Parquet, pushdown, ASOF A/B"], None),
-            ("Report packaging", "report_tables.py · lineage_graph.py", ["21 tables, t01–t21", "Figures from the dbt manifest"], None),
+            ("Report packaging", "report_tables.py · lineage_graph.py", [f"{N_TABLES} tables, t01–t{N_TABLES:02d}", "Figures from the dbt manifest"], None),
         ]),
     ]
 
@@ -1157,8 +1170,7 @@ def _flow_columns(fig_w, fig_h, cols, title, subtitle):
 
 
 def _flow_card(ax, x, cy, title, sub, kind, badge=None, h=0.95):
-    NODE_META[title] = (sub, "")
-    draw_node_card(ax, x + COL_W / 2.0, cy, COL_W - 0.30, h, title, kind, custom_badge=badge, title_fs=10.2, sub_fs=8.4, zorder=4.0)
+    draw_node_card(ax, x + COL_W / 2.0, cy, COL_W - 0.30, h, title, kind, custom_badge=badge, title_fs=10.2, sub_fs=8.4, zorder=4.0, meta1=sub)
     return (x + 0.15, cy, x + COL_W - 0.15)  # left, centre y, right
 
 
@@ -1258,7 +1270,7 @@ def build_lineage_gold_to_evaluation(out_dir=OUT):
     o3 = _flow_card(ax, xs[3], 3.50, "Cost × gain", "wall time · memory per ΔNDCG@20", "audit", "COST")
     o4 = _flow_card(ax, xs[3], 1.60, "Scale & technique tests", "1→3 countries · Parquet, ASOF A/B", "python", "SCALE")
 
-    t1 = _flow_card(ax, xs[4], 4.60, "Reproducible report tables", "report_tables.py → t01 … t21", "silver", "TABLES")
+    t1 = _flow_card(ax, xs[4], 4.60, "Reproducible report tables", f"report_tables.py → t01 … t{N_TABLES:02d}", "silver", "TABLES")
 
     L = lambda c: (c[0], c[1])
     R = lambda c: (c[2], c[1])
