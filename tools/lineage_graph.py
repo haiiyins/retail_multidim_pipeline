@@ -297,7 +297,7 @@ def draw_node_card(ax, cx, cy, w, h, name, kind, custom_badge=None, title_fs=9.6
     else:
         eff_title_fs = title_fs
 
-    tmax = bx - tx - 0.06
+    tmax = bx - tx - 0.14
     mmax = x + w - tx - 0.08
     if meta1 and meta2:
         fit_text(ax, tx, y + h * (0.74 if h >= 0.90 else 0.75), name, tmax, ha="left", va="center",
@@ -927,9 +927,11 @@ def _title_block(ax, x, y_title, title, subtitle, t_fs=21, s_fs=12):
     ax.text(x, y_title - 0.50, subtitle, ha="left", va="center", fontsize=s_fs, color="#475569")
 
 
-def _save(fig, name):
+def _save(fig, name, out_dir=OUT):
+    out_dir = pathlib.Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
     for fmt in ("svg", "png"):
-        fig.savefig(OUT / f"{name}.{fmt}", dpi=240 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.25, facecolor="#FFFFFF")
+        fig.savefig(out_dir / f"{name}.{fmt}", dpi=240 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.25, facecolor="#FFFFFF")
     plt.close(fig)
     for f in FIT_FAILS:
         print("  overflow:", f)
@@ -1117,181 +1119,158 @@ def build_architecture_detailed():
 
 
 
-def build_lineage_ingestion_to_bronze():
-    col_defs = [
-        ("STAGE 1 · RAW DATA & EXTERNAL", "11 Raw tables (~230 GB) + Python Holidays", "#334155", "#F1F5F9"),
-        ("STAGE 2 · INGESTION & STREAM LANE", "Batch loader, Redpanda replay & contracts", "#0284C7", "#E0F2FE"),
-        ("STAGE 3 · BRONZE STORAGE & VIEWS", "Partitioned ZSTD Parquet & bronze.* views", "#475569", "#F1F5F9"),
-        ("STAGE 4 · BRONZE QUARANTINE & AUDITS", "Rejects, Go/No-Go gates, QC-5 & QC-7", "#D97706", "#FEF3C7"),
-    ]
+# ── Layered flow diagrams: orthogonal "bus" edges that only run in the gap between neighbouring columns ─────────
 
-    fig, ax = plt.subplots(figsize=(18.2, 9.6))
-    ax.set_xlim(0, 18.2)
-    ax.set_ylim(0, 9.6)
+COL_W, COL_PITCH, COL_TOP = 3.60, 4.50, 8.55
+
+
+def _bus(ax, srcs, tgts, x_bus, color, ls="-", lw=1.9):
+    """Many-to-many orthogonal edge: every source runs to one vertical bus, every target leaves it with an arrowhead."""
+    ys = [y for _, y in srcs] + [y for _, y in tgts]
+    for x, y in srcs:
+        ax.plot([x, x_bus], [y, y], color=color, lw=lw, ls=ls, solid_capstyle="round", zorder=3.0)
+        ax.add_patch(Circle((x, y), 0.045, facecolor=color, edgecolor="#FFFFFF", linewidth=0.6, zorder=3.3))
+    if max(ys) - min(ys) > 1e-6:
+        ax.plot([x_bus, x_bus], [min(ys), max(ys)], color=color, lw=lw, ls=ls, solid_capstyle="round", zorder=3.0)
+    for x, y in tgts:
+        ax.plot([x_bus, x - 0.16], [y, y], color=color, lw=lw, ls=ls, zorder=3.0)
+        draw_arrowhead(ax, x, y, 1.0, 0.0, color, size=0.17, zorder=3.4)
+
+
+def _flow_columns(fig_w, fig_h, cols, title, subtitle):
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    ax.set_xlim(0, fig_w)
+    ax.set_ylim(0, fig_h)
     ax.axis("off")
-    fig.patch.set_facecolor("#FFFFFF")
+    _title_block(ax, 0.30, fig_h - 0.42, title, subtitle, t_fs=20, s_fs=11.5)
+    xs = []
+    for i, (num, name, sub, key) in enumerate(cols):
+        c = LAYER[key]
+        x = 0.30 + i * COL_PITCH
+        xs.append(x)
+        draw_rounded_box(ax, x, 0.35, COL_W, COL_TOP - 0.35, fill=c["tint"], border=c["edge"], lw=1.3, radius=0.16, shadow=False, zorder=0.8)
+        draw_rounded_box(ax, x, COL_TOP - 0.85, COL_W, 0.85, fill=c["main"], border=c["main"], lw=1.0, radius=0.14, shadow=False, zorder=2.0)
+        _number_dot(ax, x + 0.38, COL_TOP - 0.425, num, c["main"], r=0.19, fs=10)
+        fit_text(ax, x + 0.70, COL_TOP - 0.31, name, COL_W - 0.85, ha="left", va="center", fontsize=13.5, fontweight="bold", color="#FFFFFF", zorder=2.5)
+        fit_text(ax, x + 0.70, COL_TOP - 0.61, sub, COL_W - 0.85, ha="left", va="center", fontsize=9.5, color="#F1F5F9", zorder=2.5)
+    return fig, ax, xs
 
-    ax.text(0.30, 9.22, "Bronze Layer Architecture — Batch & Streaming Ingestion, Data Contracts, Partitioning & Quality Audits",
-            ha="left", va="center", fontsize=14.0, fontweight="bold", color="#0F172A")
-    ax.text(0.30, 8.86, "Raw CSV/Parquet (11 tables, ~230 GB) + Optional Redpanda Streaming Replay → Hive-Partitioned ZSTD Parquet, Zero-Copy Views & Gates (Step 2–4 & Step 8)",
-            ha="left", va="center", fontsize=9.0, color="#475569")
 
-    xs = [0.30, 4.75, 9.20, 13.65]
-    w = 4.15
-    for idx, (ctitle, csub, ccol, cbg) in enumerate(col_defs):
-        cx = xs[idx]
-        draw_rounded_box(ax, cx, 0.35, w, 8.20, fill="#F8FAFC", border="#CBD5E1", lw=1.0, radius=0.14, shadow=False, ls="--", zorder=0.8)
-        draw_rounded_box(ax, cx, 7.95, w, 0.60, fill=cbg, border=ccol, lw=1.3, radius=0.10, shadow=False, zorder=2.0)
-        fit_text(ax, cx + w / 2.0, 8.35, ctitle, w - 0.25, ha="center", va="center", fontsize=8.6, fontweight="bold", color=ccol, zorder=2.5)
-        fit_text(ax, cx + w / 2.0, 8.10, csub, w - 0.25, ha="center", va="center", fontsize=7.0, color="#334155", zorder=2.5)
+def _flow_card(ax, x, cy, title, sub, kind, badge=None, h=0.95):
+    NODE_META[title] = (sub, "")
+    draw_node_card(ax, x + COL_W / 2.0, cy, COL_W - 0.30, h, title, kind, custom_badge=badge, title_fs=10.2, sub_fs=8.4, zorder=4.0)
+    return (x + 0.15, cy, x + COL_W - 0.15)  # left, centre y, right
 
-    def bcard(col_i, y, h, title, sub1, sub2, kind="source", badge=None):
-        cx = xs[col_i] + w / 2.0
-        cy = y + h / 2.0
-        NODE_META[title] = (sub1, sub2)
-        draw_node_card(ax, cx, cy, w - 0.26, h, title, kind, custom_badge=badge, title_fs=8.5, sub_fs=6.8, zorder=4.0)
-        return (xs[col_i] + 0.13, cy, xs[col_i] + w - 0.13)
 
-    # Col 0: Raw sources grouped by type
-    r1 = bcard(0, 6.80, 0.90, "Fact Parquet Exports (4 tables)", "sales_detail (12.2 GB) · f_member_purchase", "sales_tender_detail · all_store_selling_price", "source", "PARQUET")
-    r2 = bcard(0, 5.65, 0.90, "Chunked Web Event Parts", "tracking_ecom_events/part-*.snappy.parquet", "1,774 daily files (~200 GB, 1.0B events)", "source", "1,774 PARTS")
-    r3 = bcard(0, 4.50, 0.90, "Catalogue & Dimension Exports", "dim_item.parquet (4.36M SKUs, 0.7 GB)", "dim_business_unit.csv · dim_calendar.csv", "source", "DIM TABLES")
-    r4 = bcard(0, 3.35, 0.90, "Member, Sport & Stock CSVs", "d_member.csv (2.0 GB) · f_member_favorite_sport", "stock_availability_rate.csv (5.4 GB)", "source", "CSV TABLES")
-    r5 = bcard(0, 1.95, 0.90, "Event Replay Source (3 tables)", "sales_detail · f_member_purchase", "tracking_ecom_events (streamed by timestamp)", "staging", "STREAM SRC")
-    r6 = bcard(0, 0.70, 0.90, "External Reference Sources", "Python holidays library (SG, TH, VN)", "ingestion/commercial_event_names.csv", "ext", "EXT INPUT")
+def _gap_x(xs, i, k=0.5):
+    """x of a bus in the gap right of column i (k = 0..1 across the gap)."""
+    return xs[i] + COL_W + k * (COL_PITCH - COL_W)
 
-    # Col 1: Ingestion & Contracts
-    i1 = bcard(1, 6.60, 1.10, "probe_csv_format & full_scan", "raw_source.py resolution & MD5 verification", "Outputs csv_profile.md & csv_fullscan.md", "audit", "PROFILING")
-    i2 = bcard(1, 5.05, 1.25, "batch_csv_to_bronze.py", "Enforces ingestion/table_contracts.yml", "VARCHAR key casts · 32,768-row partition flush", "silver", "BATCH LOADER")
-    i3 = bcard(1, 3.45, 1.25, "Redpanda Replay Lane", "kafka_producer_replay.py → Redpanda Broker", "kafka_consumer_to_bronze.py (stream_contracts.py)", "staging", "STREAM LANE")
-    i4 = bcard(1, 1.95, 1.10, "bronze_views_from_parquet.py", "Binds zero-copy bronze.* views in DuckDB", "Exposes 11 tables to dbt without data duplication", "silver", "VIEW BINDER")
-    i5 = bcard(1, 0.65, 0.95, "holiday_commercial_builder.py", "Builds ext.public_holidays & event dictionary", "Materialised directly in lakehouse.duckdb", "ext", "EXT BUILDER")
 
-    # Col 2: Bronze Storage & Views
-    s1 = bcard(2, 6.25, 1.40, "Hive-Partitioned ZSTD Parquet", "data/bronze/<table>/country=.../year=.../month=...", "Fact tables partitioned for pruning & pushdown", "source", "ZSTD PARQUET")
-    s2 = bcard(2, 4.55, 1.35, "Unpartitioned Bronze Parquet", "data/bronze/{dim_item, d_member, dim_calendar…}", "Dimension & lookup tables in ZSTD Parquet", "source", "DIM PARQUET")
-    s3 = bcard(2, 3.05, 1.15, "Streaming Bronze Parquet", "data/bronze_stream/<table>/country=.../year=...", "Micro-batch Parquet output from Kafka consumer", "staging", "STREAM LAKE")
-    s4 = bcard(2, 1.75, 1.00, "bronze.* DuckDB Views (11 views)", "Unified SQL interface for dbt staging & silver", "48 dbt source tests (not_null, accepted_values)", "silver", "DBT SOURCES")
-    s5 = bcard(2, 0.55, 0.95, "ext.* DuckDB Tables (2 tables)", "ext.public_holidays · ext.commercial_event_names", "Joined by slv_calendar_enriched", "ext", "EXT TABLES")
-
-    # Col 3: Quarantine & Audits
-    q1 = bcard(3, 6.55, 1.15, "quarantine.rejects_<table>", "DuckDB reject_errors on malformed CSV lines", "46 d_member & 19 dim_item rows preserved (t11)", "quarantine", "CSV REJECTS")
-    q2 = bcard(3, 5.15, 1.15, "audit.gates_by_country (Step 4)", "Member link ≥60%, Item ≥95%, Price ≥90%, ≥20k", "TH & VN = PASS (main); SG = REVIEW (50–64% link)", "audit", "GO / NO-GO")
-    q3 = bcard(3, 3.75, 1.15, "audit.volume_drift (QC-5)", "±50% vs 28-day trailing same-weekday mean", "Attaches holiday / event probable cause", "audit", "QC-5 DRIFT")
-    q4 = bcard(3, 2.35, 1.15, "Stream DLQ & QC-7 Reconciliation", "Dead-Letter Queue for invalid Kafka payloads", "audit.stream_reconciliation: row & hash match", "quarantine", "QC-7 & DLQ")
-    q5 = bcard(3, 0.70, 1.30, "Domain Audits & Run Metrics", "audit.price_uniformity · stock_coverage · gap", "audit.pipeline_run_metrics (wall time & rows)", "audit", "OBSERVABILITY")
-
-    # Connect cards cleanly
-    links = [
-        (r1, i1, "#64748B", "-"), (r2, i1, "#64748B", "-"),
-        (r1, i2, "#2563EB", "-"), (r2, i2, "#2563EB", "-"), (r3, i2, "#2563EB", "-"), (r4, i2, "#2563EB", "-"),
-        (r5, i3, "#16A34A", "-"), (r6, i5, "#7E22CE", "-"),
-        (i2, s1, "#2563EB", "-"), (i2, s2, "#2563EB", "-"), (i2, q1, "#E11D48", "--"),
-        (i3, s3, "#16A34A", "-"), (i3, q4, "#E11D48", "--"),
-        (s1, i4, "#475569", "-"), (s2, i4, "#475569", "-"), (i4, s4, "#2563EB", "-"),
-        (i5, s5, "#7E22CE", "-"),
-        (s4, q2, "#D97706", "--"), (s4, q3, "#D97706", "--"), (s4, q5, "#D97706", "--"),
-        (s1, q4, "#0D9488", "--"), (s3, q4, "#0D9488", "--"),
+def build_lineage_ingestion_to_bronze(out_dir=OUT):
+    cols = [
+        ("1", "Raw data", "files on disk", "src"),
+        ("2", "Ingestion", "scripts & contracts", "silver"),
+        ("3", "Bronze storage", "Parquet & rejects", "bronze"),
+        ("4", "Views & reconcile", "what dbt reads", "silver"),
+        ("5", "Gates & audits", "Go / No-Go, drift, metrics", "qc"),
     ]
-    for (x1_l, y1, x1_r), (x2_l, y2, x2_r), col, ls in links:
-        if x2_l > x1_r:
-            draw_routed_edge(ax, x1_r, y1, x2_l, y2, color=col, style=ls, lw=1.35)
-        else:
-            draw_routed_edge(ax, x1_r, y1, x2_r, y2, color=col, style=ls, lw=1.2)
+    fig, ax, xs = _flow_columns(0.30 + 4 * COL_PITCH + COL_W + 0.30, 10.0, cols,
+                                "Bronze Layer — Ingestion, Storage and Quality Audits",
+                                "Batch loader and optional Redpanda replay write Hive-partitioned Parquet; dbt reads it through views")
 
-    for fmt in ("svg", "png"):
-        fig.savefig(OUT / f"lineage_ingestion_to_bronze.{fmt}", dpi=260 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.20, facecolor="#FFFFFF")
-    plt.close(fig)
-    for f in FIT_FAILS:
-        print("  overflow:", f)
-    FIT_FAILS.clear()
-    print("→ docs/figures/lineage_ingestion_to_bronze.svg / .png  (Ingestion & Bronze layer detail)")
+    r1 = _flow_card(ax, xs[0], 7.00, "Fact Parquet exports", "sales · purchases · tender · prices", "source", "PARQUET")
+    r2 = _flow_card(ax, xs[0], 5.95, "Web event parts", "1,774 files · 1.0 B events", "source", "PARQUET")
+    r3 = _flow_card(ax, xs[0], 4.90, "Catalogue & dimensions", "dim_item · business units · calendar", "source", "DIM")
+    r4 = _flow_card(ax, xs[0], 3.85, "Members, sport & stock", "d_member · favourite sport · stock", "source", "CSV")
+    r5 = _flow_card(ax, xs[0], 2.55, "Event replay source", "3 tables, streamed by time", "staging", "STREAM")
+    r6 = _flow_card(ax, xs[0], 1.20, "External references", "holidays · event names", "ext", "EXT")
+
+    i1 = _flow_card(ax, xs[1], 6.45, "Profile raw files", "csv profile · MD5 check", "audit", "PROFILING")
+    i2 = _flow_card(ax, xs[1], 4.90, "Batch contract loader", "table_contracts.yml · key casts", "silver", "BATCH")
+    i3 = _flow_card(ax, xs[1], 2.55, "Redpanda replay lane", "producer → broker → consumer", "staging", "STREAM")
+    i5 = _flow_card(ax, xs[1], 1.20, "Reference builder", "holidays & event dictionary", "ext", "EXT")
+
+    s1 = _flow_card(ax, xs[2], 7.00, "Hive-partitioned Parquet", "country / year / month · ZSTD", "source", "BATCH")
+    s2 = _flow_card(ax, xs[2], 5.90, "Dimension Parquet", "dim_item · d_member · calendar", "source", "DIM")
+    q1 = _flow_card(ax, xs[2], 4.60, "Rejected CSV rows", "quarantine.rejects_<table>", "quarantine", "REJECTS")
+    s3 = _flow_card(ax, xs[2], 2.55, "Streaming Parquet", "bronze_stream · micro-batches", "staging", "STREAM")
+    s5 = _flow_card(ax, xs[2], 1.20, "Reference tables", "ext.public_holidays · event names", "ext", "EXT")
+
+    s4 = _flow_card(ax, xs[3], 6.00, "bronze.* views", "11 zero-copy views for dbt", "silver", "DBT SOURCE")
+    q4 = _flow_card(ax, xs[3], 3.25, "Batch vs stream check", "audit.stream_reconciliation", "audit", "QC-7")
+
+    q2 = _flow_card(ax, xs[4], 6.60, "Go / No-Go gates", "audit.gates_by_country", "audit", "GATES")
+    q3 = _flow_card(ax, xs[4], 5.15, "Volume drift", "audit.volume_drift", "audit", "QC-5")
+    q5 = _flow_card(ax, xs[4], 3.70, "Domain audits & run metrics", "price · stock · pipeline_run_metrics", "audit", "AUDIT")
+
+    L = lambda c: (c[0], c[1])   # left port
+    R = lambda c: (c[2], c[1])   # right port
+    # column 1 → 2: all raw tables are profiled and loaded
+    _bus(ax, [R(r1), R(r2), R(r3), R(r4)], [L(i1), L(i2)], _gap_x(xs, 0), "#475569")
+    _bus(ax, [R(r5)], [L(i3)], _gap_x(xs, 0), "#16A34A")
+    _bus(ax, [R(r6)], [L(i5)], _gap_x(xs, 0), "#7E22CE")
+    # column 2 → 3
+    _bus(ax, [R(i2)], [L(s1), L(s2)], _gap_x(xs, 1, 0.35), "#2563EB")
+    _bus(ax, [R(i2)], [L(q1)], _gap_x(xs, 1, 0.65), "#E11D48", ls="--")
+    _bus(ax, [R(i3)], [L(s3)], _gap_x(xs, 1), "#16A34A")
+    _bus(ax, [R(i5)], [L(s5)], _gap_x(xs, 1), "#7E22CE")
+    # column 3 → 4
+    _bus(ax, [R(s1), R(s2), R(s3)], [L(s4), L(q4)], _gap_x(xs, 2), "#475569")
+    # column 4 → 5
+    _bus(ax, [R(s4)], [L(q2), L(q3), L(q5)], _gap_x(xs, 3), "#D97706", ls="--")
+
+    _save(fig, "lineage_ingestion_to_bronze", out_dir)
+    print(f"→ {out_dir}/lineage_ingestion_to_bronze.svg / .png")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 7. GOLD → EVALUATION & ABLATION LAYER DIAGRAM (lineage_gold_to_evaluation.{svg,png})
-# ══════════════════════════════════════════════════════════════════════════════
-def build_lineage_gold_to_evaluation():
-    col_defs = [
-        ("STAGE 1 · GOLD SIGNALS (F0–F5 & R1–R5)", "Feature groups & candidate sources", "#A16207", "#FEF9C3"),
-        ("STAGE 2 · RANKING DATASET & SPLIT", "gld_ranking_dataset & temporal purge split", "#3730A3", "#E0E7FF"),
-        ("STAGE 3 · MEASURING INSTRUMENT", "Fixed LightGBM LambdaRank & 2-Axis Ablation", "#0F766E", "#CCFBF1"),
-        ("STAGE 4 · EVALUATION & REPORT OUTPUTS", "Bootstrap 95% CI, Cost×Gain & Scale tests", "#1D4ED8", "#DBEAFE"),
+def build_lineage_gold_to_evaluation(out_dir=OUT):
+    cols = [
+        ("1", "Gold signals", "feature groups & candidates", "gold"),
+        ("2", "Ranking data", "dataset, split, scope", "silver"),
+        ("3", "Model runs", "fixed LambdaRank, two axes", "eval"),
+        ("4", "Results", "metrics, cost, scale", "silver"),
+        ("5", "Report", "tables for the thesis", "src"),
     ]
+    fig, ax, xs = _flow_columns(0.30 + 4 * COL_PITCH + COL_W + 0.30, 10.0, cols,
+                                "Gold → Evaluation — Fixed Model, Two-Axis Ablation",
+                                "Feature groups and candidate sources feed one ranking dataset; every arm is scored on the same test positives")
 
-    fig, ax = plt.subplots(figsize=(18.2, 9.6))
-    ax.set_xlim(0, 18.2)
-    ax.set_ylim(0, 9.6)
-    ax.axis("off")
-    fig.patch.set_facecolor("#FFFFFF")
+    f0 = _flow_card(ax, xs[0], 7.10, "Baseline signals", "F0 RFM · F2 repurchase · F4 co-purchase", "gold", "BASELINE")
+    f1 = _flow_card(ax, xs[0], 6.05, "F1 · Member price profile", "price quantiles · promo affinity", "gold", "F1")
+    f3 = _flow_card(ax, xs[0], 5.00, "F3 · Stitched web intent", "web sessions · views · carts", "gold", "F3")
+    f5 = _flow_card(ax, xs[0], 3.95, "F5 · Model price & calendar", "ASOF median price · promo depth", "gold", "F5")
+    sp = _flow_card(ax, xs[0], 2.90, "Sport & store state", "sport affinity · usual store", "gold", "SPORT")
+    ca = _flow_card(ax, xs[0], 1.60, "Candidate sources R1–R5", "repurchase … national best-sellers", "gold", "TOP 200")
 
-    ax.text(0.30, 9.22, "Gold → Evaluation & Two-Axis Ablation Architecture (Data Value vs. Processing Cost)",
-            ha="left", va="center", fontsize=14.0, fontweight="bold", color="#0F172A")
-    ax.text(0.30, 8.86, "How Feature Groups (F0–F5, Sport) and Candidate Generators (R1–R5) Feed the Fixed LightGBM LambdaRank Instrument & Cost–Benefit Evaluation (Step 6–7)",
-            ha="left", va="center", fontsize=9.0, color="#475569")
+    d1 = _flow_card(ax, xs[1], 6.40, "gld_ranking_dataset", "entity 1 + 2 + 3 · labels 30 d / 90 d", "gold", "RANKING")
+    d2 = _flow_card(ax, xs[1], 5.10, "Temporal split", "train · valid · test, 42-day purge", "python", "NO LEAKAGE")
+    d3 = _flow_card(ax, xs[1], 3.80, "Evaluation scope", "TH + VN main · SG secondary", "python", "SCOPE")
+    d4 = _flow_card(ax, xs[1], 1.60, "QC-6 & candidate recall", "leakage_violations = 0 rows", "quarantine", "QC-6")
 
-    xs = [0.30, 4.75, 9.20, 13.65]
-    w = 4.15
-    for idx, (ctitle, csub, ccol, cbg) in enumerate(col_defs):
-        cx = xs[idx]
-        draw_rounded_box(ax, cx, 0.35, w, 8.20, fill="#F8FAFC", border="#CBD5E1", lw=1.0, radius=0.14, shadow=False, ls="--", zorder=0.8)
-        draw_rounded_box(ax, cx, 7.95, w, 0.60, fill=cbg, border=ccol, lw=1.3, radius=0.10, shadow=False, zorder=2.0)
-        fit_text(ax, cx + w / 2.0, 8.35, ctitle, w - 0.25, ha="center", va="center", fontsize=8.6, fontweight="bold", color=ccol, zorder=2.5)
-        fit_text(ax, cx + w / 2.0, 8.10, csub, w - 0.25, ha="center", va="center", fontsize=7.0, color="#334155", zorder=2.5)
+    m1 = _flow_card(ax, xs[2], 6.95, "Full model", "LightGBM LambdaRank · all features", "eval", "FULL")
+    m2 = _flow_card(ax, xs[2], 5.60, "Baseline B0", "R1+R2+R5 · F0+F2+F4", "eval", "B0")
+    m3 = _flow_card(ax, xs[2], 4.25, "Axis 1 · drop a feature group", "−F1 · −F3 · −F5 · −Sport", "eval", "AXIS 1")
+    m4 = _flow_card(ax, xs[2], 2.90, "Axis 2 · drop a candidate source", "−R1 … −R5 (scored −∞)", "eval", "AXIS 2")
 
-    def ecard(col_i, y, h, title, sub1, sub2, kind="gold", badge=None):
-        cx = xs[col_i] + w / 2.0
-        cy = y + h / 2.0
-        NODE_META[title] = (sub1, sub2)
-        draw_node_card(ax, cx, cy, w - 0.26, h, title, kind, custom_badge=badge, title_fs=8.5, sub_fs=6.8, zorder=4.0)
-        return (xs[col_i] + 0.13, cy, xs[col_i] + w - 0.13)
+    o1 = _flow_card(ax, xs[3], 6.30, "Ranking quality", "HR · MRR · NDCG · Recall@50", "audit", "METRICS")
+    o2 = _flow_card(ax, xs[3], 4.90, "Bootstrap 95% CI", "500× member-level, Δ(Full − arm)", "audit", "CI")
+    o3 = _flow_card(ax, xs[3], 3.50, "Cost × gain", "wall time · memory per ΔNDCG@20", "audit", "COST")
+    o4 = _flow_card(ax, xs[3], 1.60, "Scale & technique tests", "1→3 countries · Parquet, ASOF A/B", "python", "SCALE")
 
-    # Col 0: Gold Feature Groups & Candidate Sources
-    f0 = ecard(0, 6.75, 0.95, "Baseline Signals (F0, F2, F4)", "F0 Member RFM · F2 Model repurchase & cycle", "F4 Basket co-purchase lift (purchase history only)", "gold", "BASELINE B0")
-    f1 = ecard(0, 5.55, 0.95, "F1 · Member Price Profile", "price_q25, price_q50, price_q75, price_q50_eur", "promo_affinity (historical discount share)", "gold", "FEATURE F1")
-    f3 = ecard(0, 4.35, 0.95, "F3 · Stitched Web Intent", "web_sessions_7d/30d, web_view_30d, web_cart_30d", "web_data_available indicator (verified_ts ≤ t)", "gold", "FEATURE F3")
-    f5 = ecard(0, 3.15, 0.95, "F5 · Model Price & Calendar", "ASOF SKU median price, promo_depth, is_temp_promo", "in_commercial_event, days_to_next_holiday, ratio", "gold", "FEATURE F5")
-    sp = ecard(0, 1.95, 0.95, "Sport & Store State Signals", "n_sports, sport_affinity, usual_store_share", "ASOF favourite-sport intervals & modal store", "gold", "SPORT & STORE")
-    ca = ecard(0, 0.60, 1.10, "5 Candidate Sources (R1–R5)", "R1 Repurchase · R2 Co-purchase · R3 Web Intent", "R4 Sport × Dept Affinity · R5 National Best-Sellers", "gold", "POOL @ 200")
+    t1 = _flow_card(ax, xs[4], 4.60, "Reproducible report tables", "report_tables.py → t01 … t21", "silver", "TABLES")
 
-    # Col 1: Ranking Dataset & Temporal Split
-    d1 = ecard(1, 5.95, 1.55, "gold.gld_ranking_dataset", "Joins Entity 1 + Entity 2 + Entity 3 (gld_fs_pair)", "Labels: non-returned purchase in Δ=30d & Δ=90d", "gold", "RANKING SET")
-    d2 = ecard(1, 3.95, 1.55, "Temporal Split with Purge Gaps", "Train: 2023-01→2025-09 · Valid: 2025-10→2025-12", "Test: 2026-02→2026-07 · 42-day purge gaps (split.yml)", "python", "NO LEAKAGE")
-    d3 = ecard(1, 2.15, 1.35, "Evaluation Scope & Anchor Caps", "Main set: TH + VN (PASS) · Secondary: SG (REVIEW)", "50k train / 15k valid / 50k test anchors per country", "python", "TH+VN / SG")
-    d4 = ecard(1, 0.60, 1.15, "QC-6 & Candidate Recall Audit", "quarantine.leakage_violations = 0 rows verified", "audit.candidate_recall per source R1–R5 (t12)", "quarantine", "QC-6 PASS")
+    L = lambda c: (c[0], c[1])
+    R = lambda c: (c[2], c[1])
+    _bus(ax, [R(f0), R(f1), R(f3), R(f5), R(sp)], [L(d1)], _gap_x(xs, 0, 0.55), "#CA8A04")
+    _bus(ax, [R(ca)], [L(d4)], _gap_x(xs, 0), "#E11D48", ls="--")
+    _bus(ax, [R(d1), R(d2), R(d3)], [L(m1), L(m2), L(m3), L(m4)], _gap_x(xs, 1), "#0F766E")
+    _bus(ax, [R(m1), R(m2), R(m3), R(m4)], [L(o1), L(o2), L(o3)], _gap_x(xs, 2), "#0D9488")
+    _bus(ax, [R(o1), R(o2), R(o3), R(o4)], [L(t1)], _gap_x(xs, 3), "#2563EB")
 
-    # Col 2: LambdaRank & Two-Axis Ablation
-    m1 = ecard(2, 6.10, 1.45, "Fixed LightGBM LambdaRank", "train_eval_lambdarank.py · group=(member, anchor)", "Tuned once on Full (valid NDCG@20), then frozen", "eval", "INSTRUMENT")
-    m2 = ecard(2, 4.30, 1.45, "Baseline B0 vs Full Comparison", "B0: R1+R2+R5 candidates, F0+F2+F4 features", "Full: R1–R5 candidates, F0–F5 + Sport features", "eval", "B0 vs FULL")
-    m3 = ecard(2, 2.45, 1.50, "Axis 1 · Feature Ablation", "Arms: −F1 (Price), −F3 (Web), −F5 (Cal/Price), −Sport", "Re-runs dbt with vars disabled to measure true cost", "eval", "AXIS 1: FEAT")
-    m4 = ecard(2, 0.60, 1.50, "Axis 2 · Candidate Ablation", "Arms: −R1, −R2, −R3, −R4, −R5 (run_ablation_2axes.py)", "Removed source scored −∞ on same test positives", "eval", "AXIS 2: CAND")
+    _save(fig, "lineage_gold_to_evaluation", out_dir)
+    print(f"→ {out_dir}/lineage_gold_to_evaluation.svg / .png")
 
-    # Col 3: Evaluation Metrics & Report Tables
-    o1 = ecard(3, 6.20, 1.35, "Ranking Quality & Bootstrap CI", "HR@10/20, MRR@10/20, NDCG@10/20, Recall@50", "500× member-level bootstrap 95% CI on Δ(Full−Arm)", "audit", "METRICS & CI")
-    o2 = ecard(3, 4.45, 1.40, "Cost × Benefit Trade-Off (MT3)", "pipeline_cost_profiler.py + pipeline_run_metrics", "Wall time, peak RSS & output rows per ΔNDCG@20", "audit", "COST × GAIN")
-    o3 = ecard(3, 2.65, 1.45, "Scale & Technique Tests", "scale_test.py (1→3 countries, 3→36 months)", "technique_comparisons.py (Parquet, Pushdown, ASOF)", "python", "SCALE & A/B")
-    o4 = ecard(3, 0.65, 1.60, "Reproducible Report Tables", "tools/report_tables.py → docs/report/tables/t01..t21", "Zero hand-typed numbers; REDACT_TERMS enforced", "silver", "REPORT TABLES")
-
-    links = [
-        (f0, d1, "#CA8A04", "-"), (f1, d1, "#CA8A04", "-"), (f3, d1, "#CA8A04", "-"),
-        (f5, d1, "#CA8A04", "-"), (sp, d1, "#CA8A04", "-"), (ca, d1, "#CA8A04", "-"),
-        (ca, d4, "#D97706", "--"), (d1, d4, "#E11D48", "--"),
-        (d1, m1, "#0F766E", "-"), (d2, m1, "#4F46E5", "-"), (d3, m1, "#4F46E5", "-"),
-        (d1, m2, "#0F766E", "-"), (d1, m3, "#0F766E", "-"), (d1, m4, "#0F766E", "-"),
-        (m1, o1, "#0D9488", "-"), (m2, o1, "#0D9488", "-"), (m3, o1, "#0D9488", "-"), (m4, o1, "#0D9488", "-"),
-        (m3, o2, "#D97706", "-"), (m4, o2, "#D97706", "-"),
-        (o1, o4, "#2563EB", "-"), (o2, o4, "#2563EB", "-"), (o3, o4, "#2563EB", "-"),
-    ]
-    for (x1_l, y1, x1_r), (x2_l, y2, x2_r), col, ls in links:
-        draw_routed_edge(ax, x1_r, y1, x2_l, y2, color=col, style=ls, lw=1.35)
-
-    for fmt in ("svg", "png"):
-        fig.savefig(OUT / f"lineage_gold_to_evaluation.{fmt}", dpi=260 if fmt == "png" else None, bbox_inches="tight", pad_inches=0.20, facecolor="#FFFFFF")
-    plt.close(fig)
-    for f in FIT_FAILS:
-        print("  overflow:", f)
-    FIT_FAILS.clear()
-    print("→ docs/figures/lineage_gold_to_evaluation.svg / .png  (Gold → Evaluation & Ablation detail)")
 
 
 if __name__ == "__main__":
