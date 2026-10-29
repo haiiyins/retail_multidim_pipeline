@@ -231,7 +231,7 @@ retail_multidim_pipeline/
 | QC-2 | Referential integrity ≥ 95 / 60 / 90 % per country | block (main set) / warn |
 | QC-3 | Value domains: `promo_depth ∈ [0, 0.9]`, `price > 0`, `qty > 0` | route rows to quarantine |
 | QC-4 | Uniqueness after deduplication and netting | block |
-| QC-5 | Volume drift ± 50 % vs the 28-day trailing mean of the same weekday (`audit.volume_drift`) | warn |
+| QC-5 | Volume drift ± 50 % vs the 28-day trailing mean of the same weekday (`audit.volume_drift`; raw rows vs distinct line keys expose duplicated exports) | warn |
 | QC-6 | Point-in-time: `max(source_ts) ≤ anchor_date`, `identity_verified_ts ≤ anchor_date` | block, log |
 | QC-7 | Batch vs stream reconciliation | report |
 

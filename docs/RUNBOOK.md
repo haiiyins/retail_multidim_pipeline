@@ -146,7 +146,7 @@ make gates        # runs sql/gates_by_country.sql and sql/audit_checks.sql
 - `audit.interpurchase_days` — quantiles of inter-purchase gaps (validates Δ).
 - `audit.date_span` — min/max transaction timestamps per country (drives `split.yml`).
 - `audit.stream_reconciliation` — QC-7 (optional streaming lane, step 8): batch vs stream Bronze, rows / distinct keys / hash per table × country × day; written by `ingestion/qc7_stream_reconciliation.py`, not by `make gates`.
-- `audit.volume_drift` — QC-5: rows per table (`sales_detail`, `tracking_ecom_events`) × country × day against the trailing 28-day mean of the same weekday; `flagged` when |drift| > 50 %, with a `probable_cause` hint (NO_ROWS, EXPORT_EDGE, AFTER_GAP, PUBLIC_HOLIDAY, ADJACENT_TO_HOLIDAY, UNEXPLAINED). `make gates` therefore runs `make holidays` first and prints the flagged-day count; review the UNEXPLAINED days and comment them on issue #25. Warn-level: nothing is blocked.
+- `audit.volume_drift` — QC-5: rows per table (`sales_detail`, `tracking_ecom_events`) × country × day against the trailing 28-day mean of the same weekday; `flagged` when |drift| > 50 %, with a `probable_cause` hint (NO_ROWS, EXPORT_EDGE, AFTER_GAP, PUBLIC_HOLIDAY, ADJACENT_TO_HOLIDAY, UNEXPLAINED). `make gates` therefore runs `make holidays` first and prints the flagged-day count; review the UNEXPLAINED days and comment them on issue #25. Warn-level: nothing is blocked. `distinct_lines` and `dup_factor` compare the raw rows with the distinct (transaction, line, version) keys: `DUPLICATED_EXPORT` marks days on which the export repeated rows (1 – 13 October 2023 in all three countries, factor 1.6 – 2.0), which Silver deduplicates.
 
 QC-5 regression checks run against synthetic, in-memory Bronze tables using the production SQL:
 
@@ -162,8 +162,9 @@ python tools/report_tables.py --only t20 --out data/audit/qc5_review
 
 The summary and flagged-day detail include CSV copies. Probable causes are hints, not confirmed explanations.
 A one-day web-event sample cannot validate drift or server-wide gaps. For issue #25, repeat the review on
-the server with SG, TH and VN, and obtain the data owner's explanation for the October 2023 VN spike
-before marking the issue complete.
+the server with SG, TH and VN. The October 2023 spike (1 – 13 October, all three countries) is explained: the
+export repeated those rows (`dup_factor` 1.6 – 2.0), so the check labels them `DUPLICATED_EXPORT`; the question
+left for the data owner is the February 2025 doubling of the SG and TH web events.
 
 **DoD:** the audit tables listed above exist; decisions on price reference and gate grouping recorded in the README.
 
@@ -262,7 +263,7 @@ python evaluation/train_eval_lambdarank.py --config full --delta 90
 ### 7.3 Ablation matrix
 
 ```bash
-python evaluation/run_ablation_2axes.py --measure-cost
+python evaluation/run_ablation_2axes.py                  # add --measure-cost to also rerun dbt per arm (≈ 1 h per rebuild on the server; not used for the 2026-10-28 run)
 ```
 
 Runs the 12 configurations in `evaluation/ablation_configs.yml` for Δ = 30 and 90 (`--arms no_f1,no_f3 --deltas 30` to pick a subset; `--no-freeze --tag smoke` for laptop runs). With `--measure-cost`, arms that declare `exclude_models` rerun dbt without those models before training, so processing cost is measured as well as quality; dbt and training wall times go to `audit.ablation_runs`. `no_stock` is skipped while `vars.use_stock` is false (issue #21).
@@ -282,6 +283,12 @@ python evaluation/pipeline_cost_profiler.py        # all Silver/Gold models, or 
 ```
 
 Each model rebuilt alone: wall time, peak RSS of the dbt process tree, output rows → `audit.pipeline_run_metrics`, plus output bytes in `audit.model_cost`. The MT3 table joins ablation results with the cost of the excluded models.
+
+```bash
+python evaluation/mt3_table.py            # → data/audit/mt3_table.csv; report table t24 via make report-tables
+```
+
+`mt3_table.py` joins each arm's gain (Full − arm on NDCG@20, HR@10, Recall@50 with the bootstrap CI) with the cost of what it removes: profiler wall time, peak RSS and output size of the models that exist only for that source (`exclude_models` of the arm, or the producing models of a candidate source), the Bronze load time of the raw tables feeding only that source, and the arm's training time. Costs are lower bounds (models the profiler did not time are listed with cost 0). The decision of 2026-10-28 was to measure cost this way (one profiler pass, ≈ 1 h) instead of `--measure-cost` (nine Silver + Gold rebuilds).
 
 ### 7.6 Scale test
 

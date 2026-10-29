@@ -9,4 +9,4 @@ dim_calendar,csv,date_of_day,-,-,1461,0.1,0.2
 all_store_selling_price,parquet,"item_code, business_unit_gln_code, price_start_date, price_type",country_code,"country_code, tech_ingestion_year",42416758,718.5,30.1
 stock_availability_rate,csv,"site_gln, item_code, snapshot_date, availability_type",country_code,"country_code, year, month",36701681,83.1,21.7
 f_member_favorite_sport,csv,"member_id, sport_id, event_datetime_utc",country_code,"country_code, year",796143,11.1,1.5
-tracking_ecom_events,-,id,country_code,"country_code, year, month",999710429,115620.9,5220.9
+tracking_ecom_events,parquet-dir,id,country_code,"country_code, year, month",999710429,115620.9,5220.9

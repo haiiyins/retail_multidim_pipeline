@@ -1,0 +1,23 @@
+{
+  "params": {
+    "objective": "lambdarank",
+    "metric": "ndcg",
+    "eval_at": [
+      10,
+      20
+    ],
+    "num_leaves": 63,
+    "learning_rate": 0.05,
+    "min_child_samples": 50,
+    "feature_fraction": 0.8,
+    "bagging_fraction": 0.8,
+    "bagging_freq": 1,
+    "lambdarank_truncation_level": 20,
+    "verbose": -1,
+    "deterministic": true,
+    "force_row_wise": true,
+    "num_threads": 16,
+    "seed": 42
+  },
+  "num_boost_round": 192
+}

@@ -91,7 +91,8 @@ coverage of 2.2: 0.84 % of the SG quarantine (23,886 rows; 96.1 % of the SKUs so
 `audit.stitching_coverage` gives, per country, the share of web events by identity source: DIRECT (member on the event), STITCHED
 (member attached through a cookie link within ± 90 days of its verification) and ANON. Over the full click-stream, 36.14 % of SG
 events, 33.65 % of TH events and 29.94 % of VN events are DIRECT and stitching adds 5.83, 6.33 and 7.62 points (41.97 %, 39.98 % and
-37.56 % identified), through 1,295,225 cookie–member links; 945 cookies linked to several members are excluded **(t08)**. The
+37.56 % identified), through 274,979 / 212,098 / 203,167 cookie–member links whose member account is in SG / TH / VN (1,295,225 over
+every account country); 945 cookies linked to several members are excluded **(t08)**. The
 anchor-level view **(t09)** reports how many used anchors actually receive a web signal under the point-in-time rule: 18.76 % of the
 SG test anchors, 5.52 % in TH and 7.30 % in VN have an attributed event in the 30 days before the anchor, against 5.08 %, 1.79 % and
 3.61 % of the training anchors, most of which precede the start of the click-stream (TH 2023-04-26, usable VN events 2024-07-01).
@@ -135,20 +136,23 @@ stream, member-bridge conflicts, the member-link rate (QC-2 is enforced by the g
 calendar grid so that a day without rows counts as zero, compared with the trailing 28-day mean **of the same weekday**. The weekday
 restriction matters: Saturdays and Sundays carry up to 1.8 times a weekday's lines, so a plain 28-day mean flagged 221 VN days, 180 of
 them weekends; the same-weekday baseline flags 48 SG, 51 TH and 69 VN sales days out of 1,395 (3.4 – 4.9 %) **(t20)**. Each flagged day
-carries a probable cause derived from the holiday table and simple calendar rules, as a hint for the review **(t20b)**: public holidays
-(26, 29 and 31 holiday-related days; in VN the four days of Tết at −58 to −94 % every year, Hung Kings', Reunification, Labour and
-National Day at +65 to +146 %), the e-commerce double days (SG 2, TH 6, VN 12), Black Friday, days whose baseline contained a holiday,
-and 17, 11 and 14 days left unexplained.
+carries a probable cause derived from the holiday table, simple calendar rules and the duplicate test described below, as a hint
+for the review **(t20b)**: public holidays and the days around them (24, 22 and 31 holiday-related days; in VN the four days of Tết at
+−58 to −94 % every year, Hung Kings', Reunification, Labour and National Day at +65 to +146 %), the e-commerce double days and Black
+Friday (SG 1, TH 5, VN 11), duplicated export rows (15, 18 and 20 days) and 5, 1 and 4 days left unexplained.
 
-Eleven, ten and ten of those unexplained days are the same dates in the three countries — 1 to 13 October 2023 at +51 to +114 % —
-which rules out a commercial cause. The Bronze rows of those days are export duplicates: in VN the raw rows are 1.6 to 2.0 times the
-distinct (transaction, line, version) keys from 1 October 2023 onwards while the last week of September is exactly 1.0, the same factor
-the whole of January – March and October – December 2023 carry (the 9.5 % exact duplicates of 2.2). The check therefore did its job —
-it caught an export artefact that the Silver deduplication removes — and is being extended to report raw rows and distinct line keys
-side by side with a `DUPLICATED_EXPORT` cause *(next revision of `audit_checks.sql`; the server regenerates t20 / t20b after the
-experiments)*. That leaves 6, 1 and 4 unexplained sales days: 24 April 2023 and five weekdays after the end-of-year peak of 2023 in SG,
-28 March 2025 in TH, and in VN 1 June 2023 (Children's Day, not a public holiday), two weekdays after the end-of-year peak and Saturday
-7 September 2024 (−55 %, the day typhoon Yagi made landfall in northern Vietnam). No sales day has zero rows in any country.
+The duplicate test exists because the first pass left 17, 11 and 14 days unexplained, eleven, ten and ten of them the same dates in
+the three countries — 1 to 13 October 2023 at +51 to +114 % — which rules out a commercial cause. The check now reports, for every
+day, the raw rows next to the distinct (transaction, line, version) keys and labels a flagged day `DUPLICATED_EXPORT` when the rows
+exceed the keys by more than 20 %. The export repeated rows on 212, 212 and 209 of the 1,395 days (15 %; in VN the laptop check had
+located them in January – March and October – December 2023, the 9.5 % exact duplicates of §2.2), and the 53 days on which the
+repetition is large enough to show as drift all fall in 2023: the whole of 1 – 13 October in the three countries (factor SG 1.6 – 1.8,
+TH 1.7, VN 1.6 – 2.0, while the last week of September is exactly 1.0), 4 – 12 February in VN (2.0), and single days in March, April,
+November and December (1.4 – 1.8). The check therefore did its job — it caught an export artefact that the Silver deduplication
+removes. The remaining unexplained sales days are five weekdays after the end-of-year peak of 2023 in SG (3 – 10 January 2024, −52 to
+−59 %), 28 March 2025 in TH (−54 %), and in VN 1 June 2023 (Children's Day, not a public holiday, +66 %), two weekdays after the
+end-of-year peak (3 and 9 January 2024) and Saturday 7 September 2024 (−55 %, the day typhoon Yagi made landfall in northern
+Vietnam). No sales day has zero rows in any country.
 
 The web-event series behaves differently **(t20, t20b)**. SG has 86 days without any event and TH 29, all between late November 2023
 and April 2024: the known 2023-10 → 2024-04 absence is not a clean hole but a fade-out — SG and TH volumes fall to near zero through
