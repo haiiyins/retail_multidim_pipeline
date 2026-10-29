@@ -1,8 +1,8 @@
 # 5. Feature store, candidates, experiments and results
 
-> Numbers: three-country server run of 2026-10-28 — Gold build (tables t09 – t12), training, ablation, bootstrap and profiler (t22 – t26).
-> Tables are in `docs/report/tables/`; the per-member result files stay in `data/audit/` and are not committed. §5.9 (scale test) is
-> filled after the overnight run of 2026-10-29; §5.10 refers to the laptop measurements of chapter 3.
+> Numbers: three-country server run of 2026-10-28 — Gold build (tables t09 – t12), training, ablation, bootstrap and profiler (t22 – t26) —
+> and of 2026-10-29 for the scale test (§5.9) and the technique comparisons (§5.10, t13). Tables are in `docs/report/tables/`; the
+> per-member result files stay in `data/audit/` and are not committed.
 
 ## 5.1 Anchor grid and feature store
 
@@ -188,9 +188,9 @@ project: adding history is cheap, adding a country is paid in Gold, and the next
 
 ## 5.10 Technique comparisons
 
-The four with / without measurements of chapter 3, §3.9 (Parquet vs CSV 6.6×, column projection 6.7×, ASOF join 1.3×, SQL regex vs
-row-wise Python 2.9×, laptop, VN) are the micro-level counterpart of §5.7: they show why the pipeline is built the way it is, while
-§5.7 shows what each data source buys. The server rerun of `make techniques` replaces the laptop table **(t13)** when it is done.
+The four with / without measurements of chapter 3, §3.9 (server, VN: Parquet vs CSV 6.9×, column projection 8.8×, ASOF join 1.6×, SQL
+regex vs row-wise Python 15.2× on a 1-in-36 sample of the web events) are the micro-level counterpart of §5.7: they show why the
+pipeline is built the way it is, while §5.7 shows what each data source buys **(t13)**.
 
 ## 5.11 Threats to validity
 
