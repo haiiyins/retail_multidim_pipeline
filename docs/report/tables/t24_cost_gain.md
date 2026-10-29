@@ -23,4 +23,4 @@
 | −R1 repurchase | 90 | 0.1091 | 0.1071 | 0.1111 | yes | 0.176 | yes | 0.2035 | yes | 0 | 0 | 0 | 0 | 0 | 0 | 606 |  | - |
 | −R5 best-sellers | 90 | 0.1052 | 0.1033 | 0.1068 | yes | 0.1877 | yes | 0.2397 | yes | 0 | 0 | 0 | 0 | 0 | 0 | 445 |  | - |
 
-*Source:* `data/audit/mt3_table.csv` (`evaluation/mt3_table.py` over `audit.model_cost`, `audit.pipeline_run_metrics`, `audit.ablation_runs` and the bootstrap CSVs). *Generated:* 2026-10-29 04:32 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`. Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`. Costs are lower bounds: models the profiler did not time cost 0 and are listed.
+*Source:* `data/audit/mt3_table.csv` (`evaluation/mt3_table.py` over `audit.model_cost`, `audit.pipeline_run_metrics`, `audit.ablation_runs` and the bootstrap CSVs). *Generated:* 2026-10-29 08:50 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`. Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`. Costs are lower bounds: models the profiler did not time cost 0 and are listed.

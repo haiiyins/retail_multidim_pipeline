@@ -17,4 +17,4 @@
 | segment:mid | 90 | 17,949 | 0.3632 | 0.1777 | 0.1689 | 0.4736 | 0.1966 | 0.1925 | 0.2002 | 0.5307 |
 | segment:new | 90 | 25,749 | 0.3253 | 0.1586 | 0.1493 | 0.4317 | 0.175 | 0.1718 | 0.1783 | 0.4883 |
 
-*Source:* `data/audit/ablation_results_d30.csv`, `_d90.csv` (`evaluation/bootstrap_ci.py`). *Generated:* 2026-10-29 04:32 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`. Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`. `members` = members with at least one positive label in the window.
+*Source:* `data/audit/ablation_results_d30.csv`, `_d90.csv` (`evaluation/bootstrap_ci.py`). *Generated:* 2026-10-29 07:36 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`. Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`. `members` = members with at least one positive label in the window.

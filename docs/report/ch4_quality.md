@@ -91,7 +91,8 @@ coverage of 2.2: 0.84 % of the SG quarantine (23,886 rows; 96.1 % of the SKUs so
 `audit.stitching_coverage` gives, per country, the share of web events by identity source: DIRECT (member on the event), STITCHED
 (member attached through a cookie link within ± 90 days of its verification) and ANON. Over the full click-stream, 36.14 % of SG
 events, 33.65 % of TH events and 29.94 % of VN events are DIRECT and stitching adds 5.83, 6.33 and 7.62 points (41.97 %, 39.98 % and
-37.56 % identified), through 1,295,225 cookie–member links; 945 cookies linked to several members are excluded **(t08)**. The
+37.56 % identified), through 274,979 / 212,098 / 203,167 cookie–member links whose member account is in SG / TH / VN (1,295,225 over
+every account country); 945 cookies linked to several members are excluded **(t08)**. The
 anchor-level view **(t09)** reports how many used anchors actually receive a web signal under the point-in-time rule: 18.76 % of the
 SG test anchors, 5.52 % in TH and 7.30 % in VN have an attributed event in the 30 days before the anchor, against 5.08 %, 1.79 % and
 3.61 % of the training anchors, most of which precede the start of the click-stream (TH 2023-04-26, usable VN events 2024-07-01).

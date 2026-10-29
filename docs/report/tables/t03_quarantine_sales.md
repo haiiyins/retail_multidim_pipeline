@@ -21,4 +21,4 @@
 | VN | ITEM_NOT_IN_CATALOGUE | 557 | 0.05 |
 | VN | NET_QTY_NONPOSITIVE | 21 | 0 |
 
-*Source:* `quarantine.qrt_sales_line` (`models/quarantine/qrt_sales_line.sql`). *Generated:* 2026-10-28 15:13 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.
+*Source:* `quarantine.qrt_sales_line` (`models/quarantine/qrt_sales_line.sql`). *Generated:* 2026-10-29 07:36 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.

@@ -1,7 +1,7 @@
 country_code,channel,sale_lines,business_units,lines_without_unit_timezone,pct_country_timezone_fallback
 SG,offline,31009965,25,0,0.0
-SG,online,2828396,26,853606,30.18
+SG,online,2828396,26,853604,30.18
 TH,offline,22149541,34,0,0.0
-TH,online,1822582,36,963131,52.84
+TH,online,1822582,36,963140,52.84
 VN,offline,6752199,10,0,0.0
-VN,online,1559629,16,95226,6.11
+VN,online,1559629,16,95228,6.11

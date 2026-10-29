@@ -10,6 +10,7 @@ tables the script reads as inputs.
 | `lineage_full.svg` / `.png` | dbt lineage of the whole pipeline: Bronze sources → staging views → Silver → quarantine / audit → Gold; the anchor grid, model grid and split windows are built by `evaluation/build_anchor_grid.py` (component nodes) | `make docs-figures` |
 | `lineage_bronze_to_silver.svg` / `.png` | Bronze → Silver detail with the quarantine and audit tables | `make docs-figures` |
 | `lineage_silver_to_gold.svg` / `.png` | Silver → Gold detail: two feature entities, candidates, pairs, ranking dataset, leakage ledger | `make docs-figures` |
+| `scale_test.png`, `scale_test_months.png` | Silver → Gold wall time against Bronze sales rows: countries axis VN → VN + TH → VN + TH + SG and months axis 3 / 12 / 36 of VN (server 2026-10-29, 16 threads, 80 GB; report §5.9, issue #42) | `python evaluation/scale_test.py VN TH SG` and `… VN --months 3,12,36` write `data/audit/scale_test*.png`; copied here |
 | `explain_analyze_asof_price.txt` | `EXPLAIN ANALYZE` of the ASOF price lookup at one anchor date (DuckDB 2.0, laptop) | `make docs-figures` |
 
 Terminal evidence (screenshots of the server log, prompt line cropped so that no host or account name appears):

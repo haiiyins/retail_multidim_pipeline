@@ -9,4 +9,4 @@
 | tracking_ecom_events | TH | 1,279 | 29 | 166 | 100 | 22 | 69 | 2023-04-26 | 2026-10-25 |
 | tracking_ecom_events | VN | 912 | 0 | 76 | 15 | 11 | 19 | 2024-04-27 | 2026-10-25 |
 
-*Source:* `audit.volume_drift` (`sql/audit_checks.sql` 4e, `make gates`). *Generated:* 2026-10-28 15:55 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.
+*Source:* `audit.volume_drift` (`sql/audit_checks.sql` 4e, `make gates`). *Generated:* 2026-10-29 07:36 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.

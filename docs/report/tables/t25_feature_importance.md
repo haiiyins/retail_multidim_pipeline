@@ -23,4 +23,4 @@
 | 19 | dept_overdue_ratio | 10,827.0 | 1.55 |
 | 20 | model_age_days | 9,450.0 | 1.35 |
 
-*Source:* `data/audit/importance_full_d30.csv` (`evaluation/train_eval_lambdarank.py`). *Generated:* 2026-10-29 04:32 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`. Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`.
+*Source:* `data/audit/importance_full_d30.csv` (`evaluation/train_eval_lambdarank.py`). *Generated:* 2026-10-29 07:36 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`. Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`.

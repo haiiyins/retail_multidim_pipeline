@@ -10,7 +10,7 @@ The unit of prediction is (member, anchor Monday). Over the three countries the 
 anchors and 59.4 M test anchors after a member's second purchase; the 90-day purchase rule keeps 46.9 M, 4.9 M and 15.3 M of them, the
 training stride of four 11.7 M, and the per-country cap by hash rank leaves 50,000 / 15,000 / 50,000 used anchors per country —
 345,000 in all, held by 41 – 49 k distinct members per country for the training and test anchors and 13.7 – 15 k for validation **(t10)**. Three entities are built for those anchors
-(chapter 3, §3.6): the member entity (345,000 rows), the model × country entity (4,290,922 rows = the model grid, no row lost) and the
+(chapter 3, §3.6): the member entity (345,000 rows), the model × country entity (4,290,920 rows = the model grid, no row lost) and the
 pair entity (69,000,000 rows, 10.7 GB), each reading only data strictly before the anchor and carrying `last_source_ts` **(t11)**.
 
 The web features reach the anchors unevenly **(t09)**: 18.76 % of the SG test anchors, 5.52 % in TH and 7.30 % in VN have an
@@ -27,12 +27,12 @@ test split, Δ = 30:
 
 | Country | Positives | Any source | R1 repurchase | R2 co-purchase | R3 web | R4 sport × offer | R5 best-sellers |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| SG | 74,950 | 0.280 | 0.090 | 0.037 | 0.016 | 0.0002 | 0.211 |
+| SG | 74,946 | 0.280 | 0.090 | 0.037 | 0.016 | 0.0002 | 0.210 |
 | TH | 75,011 | 0.328 | 0.089 | 0.045 | 0.013 | 0.0001 | 0.270 |
-| VN | 63,320 | 0.351 | 0.073 | 0.040 | 0.015 | 0.0001 | 0.303 |
+| VN | 63,332 | 0.351 | 0.073 | 0.040 | 0.015 | 0.0001 | 0.303 |
 
 At Δ = 90 the union reaches 0.266 / 0.311 / 0.324. Three facts matter for what follows. The best-sellers carry the bulk of the reachable
-purchases, and SG's lower recall is almost entirely R5 (0.211 against 0.303 in VN): its purchases spread over more models. The web
+purchases, and SG's lower recall is almost entirely R5 (0.210 against 0.303 in VN): its purchases spread over more models. The web
 source is now measurable everywhere (0.013 – 0.016 on the test split, against 0.004 – 0.009 on training anchors that mostly predate the
 click-stream). The sport × offer source brings almost nothing as a *candidate* source (0.0002), which is why it is kept only as a
 feature. Co-purchase recall is higher on the training split (0.059 – 0.086) than on test (0.037 – 0.045) because the co-purchase
@@ -43,8 +43,8 @@ no validation or test purchase enters them.
 
 The ranking dataset is the pair entity with the labels attached: 30,000,000 training rows, 9,000,000 validation rows and 30,000,000
 test rows (the 115,000 anchors per country × 200 candidates). A candidate is positive when the member buys the model within Δ days of
-the anchor and does not return it: 72,952 / 22,558 / 67,807 positives at Δ = 30 and 201,570 / 56,959 / 188,177 at Δ = 90 for the three
-splits — a label rate of 0.23 – 0.25 % at Δ = 30 **(t27, server extract of 2026-10-28)**. The horizon Δ = 30 is the primary one (DESIGN
+the anchor and does not return it: 72,951 / 22,558 / 67,803 positives at Δ = 30 and 201,570 / 56,958 / 188,177 at Δ = 90 for the three
+splits — a label rate of 0.23 – 0.25 % at Δ = 30 **(t27, server build of 2026-10-29)**. The horizon Δ = 30 is the primary one (DESIGN
 §2); Δ = 90 is reported alongside because it triples the positives and sits at the median of the inter-purchase gap (§4.3).
 
 ## 5.4 Training protocol
@@ -159,8 +159,32 @@ feature is split on, not what is lost without it.
 
 ## 5.9 Scale test
 
-*(Server run of 2026-10-29 — §5.9 is filled from `audit.scale_test` and `data/audit/scale_test.png` / `scale_test_months.png` once E3
-completes: Silver, grid and Gold wall time and peak memory for VN → VN + TH → VN + TH + SG, and for 3 / 12 / 36 months of VN. Issue #42.)*
+`evaluation/scale_test.py` reruns staging, Silver, quarantine and audit, the anchor grid and Gold on a subset of Bronze and records the
+wall time of each stage and the peak resident memory of the process tree (`audit.scale_test`; server, DuckDB 16 threads, 80 GB memory
+limit, one dbt thread, `dbt run` without tests). Two axes **(figures `scale_test.png`, `scale_test_months.png`)**: countries, cumulative
+VN → VN + TH → VN + TH + SG, and months of VN history, 3 → 12 → 36. The five-country point of the plan is not reachable — PH and TW
+left the scope when their export proved incomplete (§2.1, issue #54) — so the months axis is the second axis.
+
+| axis | point | Bronze sales rows | Silver | anchor grid | Gold | total | peak RSS |
+|---|---|---:|---:|---:|---:|---:|---:|
+| countries | VN | 11,599,372 | 173 s | 33 s | 172 s | 379 s | 58.7 GB |
+| countries | VN + TH | 43,028,883 | 431 s | 129 s | 463 s | 1,023 s | 82.5 GB |
+| countries | VN + TH + SG | 89,321,540 | 919 s | 216 s | 2,731 s | 3,866 s | 83.9 GB |
+| months, VN | 3 | 1,302,324 | 170 s | 3 s | 69 s | 243 s | 19.9 GB |
+| months, VN | 12 | 3,821,126 | 130 s | 5 s | 103 s | 238 s | 55.7 GB |
+| months, VN | 36 | 9,100,972 | 145 s | 14 s | 152 s | 310 s | 56.7 GB |
+
+Silver scales at most linearly with the sales rows (×3.7 rows from VN to VN + TH for ×2.5 the time, ×2.1 rows for the third country
+for ×2.1), and so does the anchor grid. Gold is the super-linear stage: ×2.7 for the second country and ×5.9 for the third, when
+the pair table reaches its 69 M rows (`gld_fs_pair` alone took 1,849 s on the full build, t19) and the click-stream stitching joins
+the SG events, the largest of the three. From the second point on the peak memory sits at the DuckDB limit (82.5 and 83.9 GB resident,
+the limit plus the Python and allocator overhead), so the third point's Gold time includes spilling to `data/duck_temp`; the Full
+rebuild of the restored lakehouse took 17 minutes of Silver and 50 of Gold with the tests, consistent with these 64 minutes without.
+On the months axis the time hardly moves: 3 → 12 months triples the rows and leaves the total at 238 – 243 s, because the run is
+dominated by work that does not depend on the sales window — dbt start-up, the dimensions, the price intervals, the calendar and the
+VN click-stream (172 M events) — and 36 months costs ×1.3 the time of 3 months for ×7 the rows. The practical reading for the
+project: adding history is cheap, adding a country is paid in Gold, and the next SG-sized country would push the full build past the
+80 GB box into spill-dominated time (§5.11).
 
 ## 5.10 Technique comparisons
 

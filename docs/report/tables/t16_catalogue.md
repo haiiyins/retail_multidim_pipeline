@@ -6,4 +6,4 @@
 | TH | 48,543 | 47,888 | 98.65 | 3,121,362 | 827,047 | 23,134 |
 | VN | 41,230 | 41,017 | 99.48 | 3,121,362 | 827,047 | 23,134 |
 
-*Source:* `bronze.dim_item`, `staging.stg_sales_detail`, `silver.slv_dim_model`. *Generated:* 2026-10-28 15:13 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.
+*Source:* `bronze.dim_item`, `staging.stg_sales_detail`, `silver.slv_dim_model`. *Generated:* 2026-10-29 07:36 UTC by `tools/report_tables.py`, `COUNTRY_FILTER=ALL`.
