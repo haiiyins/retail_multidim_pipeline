@@ -11,7 +11,7 @@ the server runs `make techniques` and the cost profiler; `tables/INDEX.md` shows
 | 2. Data | [ch2_data.md](ch2_data.md) | 1 — profile of the 11 tables, nested columns, country list and date spans; data facts confirmed by the owner | #45 |
 | 3. Data processing | [ch3_processing.md](ch3_processing.md) | technique-by-technique mapping to course topics; Bronze, Silver, calendar, stitching, Gold overview; technique comparisons (item 9, second half) | #45 |
 | 4. Quality evidence | [ch4_quality.md](ch4_quality.md) | 2 — gates and PASS / REVIEW grouping; 3 — stock, price and inter-purchase audits; 4 — stitching before / after; 5 — inferred commercial events; dbt tests and the leakage ledger | #45 |
-| 5. Feature store, candidates, experiments, results | *(to be drafted after the server run, issue #46)* | 6 — candidate recall per source (table `t12` already exists); 7 — B0 vs Full and the ablation arms with CI; 8 — cost × gain; 9 — scale test | #46 |
+| 5. Feature store, candidates, experiments, results | [ch5_results.md](ch5_results.md) | 6 — candidate recall per source (`t12`); 7 — Full by country and segment, B0 vs Full and the ablation arms with CI (`t22`, `t23`, `t26`); 8 — cost × gain (`t24`), feature importance (`t25`); 9 — scale test (§5.9, filled after the run of 2026-10-29) and the technique comparisons of chapter 3 | #46 |
 
 Conventions used in the drafts:
 

@@ -355,6 +355,15 @@ def main():
                                 FROM audit.volume_drift WHERE flagged AND probable_cause NOT LIKE 'PUBLIC_HOLIDAY%' ORDER BY 1, 2, 3""")
         index.append(write_table(out, "t20b_volume_drift_days", "QC-5 flagged days other than public holidays (to review)", cols, rows, "`audit.volume_drift`"))
 
+    # ---------------------------------------------------------------- ranking dataset by split (labels)
+    if want("t27") and table_exists(con, "gold", "gld_ranking_dataset"):
+        cols, rows = q(con, """SELECT split, COUNT(*) AS rows, COUNT(DISTINCT (member_id, anchor_date)) AS anchors, COUNT(DISTINCT member_id) AS members,
+                                       SUM(label_30::INT) AS positives_30, ROUND(100.0 * SUM(label_30::INT) / COUNT(*), 3) AS label_rate_30_pct,
+                                       SUM(label_90::INT) AS positives_90, ROUND(100.0 * SUM(label_90::INT) / COUNT(*), 3) AS label_rate_90_pct
+                                FROM gold.gld_ranking_dataset GROUP BY 1 ORDER BY CASE split WHEN 'train' THEN 0 WHEN 'valid' THEN 1 ELSE 2 END""")
+        index.append(write_table(out, "t27_ranking_dataset", "Ranking dataset by split: rows (anchors × 200 candidates), anchors, members, positives and label rate at Δ = 30 and 90", cols, rows,
+                                 "`gold.gld_ranking_dataset` (`models/gold/gld_ranking_dataset.sql`)"))
+
     # ---------------------------------------------------------------- experiments (step 7): bootstrap results, Full by scope, MT3, importance, run times
     X = pathlib.Path(os.environ.get("EXPERIMENTS_DIR", "data/audit"))
     XNOTE = "Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`."
