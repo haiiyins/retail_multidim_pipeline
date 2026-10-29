@@ -347,11 +347,12 @@ def main():
     if want("t20") and table_exists(con, "audit", "volume_drift"):
         cols, rows = q(con, """SELECT table_name, country_code, COUNT(*) AS days, COUNT(*) FILTER (WHERE rows = 0) AS days_without_rows, COUNT(*) FILTER (WHERE flagged) AS flagged_days,
                                        COUNT(*) FILTER (WHERE flagged AND drift < 0) AS flagged_drops, COUNT(*) FILTER (WHERE probable_cause LIKE 'PUBLIC_HOLIDAY%' OR probable_cause LIKE 'ADJACENT%') AS holiday_related,
+                                       COUNT(*) FILTER (WHERE probable_cause = 'DUPLICATED_EXPORT') AS duplicated_export, COUNT(*) FILTER (WHERE dup_factor > 1.2) AS days_with_export_duplicates,
                                        COUNT(*) FILTER (WHERE probable_cause = 'UNEXPLAINED') AS unexplained, MIN(calendar_date) AS first_day, MAX(calendar_date) AS last_day
                                 FROM audit.volume_drift GROUP BY 1, 2 ORDER BY 1, 2""")
         index.append(write_table(out, "t20_volume_drift", "QC-5 volume drift per table × country: days, flagged days (|drift| > 50 % vs the same-weekday 28-day mean) and probable causes", cols, rows,
                                  "`audit.volume_drift` (`sql/audit_checks.sql` 4e, `make gates`)"))
-        cols, rows = q(con, """SELECT table_name, country_code, calendar_date, day_of_week, rows, mean_same_weekday_28d, drift, probable_cause
+        cols, rows = q(con, """SELECT table_name, country_code, calendar_date, day_of_week, rows, distinct_lines, dup_factor, mean_same_weekday_28d, drift, probable_cause
                                 FROM audit.volume_drift WHERE flagged AND probable_cause NOT LIKE 'PUBLIC_HOLIDAY%' ORDER BY 1, 2, 3""")
         index.append(write_table(out, "t20b_volume_drift_days", "QC-5 flagged days other than public holidays (to review)", cols, rows, "`audit.volume_drift`"))
 
