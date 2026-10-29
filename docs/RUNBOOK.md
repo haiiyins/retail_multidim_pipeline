@@ -262,7 +262,7 @@ python evaluation/train_eval_lambdarank.py --config full --delta 90
 ### 7.3 Ablation matrix
 
 ```bash
-python evaluation/run_ablation_2axes.py --measure-cost
+python evaluation/run_ablation_2axes.py                  # add --measure-cost to also rerun dbt per arm (≈ 1 h per rebuild on the server; not used for the 2026-10-28 run)
 ```
 
 Runs the 12 configurations in `evaluation/ablation_configs.yml` for Δ = 30 and 90 (`--arms no_f1,no_f3 --deltas 30` to pick a subset; `--no-freeze --tag smoke` for laptop runs). With `--measure-cost`, arms that declare `exclude_models` rerun dbt without those models before training, so processing cost is measured as well as quality; dbt and training wall times go to `audit.ablation_runs`. `no_stock` is skipped while `vars.use_stock` is false (issue #21).
@@ -282,6 +282,12 @@ python evaluation/pipeline_cost_profiler.py        # all Silver/Gold models, or 
 ```
 
 Each model rebuilt alone: wall time, peak RSS of the dbt process tree, output rows → `audit.pipeline_run_metrics`, plus output bytes in `audit.model_cost`. The MT3 table joins ablation results with the cost of the excluded models.
+
+```bash
+python evaluation/mt3_table.py            # → data/audit/mt3_table.csv; report table t24 via make report-tables
+```
+
+`mt3_table.py` joins each arm's gain (Full − arm on NDCG@20, HR@10, Recall@50 with the bootstrap CI) with the cost of what it removes: profiler wall time, peak RSS and output size of the models that exist only for that source (`exclude_models` of the arm, or the producing models of a candidate source), the Bronze load time of the raw tables feeding only that source, and the arm's training time. Costs are lower bounds (models the profiler did not time are listed with cost 0). The decision of 2026-10-28 was to measure cost this way (one profiler pass, ≈ 1 h) instead of `--measure-cost` (nine Silver + Gold rebuilds).
 
 ### 7.6 Scale test
 

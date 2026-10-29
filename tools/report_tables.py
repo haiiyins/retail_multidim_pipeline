@@ -26,7 +26,7 @@ def redact(text):
     return text
 
 
-PLAIN = {"year", "delta", "months", "threads", "dbt_threads", "reps"}   # integer columns printed without thousands separators
+PLAIN = {"year", "delta", "months", "threads", "dbt_threads", "reps", "rank_no", "models_costed"}   # integer columns printed without thousands separators
 
 
 def fmt(v, col=""):
@@ -39,14 +39,14 @@ def fmt(v, col=""):
     return str(v)
 
 
-def write_table(out, name, title, cols, rows, source, note=None):
+def write_table(out, name, title, cols, rows, source, note=None, cf=None):
     """Markdown table + CSV. Numeric columns are right-aligned. Returns the INDEX line."""
     num = [all((isinstance(r[i], (int, float)) and not isinstance(r[i], bool)) or r[i] is None for r in rows) and any(r[i] is not None for r in rows) for i in range(len(cols))]
     head = "| " + " | ".join(c.replace("_", " ") for c in cols) + " |"
     align = "|" + "|".join("---:" if n else "---" for n in num) + "|"
     body = ["| " + " | ".join(fmt(v, c) for v, c in zip(r, cols)) + " |" for r in rows] or ["| " + " | ".join("" for _ in cols) + " |"]
     text = [f"### {title}", "", head, align, *body, "",
-            f"*Source:* {source}. *Generated:* {NOW} by `tools/report_tables.py`, `COUNTRY_FILTER={CF}`." + (f" {note}" if note else ""), ""]
+            f"*Source:* {source}. *Generated:* {NOW} by `tools/report_tables.py`, `COUNTRY_FILTER={cf or CF}`." + (f" {note}" if note else ""), ""]
     (out / f"{name}.md").write_text(redact("\n".join(text)))
     with open(out / f"{name}.csv", "w", newline="") as f:
         w = csv.writer(f); w.writerow(cols)
@@ -354,6 +354,63 @@ def main():
         cols, rows = q(con, """SELECT table_name, country_code, calendar_date, day_of_week, rows, mean_same_weekday_28d, drift, probable_cause
                                 FROM audit.volume_drift WHERE flagged AND probable_cause NOT LIKE 'PUBLIC_HOLIDAY%' ORDER BY 1, 2, 3""")
         index.append(write_table(out, "t20b_volume_drift_days", "QC-5 flagged days other than public holidays (to review)", cols, rows, "`audit.volume_drift`"))
+
+    # ---------------------------------------------------------------- experiments (step 7): bootstrap results, Full by scope, MT3, importance, run times
+    X = pathlib.Path(os.environ.get("EXPERIMENTS_DIR", "data/audit"))
+    XNOTE = "Experiment files of the three-country server run (2026-10-28), copied into `data/audit/`."
+    def csvp(name): return (X / name).as_posix()
+    if want("t22") and (X / "ablation_results_d30.csv").exists():
+        rows = []
+        for d in (30, 90):
+            cols, rr = q(con, f"""
+                SELECT config, {d} AS delta,
+                       ROUND(MAX(CASE WHEN metric = 'NDCG@20' THEN mean END), 4) AS ndcg20,
+                       ROUND(MAX(CASE WHEN metric = 'NDCG@20' THEN diff_vs_full END), 4) AS ndcg20_diff,
+                       ROUND(MAX(CASE WHEN metric = 'NDCG@20' THEN diff_lo END), 4) AS ndcg20_diff_lo, ROUND(MAX(CASE WHEN metric = 'NDCG@20' THEN diff_hi END), 4) AS ndcg20_diff_hi,
+                       MAX(CASE WHEN metric = 'NDCG@20' THEN significant END) AS ndcg20_sig,
+                       ROUND(MAX(CASE WHEN metric = 'HR@10' THEN mean END), 4) AS hr10, ROUND(MAX(CASE WHEN metric = 'HR@10' THEN diff_vs_full END), 4) AS hr10_diff,
+                       MAX(CASE WHEN metric = 'HR@10' THEN significant END) AS hr10_sig,
+                       ROUND(MAX(CASE WHEN metric = 'Recall@50' THEN mean END), 4) AS recall50, ROUND(MAX(CASE WHEN metric = 'Recall@50' THEN diff_vs_full END), 4) AS recall50_diff,
+                       MAX(CASE WHEN metric = 'Recall@50' THEN significant END) AS recall50_sig, MAX(members) AS members
+                FROM read_csv('{csvp(f"ablation_results_d{d}.csv")}') WHERE scope = 'ALL' GROUP BY 1
+                ORDER BY CASE config WHEN 'full' THEN 0 WHEN 'b0' THEN 1 ELSE 2 END, ndcg20_diff""")
+            rows += rr
+        index.append(write_table(out, "t22_ablation_results", "Ablation arms vs Full on the test anchors, all countries: NDCG@20, HR@10 and Recall@50 with the bootstrap 95 % CI of the difference (member-level resampling)", cols, rows,
+                                 "`data/audit/ablation_results_d30.csv`, `_d90.csv` (`evaluation/bootstrap_ci.py`, step 7.4)", XNOTE + " `*_sig` = the CI of the difference excludes 0.", cf="ALL"))
+    if want("t23") and (X / "ablation_results_d30.csv").exists():
+        rows = []
+        for d in (30, 90):
+            cols, rr = q(con, f"""
+                SELECT scope, {d} AS delta, MAX(members) AS members,
+                       ROUND(MAX(CASE WHEN metric = 'HR@10' THEN mean END), 4) AS hr10, ROUND(MAX(CASE WHEN metric = 'MRR@10' THEN mean END), 4) AS mrr10,
+                       ROUND(MAX(CASE WHEN metric = 'NDCG@10' THEN mean END), 4) AS ndcg10, ROUND(MAX(CASE WHEN metric = 'HR@20' THEN mean END), 4) AS hr20,
+                       ROUND(MAX(CASE WHEN metric = 'NDCG@20' THEN mean END), 4) AS ndcg20, ROUND(MAX(CASE WHEN metric = 'NDCG@20' THEN ci_lo END), 4) AS ndcg20_lo,
+                       ROUND(MAX(CASE WHEN metric = 'NDCG@20' THEN ci_hi END), 4) AS ndcg20_hi, ROUND(MAX(CASE WHEN metric = 'Recall@50' THEN mean END), 4) AS recall50
+                FROM read_csv('{csvp(f"ablation_results_d{d}.csv")}') WHERE config = 'full' GROUP BY 1
+                ORDER BY CASE WHEN scope = 'ALL' THEN 0 WHEN scope LIKE 'segment%' THEN 2 ELSE 1 END, scope""")
+            rows += rr
+        index.append(write_table(out, "t23_full_by_scope", "Full pipeline on the test anchors by country and member segment (new ≤ 1 transaction in the previous year, mid = 2, loyal ≥ 3): metrics at Δ = 30 and 90 with the NDCG@20 CI", cols, rows,
+                                 "`data/audit/ablation_results_d30.csv`, `_d90.csv` (`evaluation/bootstrap_ci.py`)", XNOTE + " `members` = members with at least one positive label in the window.", cf="ALL"))
+    if want("t24") and (X / "mt3_table.csv").exists():
+        cols, rows = q(con, f"""SELECT removed, delta, gain_ndcg20, gain_ndcg20_lo, gain_ndcg20_hi, sig_ndcg20, gain_hr10, sig_hr10, gain_recall50, sig_recall50,
+                                       models_costed, model_wall_sec, bronze_load_sec, total_cost_sec, peak_rss_gb, output_gb, train_wall_sec, ndcg20_gain_per_1000s, models_not_profiled
+                                FROM read_csv('{csvp("mt3_table.csv")}') ORDER BY delta, total_cost_sec DESC""")
+        index.append(write_table(out, "t24_cost_gain", "MT3 cost × gain: what each removed source costs to process (profiler wall time of its models, Bronze load of its raw tables, peak RSS, output size) against what it adds to the Full ranker (Full − arm, bootstrap CI)", cols, rows,
+                                 "`data/audit/mt3_table.csv` (`evaluation/mt3_table.py` over `audit.model_cost`, `audit.pipeline_run_metrics`, `audit.ablation_runs` and the bootstrap CSVs)",
+                                 XNOTE + " Costs are lower bounds: models the profiler did not time cost 0 and are listed.", cf="ALL"))
+    if want("t25") and (X / "importance_full_d30.csv").exists():
+        cols, rows = q(con, f"""WITH i AS (SELECT feature, gain FROM read_csv('{csvp("importance_full_d30.csv")}')), t AS (SELECT SUM(gain) AS total FROM i)
+                                SELECT ROW_NUMBER() OVER (ORDER BY gain DESC) AS rank_no, feature, ROUND(gain) AS gain, ROUND(100.0 * gain / total, 2) AS share_pct FROM i, t ORDER BY gain DESC LIMIT 20""")
+        index.append(write_table(out, "t25_feature_importance", "Top-20 features of the Full ranker by LightGBM gain (Δ = 30) and their share of the total gain", cols, rows,
+                                 "`data/audit/importance_full_d30.csv` (`evaluation/train_eval_lambdarank.py`)", XNOTE, cf="ALL"))
+    if want("t26") and (X / "ablation_runs.csv").exists():
+        cols, rows = q(con, f"""SELECT config, delta, ROUND(train_wall_sec) AS train_wall_sec, ROUND(dbt_wall_sec) AS dbt_wall_sec, executed_at FROM read_csv('{csvp("ablation_runs.csv")}') ORDER BY executed_at""")
+        fp = pathlib.Path("evaluation/frozen_params.json"); frozen = json.load(open(fp)) if fp.exists() else None
+        note = XNOTE + (f" Hyper-parameters frozen by the Full Δ30 run (`evaluation/frozen_params.json`): {frozen['num_boost_round']} boosting rounds (early stopping on validation NDCG@20), "
+                        f"num_leaves {frozen['params']['num_leaves']}, learning_rate {frozen['params']['learning_rate']}, feature_fraction {frozen['params']['feature_fraction']}, "
+                        f"bagging_fraction {frozen['params']['bagging_fraction']}; every arm reuses them." if frozen else "")
+        index.append(write_table(out, "t26_training_runs", "Training runs of the ablation on the server (16 threads): wall time per arm and horizon; no dbt rebuild per arm (cost measured once by the profiler)", cols, rows,
+                                 "`data/audit/ablation_runs.csv` (`audit.ablation_runs`, `evaluation/run_ablation_2axes.py`)", note, cf="ALL"))
 
     write_index(out)
 
