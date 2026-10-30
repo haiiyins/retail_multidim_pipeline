@@ -280,9 +280,9 @@ Suggestions and bug reports from outside the team are welcome through the issue 
 
 | Member | Responsibilities |
 |---|---|
-| **Phan Nguyễn Hải Yến** | Data contracts, price timeline, holiday and commercial calendar, identity stitching, statistical evaluation |
-| **Nguyễn Viết Kha** | Profiling, Bronze ingestion, quality gates, streaming lane, cost profiling and scale test |
-| **Lê Đức Mạnh** | Silver core tables, Gold feature store, candidate generation, ranking model and ablation |
+| **Phan Nguyễn Hải Yến** | Repository governance and environment validation; dbt sources and source tests; value-domain and nested-column checks; Silver: SKU price intervals, public holidays and inferred commercial calendar, clean web events, two-tier identity stitching; Gold: stitched web events and the model × country feature entity; feature-axis ablation, bootstrap confidence intervals and segment analysis; report chapters on data, processing and quality, final slides and demo script, submission checklist |
+| **Nguyễn Viết Kha** | Raw-file download and checksums, profiling of the 11 tables, server provisioning and DuckDB tuning, batch loading into Bronze; go / no-go gates and PASS / REVIEW grouping; QC-1 / QC-3 / QC-4 tests and quarantine routing, QC-5 volume drift, QC-6 leakage assertions; streaming lane (Redpanda replay, consumer with dead-letter queue, QC-7 reconciliation); candidate-axis ablation, cost profiler and cost × gain table, scale test, technique comparisons; lineage figures and DBeaver evidence |
+| **Lê Đức Mạnh** | Inter-purchase and date-span audits and the temporal split; Silver core tables: member bridge and profile, model catalogue, deduplicated and netted sales fact, returns, daily stock, favourite-sport and usual-store state; Gold: anchor grid with training stride, co-purchase lift, member feature entity, five-source candidate generation, pair features and ranking dataset with labels; ranker training with frozen hyper-parameters and the B0 baseline; report chapter on experiments and results |
 
 Supervisor: **Dr. Võ Phương Bình**, Faculty of Information Science and Engineering, University of Information Technology, VNU-HCM.
 
