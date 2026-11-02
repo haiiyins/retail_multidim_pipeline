@@ -6,27 +6,28 @@ from ml.common.pit import PITViolation, assert_pit, cutoff_case_sql, cutoff_for,
 D = dt.date
 
 
-def test_cutoffs_are_quarterly_inside_train():
+def test_cutoffs_are_quarterly_through_test():
     cs = cutoffs()
-    assert cs[0] == D(2023, 7, 1) and cs[-1] <= split_windows()["train_hi"]
-    assert len(cs) == 9 and all(c.day == 1 and c.month in (1, 4, 7, 10) for c in cs)
+    assert cs[0] == D(2023, 7, 1) and cs[-1] == D(2026, 7, 1) and cs[-1] <= split_windows()["test_hi"]
+    assert len(cs) == 13 and all(c.day == 1 and c.month in (1, 4, 7, 10) for c in cs)
     assert final_cutoff() == split_windows()["train_hi"] + dt.timedelta(days=1)
 
 
 def test_cutoff_for():
-    assert cutoff_for(D(2023, 6, 26), "train") is None
-    assert cutoff_for(D(2023, 7, 3), "train") == D(2023, 7, 1)
-    assert cutoff_for(D(2024, 12, 30), "train") == D(2024, 10, 1)
-    assert cutoff_for(D(2026, 2, 2), "test") == cutoff_for(D(2025, 10, 27), "valid") == final_cutoff()
+    assert cutoff_for(D(2023, 6, 26)) is None
+    assert cutoff_for(D(2023, 7, 3)) == D(2023, 7, 1)
+    assert cutoff_for(D(2024, 12, 30)) == D(2024, 10, 1)
+    assert cutoff_for(D(2025, 10, 27)) == D(2025, 10, 1)      # valid: refitted after the train window
+    assert cutoff_for(D(2026, 2, 2)) == D(2026, 1, 1) and cutoff_for(D(2026, 7, 27)) == D(2026, 7, 1)
     assert last_fit_anchor(D(2024, 10, 1), 30) == D(2024, 8, 31)
 
 
 def test_cutoff_case_sql_matches_python():
     con = connect(read_lakehouse=False)
-    rows = [(D(2023, 6, 26), "train"), (D(2023, 7, 3), "train"), (D(2025, 9, 15), "train"), (D(2026, 2, 2), "test")]
-    con.register("a", pd.DataFrame(rows, columns=["anchor_date", "split"]))
+    rows = [D(2023, 6, 26), D(2023, 7, 3), D(2025, 9, 15), D(2025, 12, 22), D(2026, 2, 2), D(2026, 7, 27)]
+    con.register("a", pd.DataFrame({"anchor_date": rows}))
     got = [r[0] for r in con.execute(f"SELECT {cutoff_case_sql()} FROM a").fetchall()]
-    assert got == [cutoff_for(t, s) for t, s in rows]
+    assert got == [cutoff_for(t) for t in rows]
 
 
 def test_assert_pit():

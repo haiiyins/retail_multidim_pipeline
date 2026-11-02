@@ -9,7 +9,7 @@ export
 # in every recipe shell that opens the lakehouse; the fallback covers hosts with a small hard limit.
 NOFILE = ulimit -n 65536 2>/dev/null || ulimit -n 4096 2>/dev/null || true
 PYTHONUNBUFFERED = 1   # stream the loaders' per-table lines into a redirected log instead of flushing them at exit
-.PHONY: probe probe-full bronze bronze-views gates test-volume-drift holidays silver gold train ablation docs docs-figures report-tables ml-test ml-seq ml-eval all
+.PHONY: probe probe-full bronze bronze-views gates test-volume-drift holidays silver gold train ablation docs docs-figures report-tables ml-test ml-seq ml-eval ml-views ml-retrieval all
 probe:
 	python ingestion/probe_csv_format.py
 probe-full:
@@ -47,4 +47,10 @@ ml-seq:
 	$(NOFILE); python ml/common/sequences.py
 ml-eval:
 	$(NOFILE); python ml/eval/protocol.py --reeval p1_frozen --out t28
+ml-views:
+	python ml/common/data.py
+ml-retrieval:
+	$(NOFILE); python ml/retrieval/ease.py --tune --build && python ml/retrieval/tifuknn.py --tune --build
+	$(NOFILE); for c in SG TH VN; do python ml/retrieval/item2vec.py --build --countries $$c & done; wait
+	$(NOFILE); python ml/retrieval/report.py && python ml/common/data.py
 all: bronze gates silver gold train ablation

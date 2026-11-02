@@ -1,8 +1,10 @@
 """Point-in-time rules for model-generated tables (plan D7–D9).
 
-Rolling protocol: a signal model or a learned candidate source is fitted at a cutoff c on events dated strictly before c and on
-label windows that close strictly before c. A train anchor t uses the latest cutoff c ≤ t (anchors before the first cutoff get no
-model: NULL features / no candidates); valid and test anchors use the model fitted at FINAL_CUTOFF = train_hi + 1 day.
+Rolling protocol: a signal model or a learned candidate source is refitted every quarter at a cutoff c on events dated strictly
+before c and on label windows that close strictly before c, through train, valid and test alike (ml/DECISIONS.md, D8 revised): an
+anchor t uses the latest cutoff c ≤ t, so its model is at most one quarter old in every split, as a production system retrained
+quarterly. Anchors before the first cutoff get no model (NULL features / no candidates). The rankers themselves are fitted once on
+the train split, at FINAL_CUTOFF = train_hi + 1 day.
 Every ml.* table produced by a model carries fit_cutoff, source_ts_max and model_version; assert_pit() checks them."""
 import datetime as dt
 from ml.common.data import split_windows
@@ -24,22 +26,17 @@ def _quarter_starts(lo, hi):
 
 
 def cutoffs():
-    """Quarterly rolling cutoffs inside the training window: 2023-07-01 … 2025-07-01 (9 cutoffs)."""
-    return list(_quarter_starts(FIRST_CUTOFF, split_windows()["train_hi"]))
+    """Quarterly rolling cutoffs from FIRST_CUTOFF to the end of test: 2023-07-01 … 2026-07-01 (13 cutoffs)."""
+    return list(_quarter_starts(FIRST_CUTOFF, split_windows()["test_hi"]))
 
 
 def final_cutoff():
+    """Fit date of the rankers trained on the whole train split."""
     return split_windows()["train_hi"] + dt.timedelta(days=1)
 
 
-def all_cutoffs():
-    return cutoffs() + [final_cutoff()]
-
-
-def cutoff_for(anchor, split):
-    """Cutoff of the model an anchor may use, or None for train anchors before FIRST_CUTOFF."""
-    if split in ("valid", "test"):
-        return final_cutoff()
+def cutoff_for(anchor):
+    """Cutoff of the model an anchor may use, or None before FIRST_CUTOFF."""
     past = [c for c in cutoffs() if c <= anchor]
     return past[-1] if past else None
 
@@ -49,10 +46,10 @@ def last_fit_anchor(cutoff, delta):
     return cutoff - dt.timedelta(days=delta + 1)
 
 
-def cutoff_case_sql(anchor_col="anchor_date", split_col="split"):
+def cutoff_case_sql(anchor_col="anchor_date"):
     """SQL expression giving cutoff_for() per row, to join model outputs by fit_cutoff."""
     whens = " ".join(f"WHEN {anchor_col} >= DATE '{c}' THEN DATE '{c}'" for c in reversed(cutoffs()))
-    return (f"CASE WHEN {split_col} IN ('valid', 'test') THEN DATE '{final_cutoff()}' {whens} ELSE NULL END")
+    return f"CASE {whens} ELSE NULL END"
 
 
 def assert_pit(con, relation, anchor_col="anchor_date", require=("source_ts_max",)):
