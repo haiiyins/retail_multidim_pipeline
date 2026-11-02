@@ -5,8 +5,9 @@ universe.size models by buyers in the universe.window_days before c (t28b: 97 % 
 scored at anchor t from her purchases strictly before t with the model of cutoff_for(t); train anchors before FIRST_CUTOFF and members
 without a purchase of a universe model get no candidates. Output: data/ml/candidates/<source>/<country>_<cutoff>.parquet, at most
 n_out rows per anchor after the gold.anchor_model_grid filter applied to R1–R5, with fit_cutoff, source_ts_max (latest purchase read)
-and model_version; view ml.cand_<source>.
-Usage: python ml/retrieval/<source>.py --tune [--trials N]   (valid, objective unconditional Recall@100)
+and model_version; view ml.cand_<source>. With retrieval.explore_only the models the member bought before the anchor are masked out
+(explore-only candidates; R1 covers the repeats).
+Usage: python ml/retrieval/<source>.py --tune [--trials N]   (valid, objective: explore coverage added to R1–R5@200)
        python ml/retrieval/<source>.py --build               (every split, tuned parameters when they exist)"""
 import argparse, datetime as dt, glob, json, os, sys, time
 import numpy as np, pandas as pd, torch
@@ -33,29 +34,34 @@ def day_num(d):
 class Events:
     """Purchases of one country, one row per member × model × day, as integer arrays sorted by (member, day, model)."""
 
-    def __init__(self, country, members, items, m, i, day, ts):
+    def __init__(self, country, members, items, m, i, day, ts, price=None, item_dept=None):
+        """price: unit price (local) of each row; item_dept: sport department code of each item (static product attribute)."""
         self.country, self.members, self.items = country, pd.Index(members), np.asarray(items)
         order = np.lexsort((i, day, m))
         self.m, self.i, self.day, self.ts = (np.asarray(x)[order] for x in (m, i, day, ts))
+        self.price = None if price is None else np.asarray(price, np.float32)[order]
+        self.item_dept = None if item_dept is None else np.asarray(item_dept)
         self.key = self.m.astype(np.int64) * DAY_BITS + self.day
 
     @classmethod
     def load(cls, con, country):
         con.execute("""CREATE OR REPLACE TEMP TABLE _ev AS
-            SELECT member_id, model_code, transaction_date AS d, MAX(transaction_ts_local) AS ts
+            SELECT member_id, model_code, transaction_date AS d, MAX(transaction_ts_local) AS ts,
+                   SUM(gmv_local) / NULLIF(SUM(qty), 0) AS price, ANY_VALUE(sport_department_code) AS dept
             FROM lh.silver.slv_fact_sales_line
             WHERE country_code = ? AND member_id IS NOT NULL AND model_code IS NOT NULL GROUP BY ALL""", [country])
         con.execute("CREATE OR REPLACE TEMP TABLE _mem AS SELECT member_id, (ROW_NUMBER() OVER (ORDER BY member_id) - 1)::INT AS m "
                     "FROM (SELECT DISTINCT member_id FROM _ev)")
-        con.execute("CREATE OR REPLACE TEMP TABLE _itm AS SELECT model_code, (ROW_NUMBER() OVER (ORDER BY model_code) - 1)::INT AS i "
-                    "FROM (SELECT DISTINCT model_code FROM _ev)")
+        con.execute("CREATE OR REPLACE TEMP TABLE _itm AS SELECT model_code, (ROW_NUMBER() OVER (ORDER BY model_code) - 1)::INT AS i, "
+                    "dept FROM (SELECT model_code, COALESCE(MODE(dept), -1) AS dept FROM _ev GROUP BY 1)")
         members = con.execute("SELECT member_id FROM _mem ORDER BY m").df()["member_id"]
-        items = con.execute("SELECT model_code FROM _itm ORDER BY i").df()["model_code"]
+        it = con.execute("SELECT model_code, dept FROM _itm ORDER BY i").df()
         r = con.execute("""SELECT m.m, i.i, date_diff('day', DATE '1970-01-01', e.d)::INT AS day,
-                                  epoch_us(COALESCE(e.ts, CAST(e.d AS TIMESTAMP))) AS ts
+                                  epoch_us(COALESCE(e.ts, CAST(e.d AS TIMESTAMP))) AS ts, CAST(e.price AS FLOAT) AS price
                            FROM _ev e JOIN _mem m USING (member_id) JOIN _itm i USING (model_code)""").fetchnumpy()
         con.execute("DROP TABLE _ev; DROP TABLE _mem; DROP TABLE _itm")
-        return cls(country, members, items, *(np.asarray(r[k]) for k in ("m", "i", "day", "ts")))
+        return cls(country, members, it["model_code"], *(np.asarray(r[k]) for k in ("m", "i", "day", "ts")),
+                   price=np.nan_to_num(np.ma.filled(r["price"], np.nan), nan=0.0), item_dept=it["dept"].to_numpy())
 
     def member_index(self, member_ids):
         return self.members.get_indexer(member_ids).astype(np.int64)
@@ -104,12 +110,52 @@ class Query:
         keep = u >= 0
         self.row, self.item, self.days_before = row[keep], u[keep], (day[row] - ev.day[idx])[keep]
         self.has_history = np.bincount(self.row, minlength=self.n) > 0
+        self.all_row, self.all_idx, self.day = row, idx, day   # every purchase read, also outside the universe (sequence models)
+        self.ev, self.uni = ev, uni
+
+
+def item_attributes(ev, uni, cutoff, buckets):
+    """Per universe model: department index (into the sorted department codes of the universe), price bucket = quantile bucket of the
+    mean unit price before the cutoff; and the bucket edges."""
+    sel = ev.before(cutoff)
+    u = uni.pos[ev.i[sel]]
+    k = u >= 0
+    price = np.bincount(u[k], weights=ev.price[sel][k], minlength=uni.size) / np.maximum(np.bincount(u[k], minlength=uni.size), 1)
+    edges = np.quantile(price, np.linspace(0, 1, buckets + 1)[1:-1])
+    _, dept = np.unique(ev.item_dept[uni.items], return_inverse=True)
+    return dept.astype(np.int64), np.searchsorted(edges, price).astype(np.int64), edges
+
+
+def reference_days(ev, cutoff):
+    """Training reference days of the supervised sources: t = the day before one of the member's purchase days (not her first), with
+    t + Δ < cutoff so the label window (t, t + Δ] closes before the cutoff (pit.last_fit_anchor). Returns (m, t)."""
+    c, delta = day_num(cutoff), CFG["delta"]
+    bk = np.unique(ev.key[ev.before(cutoff)])   # one basket per member × day
+    bm, bd = bk // DAY_BITS, bk % DAY_BITS
+    first = np.r_[True, bm[1:] != bm[:-1]]
+    ok = ~first & (bd - 1 + delta < c)
+    return bm[ok], (bd[ok] - 1).astype(np.int64)
+
+
+def explore_targets(ev, uni, m, t, hist_row, hist_item):
+    """(row, universe item) of the universe models bought in (t, t + Δ] by members m and not in their history (hist_row, hist_item)."""
+    lo = np.searchsorted(ev.key, m * DAY_BITS + t + 1)
+    hi = np.searchsorted(ev.key, m * DAY_BITS + t + CFG["delta"] + 1)
+    n = hi - lo
+    trow = np.repeat(np.arange(len(m)), n)
+    tidx = np.arange(n.sum()) - np.repeat(np.cumsum(n) - n, n) + np.repeat(lo, n)
+    tu = uni.pos[ev.i[tidx]]
+    k = tu >= 0
+    trow, tu = trow[k], tu[k]
+    new = ~np.isin(trow.astype(np.int64) * uni.size + tu, np.asarray(hist_row, np.int64) * uni.size + hist_item)
+    key = np.unique(trow[new].astype(np.int64) * uni.size + tu[new])
+    return key // uni.size, key % uni.size
 
 
 class Source:
     """prepare(): parameter-free state per country × cutoff (cached across tuning trials); fit(): the model for given parameters;
     scores(): (n, universe) tensor on DEVICE for a Query."""
-    name, version = "", 1
+    name, version, seed = "", 1, 0
 
     def prepare(self, ev, uni, cutoff):
         return None
@@ -132,10 +178,20 @@ def load_anchors(con, splits, countries):
     return a[a["fit_cutoff"].notna()]
 
 
+def mask_scores(sc, q, explore_only=None):
+    """-inf for members without history and, with explore_only (retrieval.explore_only), for the universe models the member bought
+    before the anchor: R1 already holds them (cand_repeat 0.997), so a learned source spends its slots on explore models."""
+    explore_only = CFG["explore_only"] if explore_only is None else explore_only
+    sc[~torch.from_numpy(q.has_history).to(sc.device)] = -torch.inf
+    if explore_only and len(q.row):
+        sc[torch.from_numpy(q.row).to(sc.device), torch.from_numpy(q.item).to(sc.device)] = -torch.inf
+    return sc
+
+
 def generate(src, params, con, splits, countries, events, cache=None):
     """Yield one candidate DataFrame per country × cutoff. events(country) -> Events; cache keeps (Universe, prep) across calls."""
     n_out, chunk = CFG["n_out"], CFG["chunk"]
-    version = f"{src.name}-v{src.version}-{config_hash(params)}"
+    version = f"{src.name}-v{src.version}{'x' if CFG['explore_only'] else ''}-{config_hash(params)}"
     anchors = load_anchors(con, splits, countries)
     for country, a_c in anchors.groupby("country_code", sort=True):
         ev = events(country)
@@ -156,8 +212,7 @@ def generate(src, params, con, splits, countries, events, cache=None):
             for s in range(0, len(a), chunk):
                 q = Query(ev, uni, m[s:s + chunk], day[s:s + chunk])
                 with torch.no_grad():
-                    sc = src.scores(model, q)
-                    sc[~torch.from_numpy(q.has_history).to(sc.device)] = -torch.inf
+                    sc = mask_scores(src.scores(model, q), q)
                     v, ix = torch.topk(sc, k, dim=1)
                 v, ix = v.float().cpu().numpy(), ix.cpu().numpy()
                 ok = np.isfinite(v)
@@ -221,11 +276,18 @@ def candidates_relation(name, split):
             f"WHERE split = '{split}')")
 
 
-def objective_value(con, cands, metric="Recall@100"):
+def explore_coverage(con, rel, split="valid"):
+    res = evaluate(con, rel, f"read_parquet('{build_positives(con, split, CFG['delta'])}')", ks=(ALL_K,))
+    return float(res.groupby("member_id")[f"recall_explore@{ALL_K}"].mean().mean())
+
+
+def objective_value(con, cands, base=None):
+    """Tuning objective: the explore coverage a source adds to R1–R5@200 on valid (cand_explore of the union minus R1–R5 alone,
+    member means; `base` = R1–R5 alone, computed once by the caller)."""
     con.register("_cands", cands)
-    res = evaluate(con, "_cands", f"read_parquet('{build_positives(con, 'valid', CFG['delta'])}')", ks=KS)
+    value = explore_coverage(con, union_relation([baseline_relation("valid"), "_cands"]))
     con.unregister("_cands")
-    return float(res.groupby("member_id")[metric].mean().mean())
+    return value - (explore_coverage(con, baseline_relation("valid")) if base is None else base)
 
 
 def tuned_params(name):
@@ -251,8 +313,12 @@ def main(src):
     ap.add_argument("--trials", type=int, default=None)
     ap.add_argument("--build", action="store_true")
     ap.add_argument("--countries", default="SG,TH,VN")
+    ap.add_argument("--splits", default=",".join(SPLITS))
+    ap.add_argument("--seed", type=int, default=0, help="training seed of stochastic sources; seed > 0 writes <source>_seed<N>")
     a = ap.parse_args()
-    countries = a.countries.split(",")
+    countries, splits = a.countries.split(","), a.splits.split(",")
+    src.seed = a.seed
+    out_name = src.name if a.seed == 0 else f"{src.name}_seed{a.seed}"
     con = connect()
     loaded = {}
 
@@ -267,12 +333,14 @@ def main(src):
 
     if a.tune:
         cache = {}
+        base = explore_coverage(con, baseline_relation("valid"))
+        print(f"  R1-R5@200 cand_explore (valid) {base:.4f}", flush=True)
 
         def objective(params, trial):
             full = {**CFG[src.name]["params"], **params}
             cands = pd.concat([p for _, _, p in generate(src, full, con, ["valid"], countries, events, cache)], ignore_index=True)
-            value = objective_value(con, cands)
-            print(f"  trial {trial.number}: Recall@100 (valid, unconditional) {value:.4f}  {params}", flush=True)
+            value = objective_value(con, cands, base)
+            print(f"  trial {trial.number}: Δ cand_explore over R1-R5@200 (valid) {value:+.4f}  {params}", flush=True)
             return value
 
         study, trials = tune(src.name, objective, n_trials=a.trials, tag="" if a.trials is None else f"_smoke{a.trials}")
@@ -281,30 +349,32 @@ def main(src):
 
     if a.build:
         params = tuned_params(src.name)
-        out_dir = os.path.dirname(ml_path("candidates", src.name, "_"))
+        out_dir = os.path.dirname(ml_path("candidates", out_name, "_"))
         for c in countries:   # countries may be built by parallel processes
             for p in glob.glob(os.path.join(out_dir, f"{c}_*.parquet")):
                 os.remove(p)
-        with Run(f"cand:{src.name}", config={"retrieval": CFG, "source": src.name, "version": src.version}, params=params) as run:
-            for country, cutoff, part in generate(src, params, con, SPLITS, countries, events):
+        with Run(f"cand:{out_name}", config={"retrieval": CFG, "source": src.name, "version": src.version, "seed": a.seed,
+                                             "splits": splits}, params=params) as run:
+            for country, cutoff, part in generate(src, params, con, splits, countries, events):
                 path = os.path.join(out_dir, f"{country}_{cutoff.date()}.parquet")
                 part.to_parquet(path, index=False)
                 print(f"  {country} cutoff {cutoff.date()}: {part[['member_id', 'anchor_date']].drop_duplicates().shape[0]:,} anchors, "
                       f"{len(part):,} rows", flush=True)
             run.metrics["pit"] = assert_pit(con, f"read_parquet('{out_dir}/*.parquet')")
-            t = pd.concat([recall_table(con, {src.name: candidates_relation(src.name, s), "R1-R5@200": baseline_relation(s),
-                                              f"R1-R5@200 ∪ {src.name}": union_relation([baseline_relation(s), candidates_relation(src.name, s)])},
-                                        s, ranked={src.name, "R1-R5@200"}) for s in ("valid", "test")], ignore_index=True)
+            n = out_name
+            t = pd.concat([recall_table(con, {n: candidates_relation(n, s), "R1-R5@200": baseline_relation(s),
+                                              f"R1-R5@200 ∪ {n}": union_relation([baseline_relation(s), candidates_relation(n, s)])},
+                                        s, ranked={n, "R1-R5@200"}) for s in ("valid", "test") if s in splits], ignore_index=True)
             run.metrics["recall"] = t.round(4).to_dict("records")
             run.artifacts["candidates"] = out_dir
-            show(t, ml_path("report", f"cand_{src.name}.md"))
+            show(t, ml_path("report", f"cand_{n}.md"))
         con.close()
-        publish_view(f"cand_{src.name}", os.path.join(out_dir, "*.parquet"))
+        publish_view(f"cand_{n}", os.path.join(out_dir, "*.parquet"))
 
 
 def show(t, path):
     with open(path, "w") as f:
         f.write(t.round(4).to_markdown(index=False) + "\n")
     pd.set_option("display.width", 250)
-    print(t.drop(columns=["anchors"]).round(4).to_string(index=False))
+    print(t.drop(columns=["anchors"], errors="ignore").round(4).to_string(index=False))
     print(f"report {path}")

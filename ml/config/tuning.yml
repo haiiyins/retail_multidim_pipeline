@@ -8,8 +8,8 @@ p1:
     feature_fraction:  {type: float, low: 0.5, high: 1.0}
     bagging_fraction:  {type: float, low: 0.5, high: 1.0}
     lambda_l2:         {type: float, low: 0.001, high: 10.0, log: true}
-# Candidate sources (ease, tifuknn as R6 / R8) are tuned on unconditional Recall@100 on valid (ml/retrieval/base.py); the same
-# parameters serve their baseline rows of t31.
+# Candidate sources (ease, tifuknn, sasrec, two_tower as R6 / R8 / R10 / R9) are explore-only and tuned on the explore coverage they
+# add to R1–R5@200 on valid (ml/retrieval/base.py); their baseline rows of t31 score repeats too and get their own budget on NDCG@20.
 ease:
   space:
     l2: {type: float, low: 10.0, high: 100000.0, log: true}
@@ -38,3 +38,16 @@ p3:
     lr:         {type: float, low: 0.0001, high: 0.003, log: true}
     lambda_d90: {type: float, low: 0.0, high: 1.0}
     lambda_haz: {type: float, low: 0.0, high: 1.0}
+explin:
+  space:
+    l2:             {type: float, low: 1.0, high: 100000.0, log: true}
+    half_life_days: {type: float, low: 7.0, high: 730.0, log: true}
+rp3beta:
+  space:
+    alpha: {type: float, low: 0.2, high: 1.5}
+    beta:  {type: float, low: 0.0, high: 1.0}
+trend:
+  space:
+    window_days: {type: int, low: 3, high: 28}
+    w_dept:      {type: float, low: 0.0, high: 3.0}
+    w_price:     {type: float, low: 0.0, high: 3.0}
