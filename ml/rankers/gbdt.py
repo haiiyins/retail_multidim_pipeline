@@ -6,7 +6,8 @@ NDCG@20 on valid (ml/eval/protocol.py), so anchors whose positives all lie outsi
 P2 = the same GBDT with the rolling P2 signal features (ml/signals/run_leakage_study.add_signals) added to the pairs.
 Usage (tuning smoke, ML-07 DoD): python ml/rankers/gbdt.py --tune p1 --trials 3
        python ml/rankers/gbdt.py --tune p1 --source v2 [--final --name p1_tuned_v2]      (P1-tuned on ml.candidates_v2)
-       python ml/rankers/gbdt.py --tune p2 --source v2 --signals [--final --name p2_v2]  (P2)"""
+       python ml/rankers/gbdt.py --tune p2 --source v2 --signals [--final --name p2_v2]  (P2)
+       python ml/rankers/gbdt.py --tune p1 --source v2 --final --skip-tune --seed 1 --name p1_tuned_v2_seed1  (seed variance)"""
 import argparse, json, os, sys
 import lightgbm as lgb, numpy as np, pandas as pd
 
@@ -95,6 +96,7 @@ def main():
     ap.add_argument("--final", action="store_true", help="refit the best trial and write valid / test scores")
     ap.add_argument("--name", default=None)
     ap.add_argument("--skip-tune", action="store_true")
+    ap.add_argument("--seed", type=int, default=0, help="final refit with LightGBM seed 42 + SEED (seed variance)")
     a = ap.parse_args()
     from ml.rankers.frozen import relation
     con = connect()
@@ -124,9 +126,9 @@ def main():
         print(f"best {study.best_value:.4f}  {study.best_params}", flush=True)
     if a.final:
         from ml.common.registry import Run
-        params = best_params(study_name)
+        params = best_params(study_name) | ({"seed": BASE["seed"] + a.seed} if a.seed else {})
         name = a.name or f"{study_name}"
-        with Run(name, config={"source": a.source, "signals": a.signals}, params=params) as run:
+        with Run(name, config={"source": a.source, "signals": a.signals, "seed": a.seed}, params=params) as run:
             m = fit(params, tr, va, feat, a.delta)
             run.metrics["best_iteration"] = m.best_iteration
             te = load(con, "test", a.delta, rel)

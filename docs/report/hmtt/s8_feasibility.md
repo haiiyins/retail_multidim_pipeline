@@ -67,8 +67,9 @@ t31.
   was retrieval (+20 % coverage) and tuning (+4 % NDCG@20 on the frozen ranker).
 - **Explore is still the bottleneck.** Explore coverage rose × 1.30, not × 2, and at the top 10 the model is no better than the
   best-sellers on explore purchases. On average 60 % of a member's explore purchases are still outside the 300 candidates.
-- **Reduced budget.** 10 trials instead of 30 and one seed instead of three. Seed variance of P3 is not measured, so its +0.0009 over
-  P1-tuned may be inside the seed noise. SASRec NBR has no NDCG@20 budget of its own.
+- **Reduced budget.** 10 trials instead of 30, and one seed for tuning. The final fits of P1-tuned and P3 were repeated with three
+  seeds: the seed spread (≤ 0.0003 NDCG@20) is smaller than the P3 one-head gain, but the trial budget itself was not repeated, so
+  the hyper-parameter search noise is not measured. SASRec NBR has no NDCG@20 budget of its own.
 - **Offline only.** GMV numbers are a proxy; recommendations change behaviour, which an offline replay cannot measure.
 - **Scope.** SG labels are REVIEW (D1); results for SG are reported but not used for conclusions. Dropped from the plan: gSASRec, P4
   distillation, conformal intervals, drift monitoring, the what-if and parity check of the demo.

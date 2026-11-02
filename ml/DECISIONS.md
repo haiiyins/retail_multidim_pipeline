@@ -189,3 +189,11 @@ Test, TH + VN, unconditional NDCG@20 [95 % member bootstrap]; selection on valid
 - H2 (t29b v2): naive − rolling +0.0026 on train anchors, +0.0029 on the pseudo-test, −0.0004 on test; leaky +0.0011 on test.
 - RQ4 (t38, best on valid = P3 one head): HR@10 × 1.76 popular, × 1.54 buy-again; on explore positives 0.110 vs popular 0.115.
 - `business.py` is run with `--best p3_onehead`; `explain.py` keeps `--p3 p3_full` because the gate exists only with two heads.
+
+## 2026-11-03 · Seed variance of the final fits (t31_seeds)
+
+The plan asked for three seeds of the deep models (D6); the reduced run had one. Final fits repeated with seeds 1 and 2, same
+hyper-parameters (`gbdt.py --seed`, `umtr/train.py --seed`). Test, TH + VN, NDCG@20 mean ± sd over seeds 0–2: P1-tuned
+0.1013 ± 0.0002, P3 two heads 0.1008 ± 0.0003, P3 one head 0.1022 ± 0.0001. Seed-matched paired P3 one head − P1-tuned: +0.0009,
++0.0010, +0.0006; one head − two heads: +0.0011, +0.0018, +0.0011. The conclusions of t31 / t32 hold; the two-head model's repeat
+recall varies most (0.79–0.85). Tuning itself (10 TPE trials, seed 0) was not repeated.
