@@ -6,6 +6,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--config", default="full"); ap.add_argument("--delta", type=int, default=30); ap.add_argument("--seed", type=int, default=42)
 ap.add_argument("--no-freeze", action="store_true", help="tune with early stopping but do not write frozen_params.json (laptop smoke runs)")
 ap.add_argument("--tag", default="", help="suffix for the result files, e.g. smoke")
+ap.add_argument("--dump-scores", default="", help="also write the test scores (ids, score) to this Parquet file, for ml/eval/protocol.py")
 a = ap.parse_args()
 cfg = yaml.safe_load(open("evaluation/ablation_configs.yml"))[a.config]
 split = yaml.safe_load(open("evaluation/split.yml"))
@@ -65,6 +66,9 @@ elif tune:
     print(f"(no-freeze) best_iteration={m.best_iteration}; frozen_params.json untouched")
 te["score"] = m.predict(te[feat], num_iteration=m.best_iteration if tune else None)
 te.loc[~te_eligible, "score"] = -np.inf   # candidates of a dropped source cannot be recommended; their positives count as misses
+if a.dump_scores:
+    os.makedirs(os.path.dirname(a.dump_scores) or ".", exist_ok=True)
+    te[ID + ["score"]].assign(country_code=te["country_code"].astype(str)).to_parquet(a.dump_scores, index=False)
 
 def metrics(df, k):
     rows = []

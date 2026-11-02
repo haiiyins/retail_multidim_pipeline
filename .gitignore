@@ -6,6 +6,12 @@ data/gold/*
 data/quarantine/*
 data/audit/*
 data/duck_temp/*
+data/ml/*
+data/server_reports/*
+data/*.log
+data/*.pid
+data/*.json
+data/*.txt
 !data/**/.gitkeep
 !data/audit/csv_profile.md
 !data/audit/csv_fullscan.md
