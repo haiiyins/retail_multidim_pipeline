@@ -3,13 +3,16 @@
 Feature rule as evaluation/train_eval_lambdarank.py: every column except ids, labels and anchor-grid bookkeeping. Training and
 validation keep only groups with a positive in the list (no LambdaRank gradient otherwise); the objective is the unconditional
 NDCG@20 on valid (ml/eval/protocol.py), so anchors whose positives all lie outside the list still count as misses.
-Usage (tuning smoke, ML-07 DoD): python ml/rankers/gbdt.py --tune p1 --trials 3"""
-import argparse, os, sys
+P2 = the same GBDT with the rolling P2 signal features (ml/signals/run_leakage_study.add_signals) added to the pairs.
+Usage (tuning smoke, ML-07 DoD): python ml/rankers/gbdt.py --tune p1 --trials 3
+       python ml/rankers/gbdt.py --tune p1 --source v2 [--final --name p1_tuned_v2]      (P1-tuned on ml.candidates_v2)
+       python ml/rankers/gbdt.py --tune p2 --source v2 --signals [--final --name p2_v2]  (P2)"""
+import argparse, json, os, sys
 import lightgbm as lgb, numpy as np, pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from ml.common.data import connect, split_windows
-from ml.common.tuning import tune
+from ml.common.data import ML_DIR, connect, ml_path, split_windows
+from ml.common.tuning import N_TRIALS, tune
 from ml.eval.protocol import build_positives, evaluate
 
 ID = ["member_id", "anchor_date", "model_code", "country_code"]
@@ -44,8 +47,11 @@ def load(con, split, delta, relation="lh.gold.gld_ranking_dataset", positive_gro
     return df
 
 
+POINT_IN_TIME = ("fit_cutoff", "source_ts_max", "model_version")
+
+
 def features(df, drop=()):
-    return [c for c in df.columns if c not in NONFEAT and c not in drop] + ["country_code"]
+    return [c for c in df.columns if c not in NONFEAT and c not in drop and c not in POINT_IN_TIME] + ["country_code"]
 
 
 def groups(df):
@@ -73,27 +79,68 @@ def unconditional(con, scores, split, delta, metric="NDCG@20"):
     return float(res.groupby("member_id")[metric].mean().mean()), res
 
 
+def best_params(name):
+    t = pd.read_parquet(ml_path("tuning", f"{name}.parquet"))
+    t = t[(t["state"] == "COMPLETE") & (t["trial"] < N_TRIALS)]
+    return json.loads(t.loc[t["value"].idxmax(), "params"])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tune", default="p1")
     ap.add_argument("--trials", type=int, default=None)
     ap.add_argument("--delta", type=int, default=30)
+    ap.add_argument("--source", default="v1", help="v1 = gold.gld_ranking_dataset, v2 = pairs of ml.candidates_v2")
+    ap.add_argument("--signals", action="store_true", help="add the rolling P2 signal features (P2)")
+    ap.add_argument("--final", action="store_true", help="refit the best trial and write valid / test scores")
+    ap.add_argument("--name", default=None)
+    ap.add_argument("--skip-tune", action="store_true")
     a = ap.parse_args()
+    from ml.rankers.frozen import relation
     con = connect()
-    tr, va = load(con, "train", a.delta), load(con, "valid", a.delta)
+    rel = relation(a.source)
+    tr, va = load(con, "train", a.delta, rel), load(con, "valid", a.delta, rel)
+    if a.signals:
+        from ml.signals.run_leakage_study import add_signals, with_dept
+        tr, va = (add_signals(con, with_dept(con, d), "rolling").drop(columns=["dept"]) for d in (tr, va))
     feat = features(tr)
-    print(f"train {len(tr):,} rows · valid {len(va):,} rows · {len(feat)} features · {threads()} threads")
+    print(f"train {len(tr):,} rows · valid {len(va):,} rows · {len(feat)} features · {threads()} threads", flush=True)
+    tag = "" if a.source == "v1" else f"_{a.source}"
+    study_name = f"{a.tune}{tag}"
 
     def objective(params, trial):
         m = fit(params, tr, va, feat, a.delta)
         value, _ = unconditional(con, score(m, va, feat), "valid", a.delta)
         trial.set_user_attr("best_iteration", m.best_iteration)
-        print(f"  trial {trial.number}: NDCG@20 (valid, unconditional) {value:.4f}  rounds {m.best_iteration}  {params}")
+        print(f"  trial {trial.number}: NDCG@20 (valid, unconditional) {value:.4f}  rounds {m.best_iteration}  {params}", flush=True)
         return value
 
-    study, trials = tune(a.tune, objective, n_trials=a.trials, tag="" if a.trials is None else f"_smoke{a.trials}")
-    print(trials[["trial", "value", "state", "wall_sec"]].to_string(index=False))
-    print(f"best {study.best_value:.4f}  {study.best_params}")
+    if not a.skip_tune:
+        from ml.common.data import load_config
+        space = load_config("tuning")[a.tune]["space"]
+        study, trials = tune(study_name, objective, n_trials=a.trials, space=space,
+                             tag="" if a.trials is None else f"_smoke{a.trials}")
+        print(trials[["trial", "value", "state", "wall_sec"]].to_string(index=False))
+        print(f"best {study.best_value:.4f}  {study.best_params}", flush=True)
+    if a.final:
+        from ml.common.registry import Run
+        params = best_params(study_name)
+        name = a.name or f"{study_name}"
+        with Run(name, config={"source": a.source, "signals": a.signals}, params=params) as run:
+            m = fit(params, tr, va, feat, a.delta)
+            run.metrics["best_iteration"] = m.best_iteration
+            te = load(con, "test", a.delta, rel)
+            if a.signals:
+                te = add_signals(con, with_dept(con, te), "rolling").drop(columns=["dept"])
+            for split, df in (("valid", va), ("test", te)):
+                sc = score(m, df, feat).assign(country_code=df["country_code"].astype(str).to_numpy())
+                path = os.path.join(ML_DIR, "scores", f"{name}_{split}_d{a.delta}.parquet")
+                sc.to_parquet(path, index=False)
+                v, _ = unconditional(con, sc, split, a.delta)
+                run.metrics[f"{split}_ndcg20"] = v
+                print(f"  {split}: NDCG@20 {v:.4f} → {path}", flush=True)
+            imp = pd.DataFrame({"feature": feat, "gain": m.feature_importance("gain")}).sort_values("gain", ascending=False)
+            imp.to_csv(ml_path("report", f"importance_{name}.csv"), index=False)
 
 
 if __name__ == "__main__":

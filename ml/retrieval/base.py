@@ -188,10 +188,12 @@ def mask_scores(sc, q, explore_only=None):
     return sc
 
 
-def generate(src, params, con, splits, countries, events, cache=None):
-    """Yield one candidate DataFrame per country × cutoff. events(country) -> Events; cache keeps (Universe, prep) across calls."""
+def generate(src, params, con, splits, countries, events, cache=None, explore_only=None, full_dir=None):
+    """Yield one candidate DataFrame per country × cutoff. events(country) -> Events; cache keeps (Universe, prep) across calls.
+    full_dir: also write the unmasked top-FULL_K list of the valid / test anchors there (the full-catalogue NBR baseline of t31)."""
     n_out, chunk = CFG["n_out"], CFG["chunk"]
-    version = f"{src.name}-v{src.version}{'x' if CFG['explore_only'] else ''}-{config_hash(params)}"
+    explore_only = CFG["explore_only"] if explore_only is None else explore_only
+    version = f"{src.name}-v{src.version}{'x' if explore_only else ''}-{config_hash(params)}"
     anchors = load_anchors(con, splits, countries)
     for country, a_c in anchors.groupby("country_code", sort=True):
         ev = events(country)
@@ -209,10 +211,16 @@ def generate(src, params, con, splits, countries, events, cache=None):
             day = ((a["anchor_date"].dt.normalize() - pd.Timestamp(EPOCH)).dt.days).to_numpy()
             k = min(n_out + 50, uni.size)   # slack for the anchor_model_grid filter
             rows, items, vals, ts = [], [], [], []
+            full = []
+            eval_rows = np.isin(a["split"].to_numpy(), ("valid", "test"))
             for s in range(0, len(a), chunk):
                 q = Query(ev, uni, m[s:s + chunk], day[s:s + chunk])
                 with torch.no_grad():
-                    sc = mask_scores(src.scores(model, q), q)
+                    sc = src.scores(model, q)
+                    if full_dir is not None and eval_rows[s:s + chunk].any():
+                        fv, fix = torch.topk(mask_scores(sc.clone(), q, explore_only=False), min(FULL_K, uni.size), dim=1)
+                        full.append((s, fv.float().cpu().numpy(), fix.cpu().numpy()))
+                    sc = mask_scores(sc, q, explore_only)
                     v, ix = torch.topk(sc, k, dim=1)
                 v, ix = v.float().cpu().numpy(), ix.cpu().numpy()
                 ok = np.isfinite(v)
@@ -227,7 +235,27 @@ def generate(src, params, con, splits, countries, events, cache=None):
                                  "model_code": ev.items[np.concatenate(items)], "score": np.concatenate(vals),
                                  "fit_cutoff": cutoff, "source_ts_max": pd.to_datetime(np.concatenate(ts), unit="us"),
                                  "model_version": version})
+            if full:
+                write_full(full, a, ev, uni, country, cutoff, version, eval_rows, full_dir)
             yield country, cutoff, grid_filter(con, part, n_out)
+
+
+FULL_K = 100
+
+
+def write_full(full, a, ev, uni, country, cutoff, version, eval_rows, full_dir):
+    parts = []
+    for s, v, ix in full:
+        ok = np.isfinite(v)
+        r = np.broadcast_to(np.arange(len(v))[:, None], v.shape)[ok] + s
+        keep = eval_rows[r]
+        parts.append(pd.DataFrame({"member_id": a["member_id"].to_numpy()[r[keep]], "country_code": country,
+                                   "anchor_date": a["anchor_date"].to_numpy()[r[keep]], "split": a["split"].to_numpy()[r[keep]],
+                                   "model_code": ev.items[uni.items[ix[ok][keep]]], "score": v[ok][keep]}))
+    out = pd.concat(parts, ignore_index=True)
+    out["fit_cutoff"], out["model_version"] = pd.Timestamp(cutoff).date(), version.replace("x-", "-")
+    os.makedirs(full_dir, exist_ok=True)
+    out.to_parquet(os.path.join(full_dir, f"{country}_{pd.Timestamp(cutoff).date()}.parquet"), index=False)
 
 
 def grid_filter(con, part, n_out):
@@ -355,7 +383,9 @@ def main(src):
                 os.remove(p)
         with Run(f"cand:{out_name}", config={"retrieval": CFG, "source": src.name, "version": src.version, "seed": a.seed,
                                              "splits": splits}, params=params) as run:
-            for country, cutoff, part in generate(src, params, con, splits, countries, events):
+            full_dir = (os.path.dirname(ml_path("candidates", f"{out_name}_full", "_")) if src.name in CFG.get("full_catalogue", ())
+                        else None)
+            for country, cutoff, part in generate(src, params, con, splits, countries, events, full_dir=full_dir):
                 path = os.path.join(out_dir, f"{country}_{cutoff.date()}.parquet")
                 part.to_parquet(path, index=False)
                 print(f"  {country} cutoff {cutoff.date()}: {part[['member_id', 'anchor_date']].drop_duplicates().shape[0]:,} anchors, "

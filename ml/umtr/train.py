@@ -87,9 +87,13 @@ def fit(tr, va, params, variant, con, codes, seed=0, log=""):
     return model, best, best_ep
 
 
-def tuned_params():
+def study(source):
+    return "p3" if source == "v2" else f"p3_{source}"
+
+
+def tuned_params(source):
     p = dict(C["params"])
-    path = ml_path("tuning", "p3.parquet")
+    path = ml_path("tuning", f"{study(source)}.parquet")
     if os.path.exists(path):
         t = pd.read_parquet(path)
         t = t[(t["state"] == "COMPLETE") & (t["trial"] < N_TRIALS)]
@@ -118,18 +122,19 @@ def main():
             trial.set_user_attr("best_epoch", ep)
             print(f"  trial {trial.number}: NDCG@20 (valid, unconditional) {v:.4f}  epoch {ep}  {params}", flush=True)
             return v
-        study, trials = tune("p3", objective, n_trials=a.trials, tag="" if a.trials is None else f"_smoke{a.trials}")
-        print(f"best {study.best_value:.4f}  {study.best_params}")
+        st, _ = tune(study(a.source), objective, n_trials=a.trials, space=load_config("tuning")["p3"]["space"],
+                     tag="" if a.trials is None else f"_smoke{a.trials}")
+        print(f"best {st.best_value:.4f}  {st.best_params}", flush=True)
     if a.final:
         te = get(a.source, "test")
-        params = tuned_params()
+        params = tuned_params(a.source)
         for variant in a.variants.split(","):
-            with Run(f"p3:{variant}", config={"umtr": C, "variant": variant, "source": a.source, "seed": a.seed}, params=params) as run:
+            with Run(f"p3:{a.source}:{variant}", config={"umtr": C, "variant": variant, "source": a.source, "seed": a.seed}, params=params) as run:
                 t0 = time.time()
                 model, v, ep = fit(tr, va, params, variant, con, codes, seed=a.seed, log=variant)
                 run.metrics.update({"valid_ndcg20": v, "best_epoch": ep, "train_sec": time.time() - t0,
                                     "params": int(sum(p.numel() for p in model.parameters()))})
-                tag = variant if a.seed == 0 else f"{variant}_seed{a.seed}"
+                tag = (variant if a.source == "v2" else f"{a.source}_{variant}") + ("" if a.seed == 0 else f"_seed{a.seed}")
                 for split, d in (("valid", va), ("test", te)):
                     t1 = time.time()
                     sc = score(model, d, codes)

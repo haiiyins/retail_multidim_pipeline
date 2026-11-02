@@ -2,6 +2,7 @@
 # (ml/common/pit.py) and scores the universe below; `params` are the defaults, replaced by the tuned ones when
 # data/ml/tuning/<source>.parquet exists. Tuning objective of a source: the unconditional explore coverage it adds to R1–R5@200
 # on valid, Δ = 30 (cand_explore of the union minus R1–R5 alone).
+full_catalogue: [sasrec]   # build also writes the unmasked top-100 of valid / test anchors: the SASRec NBR baseline of t31
 explore_only: true    # mask the models the member bought before the anchor out of every learned source (R1 covers repeats)
 universe:
   size: 5000          # top models by buyers in the window before the cutoff (t28b: 97 % of positives rank inside the top 5 000)

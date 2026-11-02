@@ -2,13 +2,15 @@
 # NDCG@20 on valid. timeout_sec only cuts a study short and is reported; it never changes the trial budget of another model.
 n_trials: 10          # every model (plan: 30; cut on 2026-11-02 for the 30-hour end-to-end run, ml/DECISIONS.md)
 p1:
-  space:
+  space: &gbdt
     num_leaves:        {type: int, low: 15, high: 255, log: true}
     learning_rate:     {type: float, low: 0.02, high: 0.2, log: true}
     min_child_samples: {type: int, low: 20, high: 500, log: true}
     feature_fraction:  {type: float, low: 0.5, high: 1.0}
     bagging_fraction:  {type: float, low: 0.5, high: 1.0}
     lambda_l2:         {type: float, low: 0.001, high: 10.0, log: true}
+p2:                   # P1 features + the rolling P2 signals (ml/signals/), same space and budget
+  space: *gbdt
 # Candidate sources (ease, tifuknn, sasrec, two_tower as R6 / R8 / R10 / R9) are explore-only and tuned on the explore coverage they
 # add to R1–R5@200 on valid (ml/retrieval/base.py); their baseline rows of t31 score repeats too and get their own budget on NDCG@20.
 ease:
