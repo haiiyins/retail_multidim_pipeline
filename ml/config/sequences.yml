@@ -1,0 +1,6 @@
+# ml/common/sequences.py — behaviour sequences at each anchor, newest last, strictly before the anchor date.
+max_len: 50
+web_window_days: 180          # web events are only kept from 2024-07-01; older anchors get an empty web sequence
+# product_list_viewed (≈ 75 % of the events with a model) is an impression, not an intent on one model: it would fill the
+# 50 slots, so only events about one model are kept
+web_events: [product_page_viewed, product_size_selected, product_added_to_cart, cart_viewed, checkout_commenced, order_completed]
