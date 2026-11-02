@@ -40,11 +40,37 @@ def load_config(name):
     return yaml.safe_load(open(ROOT / "ml" / "config" / f"{name}.yml"))
 
 
-def publish_view(name, parquet_path):
-    """CREATE OR REPLACE VIEW ml.<name> over a Parquet file or glob (absolute path, like the bronze views)."""
-    con = duckdb.connect(os.environ["DUCKDB_PATH"])
+def publish_view(name, parquet_path, strict=False):
+    """CREATE OR REPLACE VIEW ml.<name> over a Parquet file or glob (absolute path, like the bronze views).
+    Another process reading the lakehouse blocks the write lock: then the view is skipped (strict=False) and `make ml-views`
+    publishes every ml output later."""
+    try:
+        con = duckdb.connect(os.environ["DUCKDB_PATH"])
+    except duckdb.IOException as e:
+        if strict:
+            raise
+        print(f"lakehouse busy, view ml.{name} not published (run `make ml-views` later): {str(e).splitlines()[0]}")
+        return False
     try:
         con.execute("CREATE SCHEMA IF NOT EXISTS ml")
         con.execute(f"CREATE OR REPLACE VIEW ml.{name} AS SELECT * FROM read_parquet('{os.path.abspath(parquet_path)}')")
     finally:
         con.close()
+    return True
+
+
+def publish_all():
+    """Views for every ml output on disk: features/<name>.parquet → ml.<name>, candidates/<source>/ → ml.cand_<source>."""
+    import glob
+    for p in sorted(glob.glob(os.path.join(ML_DIR, "features", "*.parquet"))):
+        name = os.path.basename(p)[:-len(".parquet")]
+        publish_view(name, p, strict=True)
+        print(f"ml.{name}")
+    for d in sorted(glob.glob(os.path.join(ML_DIR, "candidates", "*", ""))):
+        name = os.path.basename(d.rstrip("/"))
+        publish_view(f"cand_{name}", os.path.join(d, "*.parquet"), strict=True)
+        print(f"ml.cand_{name}")
+
+
+if __name__ == "__main__":
+    publish_all()

@@ -1,0 +1,20 @@
+# Learned candidate sources R6–R10 (ml/retrieval/, plan §5.1). Each source is fitted per country at every rolling cutoff
+# (ml/common/pit.py) and scores the universe below; `params` are the defaults, replaced by the tuned ones when
+# data/ml/tuning/<source>.parquet exists. Tuning objective of a source: unconditional Recall@100 on valid, Δ = 30.
+universe:
+  size: 5000          # top models by buyers in the window before the cutoff (t28b: 97 % of positives rank inside the top 5 000)
+  window_days: 365
+n_out: 100            # candidates kept per anchor and source, after the anchor_model_grid filter
+delta: 30
+chunk: 8192           # anchors scored per GPU batch
+ease:
+  fit_window_days: 730
+  params: {l2: 500.0}
+tifuknn:
+  group_size: 7       # baskets per group (Hu et al., SIGIR 2020)
+  pool_size: 300000   # neighbour pool: members active in the pool window before the cutoff, sampled with seed 0
+  pool_active_days: 365
+  params: {k: 300, r_b: 0.9, r_g: 0.7, alpha: 0.7}
+item2vec:
+  params: {d: 64, window: 10, negative: 10, epochs: 5, min_count: 5, half_life_days: 90}
+  workers: 20         # per process; `make ml-retrieval` builds the three countries in parallel

@@ -8,9 +8,11 @@ p1:
     feature_fraction:  {type: float, low: 0.5, high: 1.0}
     bagging_fraction:  {type: float, low: 0.5, high: 1.0}
     lambda_l2:         {type: float, low: 0.001, high: 10.0, log: true}
+# Candidate sources (ease, tifuknn as R6 / R8) are tuned on unconditional Recall@100 on valid (ml/retrieval/base.py); the same
+# parameters serve their baseline rows of t31.
 ease:
   space:
-    l2: {type: float, low: 1.0, high: 10000.0, log: true}
+    l2: {type: float, low: 10.0, high: 100000.0, log: true}
 tifuknn:
   space:
     k:     {type: int, low: 50, high: 1000, log: true}
