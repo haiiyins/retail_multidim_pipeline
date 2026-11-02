@@ -60,6 +60,20 @@ Read as answers rather than a leaderboard:
 
 Selected on valid (P3 one head 0.1049, P3 two heads 0.1037, P2 0.1034, P1-tuned 0.1033), the order is the same as on test.
 
+*Seed variance (t31_seeds).* The final fits of P1-tuned, P3 two heads and P3 one head were repeated with seeds 1 and 2 (same
+hyper-parameters; LightGBM bagging / feature sampling and the network initialisation and batch order change). Test, TH + VN:
+
+| Model | NDCG@20, seeds 0 / 1 / 2 | mean ± sd | recall_repeat@20 mean ± sd |
+|---|---|---|---|
+| P1-tuned | 0.1011 / 0.1013 / 0.1016 | 0.1013 ± 0.0002 | 0.809 ± 0.007 |
+| P3 two heads | 0.1009 / 0.1005 / 0.1011 | 0.1008 ± 0.0003 | 0.824 ± 0.030 |
+| P3 one head | 0.1020 / 0.1022 / 0.1022 | 0.1022 ± 0.0001 | 0.831 ± 0.008 |
+
+The seed spread (≤ 0.0003) is below the gap between P3 one head and P1-tuned, and the seed-matched paired differences are
++0.0009, +0.0010 and +0.0006 (the last with a lower bound of −0.0000; t31_seeds_paired). One head beats two heads at every seed
+(+0.0011, +0.0018, +0.0011). The two-head model is the least stable: its repeat recall moves from 0.79 to 0.85 across seeds, i.e.
+the learned gate lands in different places from one run to the next.
+
 ## B. By country and segment (t34)
 
 NDCG@20 on test (segments by transactions in the 365 days before the anchor: new ≤ 1, mid 2, loyal ≥ 3; all countries):
