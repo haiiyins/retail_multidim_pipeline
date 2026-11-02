@@ -109,3 +109,10 @@ def test_trend_reads_only_before_the_anchor():
     sa, sb = (Trend().scores(Trend().fit(Trend().prepare(e, uni, dt.date(2024, 1, 20)), params, e, uni, None), Query(e, uni, m, day))
               for e in (a, b))
     assert torch.allclose(sa, sb) and torch.isfinite(sa).all()
+
+
+def test_repeat_counts():
+    from ml.retrieval.mixer import repeat_counts
+    ev = toy_events()   # member 0: items 0, 1, 2 on days 10, 12, 15; member 1: item 3 on day -400, item 0 on days 3 and 11
+    n, rep = repeat_counts(ev, np.array([0, 1, 1, -1]), np.array([D0 + 20, D0 + 11, D0 + 12, D0 + 20]))
+    assert n.tolist() == [3, 2, 3, 0] and rep.tolist() == [0, 0, 1, 0]

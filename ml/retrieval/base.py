@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from ml.common.data import connect, load_config, ml_path, publish_view
 from ml.common.pit import assert_pit, cutoff_for
 from ml.common.registry import Run, config_hash
-from ml.common.tuning import tune
+from ml.common.tuning import N_TRIALS, tune
 from ml.eval.protocol import MAIN_COUNTRIES, build_positives, evaluate
 
 CFG = load_config("retrieval")
@@ -295,7 +295,7 @@ def tuned_params(name):
     path = ml_path("tuning", f"{name}.parquet")
     if os.path.exists(path):
         t = pd.read_parquet(path)
-        t = t[t["state"] == "COMPLETE"]
+        t = t[(t["state"] == "COMPLETE") & (t["trial"] < N_TRIALS)]   # TPE seed 0: the first N trials are an N-trial study
         if len(t):
             defaults.update(json.loads(t.loc[t["value"].idxmax(), "params"]))
     return defaults

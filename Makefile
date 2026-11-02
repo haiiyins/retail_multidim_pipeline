@@ -53,6 +53,5 @@ ml-retrieval:
 	$(NOFILE); for s in ease tifuknn rp3beta explin trend; do python ml/retrieval/$$s.py --tune --build || exit 1; done
 	$(NOFILE); for c in SG TH VN; do python ml/retrieval/item2vec.py --build --countries $$c & done; wait
 	$(NOFILE); python ml/retrieval/sasrec.py --tune --build & python ml/retrieval/two_tower.py --tune --build; wait
-	$(NOFILE); for s in 1 2; do python ml/retrieval/two_tower.py --build --seed $$s --splits test; done
 	$(NOFILE); python ml/retrieval/report.py && python ml/common/data.py
 all: bronze gates silver gold train ablation

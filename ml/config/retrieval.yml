@@ -45,3 +45,10 @@ rp3beta:
   params: {alpha: 0.8, beta: 0.4}
 trend:
   params: {window_days: 14, w_dept: 1.0, w_price: 0.5}
+mixer:                    # ml/retrieval/mixer.py (ML-13)
+  learned: [ease, item2vec, tifuknn, two_tower, sasrec, explin, rp3beta, trend]
+  k: 300                  # cap of ml.candidates_v2 for the rankers, read off the t30 curve
+  k_max: 500
+  curve_k: [100, 200, 300, 500]
+  rho_prior: 20           # pseudo-rows of the country mean in the member's repeat share
+  rho_clip: [0.2, 5.0]
