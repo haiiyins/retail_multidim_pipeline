@@ -1,0 +1,14 @@
+# On top of ../requirements.txt. torch comes from the PyTorch index matching the CUDA driver, e.g.
+#   uv pip install torch --index-url https://download.pytorch.org/whl/cu130
+optuna
+gensim
+hnswlib
+shap
+captum
+onnx
+onnxruntime
+pytest
+tabulate
+fastapi
+uvicorn
+huggingface_hub
