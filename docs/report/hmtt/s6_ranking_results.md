@@ -34,6 +34,8 @@ Test, TH + VN, 41 734 anchors, Δ = 30, unconditional; 95 % member-bootstrap int
 | P3 two heads | 0.1009 | [0.0988, 0.1029] | 0.237 | 0.845 | 0.089 | 0.450 |
 | **P3 one head** | **0.1020** | [0.0999, 0.1040] | 0.240 | 0.838 | 0.090 | 0.450 |
 
+![NDCG@20 of every model](../../figures/ml/fig_t31_ndcg.png)
+
 Paired member bootstrap (t31_paired), NDCG@20 difference [95 % CI]:
 
 | a − b | NDCG@20 | recall_explore@20 |
@@ -69,6 +71,8 @@ hyper-parameters; LightGBM bagging / feature sampling and the network initialisa
 | P3 two heads | 0.1009 / 0.1005 / 0.1011 | 0.1008 ± 0.0003 | 0.824 ± 0.030 |
 | P3 one head | 0.1020 / 0.1022 / 0.1022 | 0.1022 ± 0.0001 | 0.831 ± 0.008 |
 
+![Seed variance](../../figures/ml/fig_t31_seeds.png)
+
 The seed spread (≤ 0.0003) is below the gap between P3 one head and P1-tuned, and the seed-matched paired differences are
 +0.0009, +0.0010 and +0.0006 (the last with a lower bound of −0.0000; t31_seeds_paired). One head beats two heads at every seed
 (+0.0011, +0.0018, +0.0011). The two-head model is the least stable: its repeat recall moves from 0.79 to 0.85 across seeds, i.e.
@@ -98,6 +102,8 @@ reported: 2 – 19 % of the anchors have web events (KTXLDL t09) and the web fea
 | one head | +0.0011 [+0.0007, +0.0016] | +0.0025 | −0.0073 | +0.0016 |
 | fixed gate (g = member's repeat share) | −0.0066 [−0.0074, −0.0058] | −0.0105 | −0.2753 | +0.0159 |
 | no sequence (member context only) | −0.0003 [−0.0007, +0.0000] | +0.0001 | −0.0240 | +0.0020 |
+
+![P3 ablation](../../figures/ml/fig_t32_ablation.png)
 
 The explicit split does **not** improve explore: the single head is better on NDCG@20 *and* on explore recall, at a small cost in
 repeat recall. The gate is the part that matters — replacing the learned g by the member's historical repeat share loses 0.0066

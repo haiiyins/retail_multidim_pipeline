@@ -39,7 +39,9 @@ the pairs of the KTXLDL build, while K = 500 adds +0.085 for about 1.6× the pai
 | **candidates_v2: mixer, K = 300** | 300 | **0.450** | 0.972 | **0.400** |
 | mixer, K = 500 | 470 | 0.535 | 0.994 | 0.492 |
 
-Coverage rises from 0.370 to 0.450 at K = 300, meeting the plan's target (≥ 0.45); explore coverage rises × 1.30, short of the × 2
+![Coverage against K](../../figures/ml/fig_t30_curve.png)
+
+The fixed and per-member mixers overlap at every K. Coverage rises from 0.370 to 0.450 at K = 300, meeting the plan's target (≥ 0.45); explore coverage rises × 1.30, short of the × 2
 target. The cap costs 2.5 points of repeat coverage: R1 lists beyond rank ~60 lose their slots to explore candidates. The sources are
 complementary — the union of all eight adds 0.17 over R1–R5 while the best single source adds 0.07 — and the neural sources do not
 beat the cheap ones: SASRec ties with EASE, two-tower is below, and RP3beta, the best single source, trains in minutes against about
