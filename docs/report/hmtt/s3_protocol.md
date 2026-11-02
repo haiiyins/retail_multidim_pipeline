@@ -46,6 +46,8 @@ Each of the 213 289 test positives is put in one cell: ranked in the top 10, ran
 | explore | 195 038 | 0.028 | 0.227 | 0.111 | 0.634 |
 | all | 213 289 | 0.082 | 0.236 | 0.103 | 0.580 |
 
+![Where the test positives of P1-frozen end up](../../figures/ml/fig_t28b_errors.png)
+
 Repeat is largely solved; explore is 91 % of the positives and 74.5 % of it never reaches the ranker. 95 % of the capped positives come
 from R5 (national top 300), whose lower ranks do not fit the cap. The positives without a source are mid-tail, not long-tail: 95 %
 have a popularity rank between 301 and 5 000 at the anchor, so a learned source over a per-country universe of the top 5 000 models

@@ -71,3 +71,15 @@ identifiers:
 | `dbeaver_leakage_ledger.png` | `SELECT * FROM quarantine.leakage_violations;` (expected: no rows) and `SELECT * FROM audit.stitching_coverage ORDER BY 1, 2;` | QC-6 ledger empty; stitching coverage before / after per country |
 
 Captions are in English for the report; the data screenshots show the three-country server build.
+
+### ML results (HMTT report and slides)
+
+`ml/analysis/figures.py` renders these PNGs (160 DPI) from the ML report tables; regenerate with `make ml-figures`.
+
+| file | caption | source table |
+|---|---|---|
+| `ml/fig_t28b_errors.png` | where the test positives of P1-frozen end up (top 10 / rank 11+ / cut by the cap / no source), repeat vs explore | t28b |
+| `ml/fig_t30_curve.png` | candidate coverage against K, all and explore positives, R1–R5 vs the mixers (test, TH + VN) | t30_curve |
+| `ml/fig_t31_ndcg.png` | NDCG@20 with 95 % member-bootstrap intervals of every compared model | t31 |
+| `ml/fig_t31_seeds.png` | NDCG@20 of seeds 0 / 1 / 2 of P1-tuned and P3 | t31_seeds |
+| `ml/fig_t32_ablation.png` | paired differences of the P3 variants against P3 two heads | t32_paired |
