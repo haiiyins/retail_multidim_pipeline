@@ -37,7 +37,7 @@ def main():
         os.remove(os.path.join(out_dir, f))
     for split, country in con.execute(f"SELECT DISTINCT split, country_code FROM read_parquet('{mix}') ORDER BY ALL").fetchall():
         con.execute(f"""COPY (
-            SELECT m.country_code, m.split, m.in_train_sample, m.member_id, m.anchor_date, m.model_code,
+            SELECT m.country_code, m.split, m.in_train_sample, m.member_id, CAST(m.anchor_date AS DATE) AS anchor_date, m.model_code,
                    COALESCE(g.r1, 0) AS r1, COALESCE(g.r2, 0) AS r2, COALESCE(g.r3, 0) AS r3, 0 AS r4, COALESCE(g.r5, 0) AS r5,
                    g.score_r1, g.score_r2, g.score_r3, CAST(NULL AS DOUBLE) AS score_r4, g.score_r5,
                    CASE WHEN g.r1 = 1 THEN 1 WHEN g.r3 = 1 THEN 2 WHEN g.r2 = 1 THEN 3 WHEN g.r5 = 1 THEN 5 ELSE 6 END AS priority_source,

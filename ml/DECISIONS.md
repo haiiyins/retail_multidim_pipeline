@@ -141,3 +141,51 @@ splits the probability mass: g for the repeat group, 1 − g for the explore gro
 of the member's positives. Auxiliary Δ90 BCE head. The loss is listwise (mean −log p over the positives). Early stopping uses
 unconditional valid NDCG@20. The department-hazard auxiliary head of the plan is dropped (its λ left the tuning space), because
 P2's hazard covers that signal. Ablation (t32): one head, fixed gate (g = the member's repeat share), no sequence (context only).
+
+## 2026-11-02 · Learned sources R6–R13, mixer and candidates_v2 (ML-11..14, t30a, t30)
+
+Best valid Δ cand_explore over R1–R5@200 (10 trials): two-tower +0.0742 (d 256, τ 0.096), SASRec +0.0848 (d 256, one block).
+Test, TH + VN, unconditional (Δ = 30):
+
+| test, TH + VN | list | cand | cand_repeat | cand_explore |
+|---|---|---|---|---|
+| R1–R5 (200) | 200 | 0.370 | 0.997 | 0.307 |
+| R1–R5 ∪ R12 RP3beta (best single addition) | 277 | 0.439 | 0.997 | 0.386 |
+| R1–R5 ∪ R6 EASE / R10 SASRec / R7 item2vec | 260–282 | 0.430–0.435 | 0.997 | 0.375–0.381 |
+| R1–R5 ∪ every learned source (uncapped) | 483 | 0.541 | 0.997 | 0.499 |
+| **candidates_v2 = mixer, fixed quotas, K = 300** | 300 | **0.450** | 0.972 | **0.400** |
+| mixer at K = 500 | 470 | 0.535 | 0.994 | 0.492 |
+
+- Neural sources do not beat the cheap ones: SASRec ≈ EASE, two-tower below. RP3beta is the best single source and trains in
+  minutes, while the neural sources need about 3 GPU-hours to tune and 3 more to build (t37).
+- Mixer: weighted rank quotas, key = min over sources of (rank − 0.5) / w_s, where w is a source's stand-alone valid Recall@100.
+  The per-member policy scales w_r1 by the member's repeat share. It ties with fixed (valid MAIN cand@300 0.4841 against
+  0.4847), so fixed is used.
+- The coverage target of §5.2 (≥ 0.45 on TH + VN) is met at the cap (0.450). Explore coverage rises × 1.30 (0.307 → 0.400), below
+  the × 2 target. The cap costs 2.5 points of repeat coverage (0.997 → 0.972): R1 lists past rank ~60 lose their slots to
+  explore candidates. K = 500 would keep 0.994 for +0.085 coverage, but 1.7× the pairs.
+- QC-6 on candidates_v2: 0 rows with source_ts_max ≥ anchor or fit_cutoff > anchor; at most 300 rows per anchor.
+
+## 2026-11-02 · Ranking results on candidates_v2 (ML-19..26, t31, t32, t29b v2)
+
+Test, TH + VN, unconditional NDCG@20 [95 % member bootstrap]; selection on valid with 10 trials, one seed.
+
+| model | valid | test | test 95 % CI |
+|---|---|---|---|
+| TIFU-KNN NBR (best baseline) | — | 0.0788 | [0.0770, 0.0806] |
+| P1-frozen v1 → v2 | — | 0.0947 → 0.0973 | |
+| P1-tuned v2 | 0.1033 | 0.1011 | [0.0990, 0.1033] |
+| P2 v2 (+ rolling hazard / WTP) | 0.1034 | 0.1013 | [0.0994, 0.1034] |
+| P3 two heads + learned gate | 0.1037 | 0.1009 | [0.0988, 0.1029] |
+| P3 one head | 0.1049 | 0.1020 | [0.0999, 0.1040] |
+
+- RQ1 (paired, t31_paired): retrieval under the frozen ranker +0.0025 [0.0018, 0.0032]; tuning the GBDT on the same pairs adds
+  +0.0039 [0.0032, 0.0045]. The learned source ranks are the second SHAP group of P1-tuned (17 %, t35a).
+- RQ2: P3 one head − P1-tuned +0.0009 [0.0002, 0.0016]; P3 two heads − P1-tuned −0.0002 [−0.0009, 0.0005]; P2 − P1-tuned +0.0002
+  [−0.0002, 0.0006]. The order holds in every country and segment (t31_segments = t34 of the plan).
+- RQ3 (t32_paired, vs two heads): one head +0.0011 [0.0007, 0.0016] with more explore recall (+0.0016); fixed gate −0.0066 and
+  −0.275 repeat recall; no sequence −0.0003 and −0.024 repeat recall. The learned gate matters, the explicit split does not. The gate
+  ranks segments right but is about 2× the observed repeat share (t35c).
+- H2 (t29b v2): naive − rolling +0.0026 on train anchors, +0.0029 on the pseudo-test, −0.0004 on test; leaky +0.0011 on test.
+- RQ4 (t38, best on valid = P3 one head): HR@10 × 1.76 popular, × 1.54 buy-again; on explore positives 0.110 vs popular 0.115.
+- `business.py` is run with `--best p3_onehead`; `explain.py` keeps `--p3 p3_full` because the gate exists only with two heads.

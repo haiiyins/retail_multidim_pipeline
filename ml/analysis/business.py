@@ -25,7 +25,7 @@ def positives_gmv(con):
                   AND NOT EXISTS (SELECT 1 FROM lh.silver.slv_fact_returns r WHERE r.transaction_id = f.transaction_id AND r.model_code = f.model_code)),
         first_buy AS (SELECT member_id, model_code, MIN(transaction_date) AS first_d FROM buy GROUP BY ALL)
         SELECT a.member_id, a.country_code, CAST(a.anchor_date AS DATE) AS anchor_date, b.model_code, SUM(b.gmv_eur) AS gmv,
-               ANY_VALUE(fb.first_d) <= a.anchor_date AS is_repeat
+               ANY_VALUE(fb.first_d <= a.anchor_date) AS is_repeat
         FROM a JOIN buy b ON b.member_id = a.member_id AND b.transaction_date > a.anchor_date AND b.transaction_date <= a.anchor_date + {DELTA}
         JOIN first_buy fb ON fb.member_id = b.member_id AND fb.model_code = b.model_code
         GROUP BY 1, 2, 3, 4""").df()

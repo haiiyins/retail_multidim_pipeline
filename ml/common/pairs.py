@@ -40,7 +40,8 @@ def ranking_sql(candidates):
 
 
 def build(con, split, country, cand_glob):
-    cand = f"(SELECT * FROM read_parquet('{cand_glob}') WHERE country_code = '{country}')"
+    cand = (f"(SELECT * REPLACE (CAST(anchor_date AS DATE) AS anchor_date) FROM read_parquet('{cand_glob}') "
+            f"WHERE country_code = '{country}')")
     out = ml_path("pairs_v2", f"{split}_{country}.parquet")
     t0 = time.time()
     con.execute(f"COPY ({ranking_sql(cand)}) TO '{out}' (FORMAT parquet)")
