@@ -1,6 +1,6 @@
 """Fair tuning harness (plan D5): every model with hyper-parameters gets the same Optuna budget on valid.
 
-Budget: N_TRIALS = 30 trials of TPE (seed 0) is the binding budget; an optional per-model timeout (tuning.yml) only stops a study
+Budget: N_TRIALS trials of TPE (seed 0, tuning.yml n_trials; the plan's 30, cut to 10 for every model on 2026-11-02) is the binding budget; an optional per-model timeout (tuning.yml) only stops a study
 early and is reported. Objective: unconditional NDCG@20 on valid (ml/eval/protocol.py), maximised. Search spaces are declared in
 ml/config/tuning.yml. Every trial is written to data/ml/tuning/<model>.parquet (model, trial, params, value, state, wall_sec) and the
 summary (best, median of completed trials) to the run registry."""
@@ -9,7 +9,7 @@ import numpy as np, optuna, pandas as pd
 from ml.common.data import load_config, ml_path
 from ml.common.registry import Run
 
-N_TRIALS = 30
+N_TRIALS = load_config("tuning").get("n_trials", 30)
 
 
 def suggest(trial, space):

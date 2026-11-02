@@ -75,3 +75,117 @@ and runs with the defaults of `ml/config/retrieval.yml`. Unconditional coverage 
 - Exact search on the GPU replaces FAISS: 5 000 models per country, a full matrix product is cheaper than an ANN index.
 - gensim 4.4 on aarch64 prints `Exception ignored in our_dot_float` a few times per fit with several workers (one dot product
   out of ~10⁹; a single worker never shows it); the vectors are finite with normal norms, so the warning is filtered from the logs.
+
+## 2026-11-02 · Explore-only learned sources, marginal explore objective (model review, ML-11/12)
+
+R1 already holds 99.7 % of the repeat positives, while 91 % of the positives are explore models and 74.5 % of them were outside the
+list. Before this change the learned sources spent most of their slots on repeats (EASE cand_repeat 0.59, TIFU-KNN 0.97).
+- Every learned source masks the models the member bought before the anchor (`retrieval.explore_only`, `base.mask_scores`).
+- A source is tuned on the explore coverage it adds to R1–R5@200 on valid (Δ cand_explore of the union), not on its own Recall@100.
+- Two-tower (R9): several reference days per member and epoch (4), month of t in the member tower, explore targets with a
+  softmax that masks the models already seen. SASRec (R10): one step per basket (mean of its models), gap embedding, dense all-action
+  explore loss (each step predicts every explore model of (t, t + Δ], PinnerFormer-style), 8 epochs. gSASRec is dropped.
+- New cheap sources: R11 explin (supervised windowed linear model, X = decayed history ≤ t, Y = explore purchases in (t, t + Δ],
+  closed form), R12 RP3beta, R13 context-aware trend (last-window popularity reweighted by the member's departments and price band).
+- Best valid Δ cand_explore, 10 trials: EASE +0.0853, TIFU-KNN +0.0569, RP3beta +0.0877, explin +0.0738, trend +0.0692
+  (two-tower, SASRec: see below).
+
+## 2026-11-02 · Reduced run: 10 trials per model, one seed, smaller scope
+
+The end-to-end run has to finish by 2026-11-03. Agreed with the user:
+- `tuning.yml n_trials: 10` for every model with hyper-parameters (D5 keeps its meaning: the same budget for all). TPE is seeded,
+  so the first 10 trials of a 30-trial study are a 10-trial study; already-finished sources were rebuilt with their best of 10
+  (best of 30 vs best of 10 differ by ≤ 0.001, except TIFU-KNN 0.0578 vs 0.0569).
+- One seed for the deep models (D6 asked for 3).
+- Dropped: gSASRec, P4, conformal intervals, drift monitoring; P3 ablation reduced to three rows (one head, fixed gate, no
+  sequence); demo v0 (CSV → top-K with reasons, no what-if, no parity check).
+
+## 2026-11-02 · Pairs of candidates_v2 (ML-17)
+
+`ml/common/pairs.py` renders the Gold dbt SQL of `gld_fs_pair` / `gld_ranking_dataset` (Jinja, `ref()` resolved to the attached
+lakehouse or to the new candidates) and writes Parquet, because the lakehouse is read-only while jobs read it. Parity on one VN anchor
+day against `gld_ranking_dataset`: same rows and columns; differences are float noise (~1e-9) and 40 `dept_buy_cnt` values that
+come from ties in Gold's ASOF join, which is not deterministic.
+
+## 2026-11-02 · P2 signals and H2 (ML-15/16, t29, t29b)
+
+- Temporal hazard: LightGBM binary over member × department rows (departments bought before t plus the country top 10 of the last
+  90 days; 4.37 M rows, 6 % positive). WTP: LightGBM quantile regression of the log unit price paid in (t, t + Δ] (α 0.5 on the
+  median line, α 0.9 on the maximum). Fixed hyper-parameters (300 rounds): they are features of a ranker, not compared models.
+  item2vec enters P2 through the rolling R7 rank of the pairs, not as a separate model.
+- Each signal is fitted three ways (D7): rolling (quarterly cutoffs, the only point-in-time-correct variant; QC: 0 violations),
+  naive (fitted once on train and applied in-sample) and leaky (fitted on every split). Fits use at most 120 000 anchors.
+- t29, hazard AUC on train / pseudo-test (last train quarter) / test: rolling 0.681 / 0.703 / 0.708, naive 0.725 / 0.744 / 0.705,
+  leaky 0.710 / 0.717 / 0.723. Naive looks better in-sample and is no better on test; leaky stays better on test, where it has seen
+  the labels.
+- t29b (v1 pairs, P1-frozen hyper-parameters, fused on train anchors ≤ 2025-05-31; unconditional NDCG@20, TH + VN): the naive
+  fusion is +0.0019 over rolling on its training anchors, +0.0005 on the pseudo-test and −0.0011 on test. This is H2's direction,
+  but every gap lies inside the member-bootstrap intervals (± 0.002 on test). The signals add little to the pairs (rolling
+  +0.0004 over no signals on test), because Gold already has department recency/cycle and price-gap features.
+
+## 2026-11-02 · Baselines of t31 (ML-18..21)
+
+- P-TopFreq (the member's own purchase counts) and GP-TopFreq (then country popularity) score the full catalogue.
+- EASE and TIFU-KNN as NBR rankers: the same rolling models, without the explore-only mask, with their own 10-trial budget on
+  valid NDCG@20 (`ml/baselines/nbr.py`). SASRec: the R10 build also writes the unmasked top 100 of the valid and test anchors
+  (`retrieval.full_catalogue`), with the R10 parameters (no separate NDCG@20 budget, a stated limitation).
+- P1-frozen is refitted on the v2 pairs with its original feature set (`ml/rankers/frozen.py`) and stays a reference row.
+  P1-tuned and P2 get 10 trials on v2 with every pair column, source ranks included, as does P3.
+
+## 2026-11-02 · P3 UMTR design (ML-22..24)
+
+User tower: a Transformer over the last 50 purchases (shared model embedding plus a log-gap embedding) and an MLP over the member
+context. Item tower: model and department embeddings plus an MLP over the candidate's pair features. DIN-style target attention of
+each candidate over the sequence states. Two heads, repeat and explore, each with a softmax inside its group. A learned gate g(u)
+splits the probability mass: g for the repeat group, 1 − g for the explore group. The gate is trained with BCE on the repeat share
+of the member's positives. Auxiliary Δ90 BCE head. The loss is listwise (mean −log p over the positives). Early stopping uses
+unconditional valid NDCG@20. The department-hazard auxiliary head of the plan is dropped (its λ left the tuning space), because
+P2's hazard covers that signal. Ablation (t32): one head, fixed gate (g = the member's repeat share), no sequence (context only).
+
+## 2026-11-02 · Learned sources R6–R13, mixer and candidates_v2 (ML-11..14, t30a, t30)
+
+Best valid Δ cand_explore over R1–R5@200 (10 trials): two-tower +0.0742 (d 256, τ 0.096), SASRec +0.0848 (d 256, one block).
+Test, TH + VN, unconditional (Δ = 30):
+
+| test, TH + VN | list | cand | cand_repeat | cand_explore |
+|---|---|---|---|---|
+| R1–R5 (200) | 200 | 0.370 | 0.997 | 0.307 |
+| R1–R5 ∪ R12 RP3beta (best single addition) | 277 | 0.439 | 0.997 | 0.386 |
+| R1–R5 ∪ R6 EASE / R10 SASRec / R7 item2vec | 260–282 | 0.430–0.435 | 0.997 | 0.375–0.381 |
+| R1–R5 ∪ every learned source (uncapped) | 483 | 0.541 | 0.997 | 0.499 |
+| **candidates_v2 = mixer, fixed quotas, K = 300** | 300 | **0.450** | 0.972 | **0.400** |
+| mixer at K = 500 | 470 | 0.535 | 0.994 | 0.492 |
+
+- Neural sources do not beat the cheap ones: SASRec ≈ EASE, two-tower below. RP3beta is the best single source and trains in
+  minutes, while the neural sources need about 3 GPU-hours to tune and 3 more to build (t37).
+- Mixer: weighted rank quotas, key = min over sources of (rank − 0.5) / w_s, where w is a source's stand-alone valid Recall@100.
+  The per-member policy scales w_r1 by the member's repeat share. It ties with fixed (valid MAIN cand@300 0.4841 against
+  0.4847), so fixed is used.
+- The coverage target of §5.2 (≥ 0.45 on TH + VN) is met at the cap (0.450). Explore coverage rises × 1.30 (0.307 → 0.400), below
+  the × 2 target. The cap costs 2.5 points of repeat coverage (0.997 → 0.972): R1 lists past rank ~60 lose their slots to
+  explore candidates. K = 500 would keep 0.994 for +0.085 coverage, but 1.7× the pairs.
+- QC-6 on candidates_v2: 0 rows with source_ts_max ≥ anchor or fit_cutoff > anchor; at most 300 rows per anchor.
+
+## 2026-11-02 · Ranking results on candidates_v2 (ML-19..26, t31, t32, t29b v2)
+
+Test, TH + VN, unconditional NDCG@20 [95 % member bootstrap]; selection on valid with 10 trials, one seed.
+
+| model | valid | test | test 95 % CI |
+|---|---|---|---|
+| TIFU-KNN NBR (best baseline) | — | 0.0788 | [0.0770, 0.0806] |
+| P1-frozen v1 → v2 | — | 0.0947 → 0.0973 | |
+| P1-tuned v2 | 0.1033 | 0.1011 | [0.0990, 0.1033] |
+| P2 v2 (+ rolling hazard / WTP) | 0.1034 | 0.1013 | [0.0994, 0.1034] |
+| P3 two heads + learned gate | 0.1037 | 0.1009 | [0.0988, 0.1029] |
+| P3 one head | 0.1049 | 0.1020 | [0.0999, 0.1040] |
+
+- RQ1 (paired, t31_paired): retrieval under the frozen ranker +0.0025 [0.0018, 0.0032]; tuning the GBDT on the same pairs adds
+  +0.0039 [0.0032, 0.0045]. The learned source ranks are the second SHAP group of P1-tuned (17 %, t35a).
+- RQ2: P3 one head − P1-tuned +0.0009 [0.0002, 0.0016]; P3 two heads − P1-tuned −0.0002 [−0.0009, 0.0005]; P2 − P1-tuned +0.0002
+  [−0.0002, 0.0006]. The order holds in every country and segment (t31_segments = t34 of the plan).
+- RQ3 (t32_paired, vs two heads): one head +0.0011 [0.0007, 0.0016] with more explore recall (+0.0016); fixed gate −0.0066 and
+  −0.275 repeat recall; no sequence −0.0003 and −0.024 repeat recall. The learned gate matters, the explicit split does not. The gate
+  ranks segments right but is about 2× the observed repeat share (t35c).
+- H2 (t29b v2): naive − rolling +0.0026 on train anchors, +0.0029 on the pseudo-test, −0.0004 on test; leaky +0.0011 on test.
+- RQ4 (t38, best on valid = P3 one head): HR@10 × 1.76 popular, × 1.54 buy-again; on explore positives 0.110 vs popular 0.115.
+- `business.py` is run with `--best p3_onehead`; `explain.py` keeps `--p3 p3_full` because the gate exists only with two heads.

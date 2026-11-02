@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Next-basket recommendation demo v0</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.3/full/pyodide.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 1200px; padding: 0 1rem; color: #1f2933; }
+    h1 { font-size: 1.5rem; }
+    .row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
+    button { padding: .5rem 1.2rem; font-size: 1rem; background: #2563eb; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+    button:disabled { background: #94a3b8; cursor: wait; }
+    table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: .35rem .5rem; text-align: left; vertical-align: top; }
+    th { background: #f1f5f9; position: sticky; top: 0; }
+    .member { background: #eef2ff; font-weight: 600; }
+    #status { color: #475569; }
+    .src-repeat { color: #047857; } .src-co_purchase { color: #1d4ed8; } .src-trend { color: #b45309; }
+  </style>
+</head>
+<body>
+  <h1>Gợi ý sản phẩm cho kỳ mua tiếp theo — demo v0</h1>
+  <p>Tải lên CSV lịch sử mua (<code>member_id, country_code, model_id, purchase_date, quantity</code>) hoặc dùng
+     <a href="reference/sample_purchases.csv" download>file mẫu</a> (khách tổng hợp). Mỗi gợi ý kèm nguồn và lý do. Mã sản phẩm
+     và ngành hàng đã được ẩn danh; mọi xử lý chạy trong trình duyệt của bạn, dữ liệu tải lên không rời máy.</p>
+  <div class="row">
+    <input type="file" id="file" accept=".csv" />
+    <label>Top-K <input type="number" id="k" value="10" min="5" max="30" style="width:4rem" /></label>
+    <button id="go" disabled>Đang tải mô hình…</button>
+    <a id="dl" style="display:none" download="recommendations.csv">Tải kết quả CSV</a>
+  </div>
+  <p id="status">Đang khởi động Python trong trình duyệt (lần đầu ~10–20 giây)…</p>
+  <div id="out"></div>
+  <details id="about" style="margin-top:2rem"><summary>Về mô hình và kết quả offline</summary><div id="aboutText"></div></details>
+<script>
+const FILES = __FILES__;
+let py;
+async function boot() {
+  py = await loadPyodide();
+  await py.loadPackage("pandas");
+  py.FS.mkdir("reference");
+  for (const f of FILES) {
+    const r = await fetch(f);
+    if (!r.ok) throw new Error(`cannot load ${f}`);
+    py.FS.writeFile(f, new Uint8Array(await r.arrayBuffer()));
+  }
+  py.runPython(`
+import sys, io, json
+sys.path.insert(0, ".")
+import pandas as pd
+from recommend import load_refs, recommend, validate
+REFS = load_refs("reference")
+def run(text, k):
+    df, rejected = validate(pd.read_csv(io.StringIO(text)))
+    out = recommend(df, REFS, int(k))
+    note = (f"{df['member_id'].nunique()} khách, {len(df)} dòng hợp lệ, {rejected} dòng bị loại. "
+            f"Dữ liệu tham chiếu tại {next(iter(REFS.values())).asof}. Quốc gia hỗ trợ: {', '.join(REFS)}.")
+    return json.dumps({"note": note, "rows": out.to_dict("records"), "csv": out.to_csv(index=False)}, default=str)
+`);
+  try { document.getElementById("aboutText").innerHTML = "<pre style='white-space:pre-wrap'>" +
+        (await (await fetch("ABOUT.md")).text()).replace(/</g, "&lt;") + "</pre>"; } catch (e) {}
+  const b = document.getElementById("go"); b.disabled = false; b.textContent = "Gợi ý";
+  document.getElementById("status").textContent = "Sẵn sàng. Chọn file hoặc bấm Gợi ý để dùng file mẫu.";
+}
+function esc(s) { return String(s ?? "").replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c])); }
+async function go() {
+  const b = document.getElementById("go"); b.disabled = true;
+  const f = document.getElementById("file").files[0];
+  const text = f ? await f.text() : await (await fetch("reference/sample_purchases.csv")).text();
+  try {
+    const res = JSON.parse(py.globals.get("run")(text, document.getElementById("k").value));
+    document.getElementById("status").textContent = res.note;
+    let html = "<table><tr><th>#</th><th>model_id</th><th>ngành hàng</th><th>bậc giá</th><th>nguồn</th><th>lý do</th></tr>";
+    let last = null;
+    for (const r of res.rows) {
+      if (r.member_id !== last) { html += `<tr class="member"><td colspan="6">${esc(r.member_id)} · ${esc(r.country_code)}</td></tr>`; last = r.member_id; }
+      html += `<tr><td>${r.rank}</td><td>${esc(r.model_id)}</td><td>${esc(r.department)}</td><td>${esc(r.price_band)}</td>` +
+              `<td class="src-${esc(r.source)}">${esc(r.source)}</td><td>${esc(r.reason)}</td></tr>`;
+    }
+    document.getElementById("out").innerHTML = html + "</table>";
+    const dl = document.getElementById("dl");
+    dl.href = URL.createObjectURL(new Blob([res.csv], {type: "text/csv"})); dl.style.display = "inline";
+  } catch (e) {
+    document.getElementById("status").textContent = "Lỗi: " + e.message.split("\n").filter(Boolean).pop();
+  }
+  b.disabled = false;
+}
+document.getElementById("go").addEventListener("click", go);
+boot().catch(e => { document.getElementById("status").textContent = "Không khởi động được: " + e.message; });
+</script>
+</body>
+</html>

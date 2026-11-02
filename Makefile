@@ -50,7 +50,17 @@ ml-eval:
 ml-views:
 	python ml/common/data.py
 ml-retrieval:
-	$(NOFILE); python ml/retrieval/ease.py --tune --build && python ml/retrieval/tifuknn.py --tune --build
+	$(NOFILE); for s in ease tifuknn rp3beta explin trend; do python ml/retrieval/$$s.py --tune --build || exit 1; done
 	$(NOFILE); for c in SG TH VN; do python ml/retrieval/item2vec.py --build --countries $$c & done; wait
+	$(NOFILE); python ml/retrieval/sasrec.py --tune --build & python ml/retrieval/two_tower.py --tune --build; wait
 	$(NOFILE); python ml/retrieval/report.py && python ml/common/data.py
 all: bronze gates silver gold train ablation
+
+# Demo v0 on a public Hugging Face Space (anonymised reference, synthetic sample; the salt never leaves data/demo/)
+DEMO_SPACE ?= yphan3103/nbr-demo
+demo-reference:
+	python serve/export_reference.py
+demo-push:
+	python serve/build_space.py
+	hf repos create $(DEMO_SPACE) --type space --sdk static --public --exist-ok
+	hf upload $(DEMO_SPACE) data/demo/space . --repo-type space --delete "*"
