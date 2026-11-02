@@ -11,23 +11,14 @@ Scores: data/ml/scores/<name>_<split>_d<Δ>.parquet with member_id, anchor_date,
 without scores still count, with every metric at 0.
 Usage: python ml/eval/protocol.py --reeval p1_frozen --out t28 [--delta 30] [--split test] [--legacy data/audit/results_full_d30.parquet]"""
 import argparse, os, sys, duckdb, numpy as np, pandas as pd
-from dotenv import load_dotenv
 
-load_dotenv()
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from ml.common.data import ML_DIR, connect
+
 KS = (10, 20, 50, 100, 200)
-ML_DIR = os.path.join(os.environ.get("DATA_ROOT", "data"), "ml")
 REPORT_METRICS = ["HR@10", "NDCG@10", "NDCG@20", "MRR@20", "Recall@20", "Recall@50", "recall_repeat@20", "recall_explore@20",
                   "PHR_repeat@20", "PHR_explore@20", "cand_recall", "repeat_share"]
 MAIN_COUNTRIES = ("TH", "VN")
-
-
-def connect(read_lakehouse=True):
-    con = duckdb.connect()
-    con.execute(f"SET memory_limit='{os.environ.get('DUCKDB_MEMORY', '10GB')}'")
-    con.execute(f"SET threads={int(os.environ.get('DUCKDB_THREADS', '6'))}")
-    if read_lakehouse:
-        con.execute(f"ATTACH '{os.environ['DUCKDB_PATH']}' AS lh (READ_ONLY)")
-    return con
 
 
 def build_positives(con, split, delta):

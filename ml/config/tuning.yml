@@ -1,0 +1,38 @@
+# Search spaces of the fair tuning harness (ml/common/tuning.py, plan D5). 30 TPE trials per model, objective = unconditional
+# NDCG@20 on valid. timeout_sec only cuts a study short and is reported; it never changes the trial budget of another model.
+p1:
+  space:
+    num_leaves:        {type: int, low: 15, high: 255, log: true}
+    learning_rate:     {type: float, low: 0.02, high: 0.2, log: true}
+    min_child_samples: {type: int, low: 20, high: 500, log: true}
+    feature_fraction:  {type: float, low: 0.5, high: 1.0}
+    bagging_fraction:  {type: float, low: 0.5, high: 1.0}
+    lambda_l2:         {type: float, low: 0.001, high: 10.0, log: true}
+ease:
+  space:
+    l2: {type: float, low: 1.0, high: 10000.0, log: true}
+tifuknn:
+  space:
+    k:     {type: int, low: 50, high: 1000, log: true}
+    r_b:   {type: float, low: 0.5, high: 1.0}
+    r_g:   {type: float, low: 0.5, high: 1.0}
+    alpha: {type: float, low: 0.0, high: 1.0}
+sasrec:
+  space:
+    d:       {type: categorical, choices: [64, 128, 256]}
+    blocks:  {type: int, low: 1, high: 3}
+    dropout: {type: float, low: 0.0, high: 0.5}
+    lr:      {type: float, low: 0.0001, high: 0.003, log: true}
+two_tower:
+  space:
+    d:           {type: categorical, choices: [64, 128, 256]}
+    temperature: {type: float, low: 0.02, high: 0.2, log: true}
+    lr:          {type: float, low: 0.0001, high: 0.003, log: true}
+    dropout:     {type: float, low: 0.0, high: 0.5}
+p3:
+  space:
+    d:          {type: categorical, choices: [64, 128]}
+    dropout:    {type: float, low: 0.0, high: 0.4}
+    lr:         {type: float, low: 0.0001, high: 0.003, log: true}
+    lambda_d90: {type: float, low: 0.0, high: 1.0}
+    lambda_haz: {type: float, low: 0.0, high: 1.0}

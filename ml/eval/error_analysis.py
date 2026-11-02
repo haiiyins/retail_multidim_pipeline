@@ -12,12 +12,10 @@ R4 check (ML-04): coverage of favourite sports, affinity sanity, pre-cap volume 
 
 Usage: python ml/eval/error_analysis.py [--scores p1_frozen] [--delta 30] [--out t28b]"""
 import argparse, os, sys, numpy as np, pandas as pd
-from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from ml.eval.protocol import ML_DIR, connect, build_positives
 
-load_dotenv()
 CELLS = ["top10", "rank_11_plus", "out_capped", "out_no_source"]
 
 
