@@ -1,437 +1,93 @@
 <!doctype html>
 <html lang="vi">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>NextBasket Studio</title>
-<script src="https://cdn.jsdelivr.net/pyodide/v0.27.3/full/pyodide.js"></script>
-<style>
-:root {
-  --bg: #f5f7fb; --card: #fff; --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --brand: #4f46e5; --brand2: #06b6d4;
-  --repeat: #059669; --co: #2563eb; --trend: #d97706; --due: #dc2626; --radius: 14px; --shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.06);
-}
-* { box-sizing: border-box; }
-body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); }
-button, input, select { font: inherit; }
-.wrap { max-width: 1320px; margin: 0 auto; padding: 0 20px; }
-
-/* header */
-header { background: linear-gradient(120deg, #312e81, var(--brand) 45%, var(--brand2)); color: #fff; padding: 22px 0 64px; }
-.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.2rem; letter-spacing: .2px; }
-.logo i { width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,.18); display: grid; place-items: center; font-style: normal; }
-.pill { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,.16); padding: 6px 12px; border-radius: 999px; font-size: .85rem; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; box-shadow: 0 0 0 0 rgba(251,191,36,.7); animation: pulse 1.4s infinite; }
-.dot.ok { background: #34d399; animation: none; }
-@keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(251,191,36,0); } 100% { box-shadow: 0 0 0 0 rgba(251,191,36,0); } }
-.lang { display: flex; background: rgba(255,255,255,.16); border-radius: 999px; padding: 3px; }
-.lang button { border: 0; background: none; color: #fff; padding: 4px 12px; border-radius: 999px; cursor: pointer; }
-.lang button.on { background: #fff; color: var(--brand); font-weight: 600; }
-h1 { font-size: 1.9rem; margin: 26px 0 6px; line-height: 1.2; }
-.sub { opacity: .9; max-width: 760px; margin: 0; }
-
-/* KPI strip */
-.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: -44px; }
-.kpi { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; animation: up .5s both; }
-.kpi b { display: block; font-size: 1.7rem; color: var(--brand); line-height: 1.1; }
-.kpi span { color: var(--muted); font-size: .86rem; }
-.note { color: var(--muted); font-size: .78rem; margin: 8px 2px 0; }
-
-/* data bar */
-.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 18px 0; background: var(--card); border-radius: var(--radius);
-       box-shadow: var(--shadow); padding: 12px 14px; }
-.drop { flex: 1; min-width: 260px; border: 2px dashed var(--line); border-radius: 12px; padding: 10px 14px; color: var(--muted); cursor: pointer;
-        transition: .2s; display: flex; align-items: center; gap: 10px; }
-.drop:hover, .drop.over { border-color: var(--brand); background: #eef2ff; color: var(--brand); }
-.btn { border: 0; border-radius: 10px; padding: 9px 16px; cursor: pointer; background: var(--brand); color: #fff; font-weight: 600; transition: .15s; }
-.btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(79,70,229,.3); }
-.btn.ghost { background: #eef2ff; color: var(--brand); }
-.btn:disabled { opacity: .5; cursor: wait; transform: none; box-shadow: none; }
-.k { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .9rem; }
-
-/* tabs */
-.tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
-.tab { border: 0; background: none; padding: 10px 14px; cursor: pointer; color: var(--muted); font-weight: 600; border-bottom: 3px solid transparent; }
-.tab.on { color: var(--brand); border-color: var(--brand); }
-.view { display: none; animation: fade .3s; } .view.on { display: block; }
-@keyframes fade { from { opacity: 0; } } @keyframes up { from { opacity: 0; transform: translateY(10px); } }
-
-/* customer view */
-.grid3 { display: grid; grid-template-columns: 280px 1fr 300px; gap: 16px; align-items: start; }
-.panel { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; }
-.search { width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; }
-.members { max-height: 640px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
-.mem { border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; cursor: pointer; transition: .15s; background: #fff; text-align: left; }
-.mem:hover { border-color: #c7d2fe; transform: translateX(2px); }
-.mem.on { border-color: var(--brand); background: #eef2ff; }
-.mem .id { font-weight: 600; font-size: .9rem; }
-.tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
-.tag { font-size: .72rem; padding: 1px 8px; border-radius: 999px; background: #f1f5f9; color: #334155; white-space: nowrap; }
-.tag.new { background: #e0f2fe; color: #0369a1; } .tag.mid { background: #fef3c7; color: #92400e; } .tag.loyal { background: #ede9fe; color: #5b21b6; }
-.tag.due { background: #fee2e2; color: var(--due); } .tag.x { background: #dbeafe; color: var(--co); } .tag.nd { background: #dcfce7; color: #166534; }
-.profile { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
-.stat { background: #f8fafc; border-radius: 12px; padding: 10px 12px; }
-.stat b { display: block; font-size: 1.25rem; } .stat span { color: var(--muted); font-size: .8rem; }
-.depts { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 14px; }
-h3 { margin: 6px 0 10px; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
-h3 small { color: var(--muted); font-weight: 400; }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 18px; }
-.card { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #fff; transition: .2s; animation: up .4s both;
-        animation-delay: calc(var(--i) * 45ms); display: flex; flex-direction: column; }
-.card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
-.thumb { height: 78px; display: flex; align-items: flex-end; justify-content: space-between; padding: 8px 10px; color: #fff; position: relative; }
-.thumb .rk { position: absolute; top: 8px; left: 10px; background: rgba(0,0,0,.25); padding: 0 8px; border-radius: 999px; font-size: .75rem; }
-.thumb .dp { font-weight: 700; font-size: 1.05rem; } .thumb .pr { letter-spacing: 2px; font-size: .8rem; }
-.badge { position: absolute; top: 8px; right: 8px; font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #fff; }
-.badge.due { color: var(--due); animation: pulse2 1.6s infinite; } .badge.nd { color: #166534; }
-@keyframes pulse2 { 50% { transform: scale(1.08); } }
-.body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-.code { font-family: ui-monospace, monospace; font-size: .8rem; color: var(--muted); }
-.why { font-size: .86rem; }
-.src { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
-.src.repeat { color: var(--repeat); } .src.co_purchase { color: var(--co); } .src.trend { color: var(--trend); }
-.meter { height: 5px; background: #f1f5f9; border-radius: 999px; overflow: hidden; margin-top: auto; }
-.meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--brand), var(--brand2)); width: 0; transition: width .8s ease; }
-.empty { color: var(--muted); padding: 30px; text-align: center; }
-
-/* phone preview */
-.phone { width: 270px; margin: 0 auto; border-radius: 36px; background: #0f172a; padding: 12px; box-shadow: 0 20px 40px rgba(15,23,42,.25); }
-.screen { background: #fff; border-radius: 26px; overflow: hidden; height: 560px; display: flex; flex-direction: column; }
-.notch { height: 22px; background: #0f172a; width: 120px; margin: 0 auto; border-radius: 0 0 14px 14px; }
-.app { padding: 12px 14px; overflow: auto; flex: 1; }
-.app .hi { font-weight: 700; font-size: 1.05rem; } .app .hs { color: var(--muted); font-size: .8rem; margin-bottom: 10px; }
-.app .sec { font-weight: 700; font-size: .85rem; margin: 12px 0 6px; }
-.row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
-.mini { min-width: 104px; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; animation: up .4s both; animation-delay: calc(var(--i) * 60ms); }
-.mini .t { height: 64px; display: grid; place-items: center; color: #fff; font-weight: 700; }
-.mini .c { padding: 6px 8px; font-size: .72rem; line-height: 1.3; }
-.mini .cta { margin: 0 8px 8px; font-size: .7rem; background: var(--ink); color: #fff; border-radius: 8px; text-align: center; padding: 4px; }
-.cap { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 10px; }
-
-/* campaigns */
-.ctypes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
-.ctype { border: 2px solid var(--line); border-radius: var(--radius); background: #fff; padding: 14px; cursor: pointer; text-align: left; transition: .2s; }
-.ctype:hover { border-color: #c7d2fe; } .ctype.on { border-color: var(--brand); box-shadow: 0 8px 20px rgba(79,70,229,.15); }
-.ctype .ic { font-size: 1.4rem; } .ctype b { display: block; margin: 4px 0 2px; } .ctype span { color: var(--muted); font-size: .84rem; }
-.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
-.chip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 12px; cursor: pointer; font-size: .85rem; transition: .15s; }
-.chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
-.sum { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 12px; align-items: center; margin-bottom: 14px; }
-.sum .stat b { font-size: 1.5rem; color: var(--brand); }
-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
-th { text-align: left; color: var(--muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .4px; padding: 8px; border-bottom: 1px solid var(--line); }
-td { padding: 9px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
-tr.in { animation: up .35s both; animation-delay: calc(var(--i) * 30ms); }
-.msg { color: #334155; font-style: italic; }
-.toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--ink); color: #fff; padding: 10px 18px;
-         border-radius: 12px; transition: .3s; z-index: 9; } .toast.on { transform: translateX(-50%) translateY(0); }
-.skel { background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%); background-size: 200% 100%; animation: sh 1.2s infinite; border-radius: 12px; height: 150px; }
-@keyframes sh { to { background-position: -200% 0; } }
-.about { white-space: pre-wrap; font: .9rem/1.6 system-ui, sans-serif; }
-footer { color: var(--muted); font-size: .8rem; padding: 26px 0 40px; }
-@media (max-width: 1100px) { .grid3 { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, 1fr); } .ctypes { grid-template-columns: 1fr; } .profile { grid-template-columns: repeat(2, 1fr); } }
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Next-basket recommendation demo v0</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.3/full/pyodide.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 1200px; padding: 0 1rem; color: #1f2933; }
+    h1 { font-size: 1.5rem; }
+    .row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
+    button { padding: .5rem 1.2rem; font-size: 1rem; background: #2563eb; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+    button:disabled { background: #94a3b8; cursor: wait; }
+    table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: .35rem .5rem; text-align: left; vertical-align: top; }
+    th { background: #f1f5f9; position: sticky; top: 0; }
+    .member { background: #eef2ff; font-weight: 600; }
+    #status { color: #475569; }
+    .src-repeat { color: #047857; } .src-co_purchase { color: #1d4ed8; } .src-trend { color: #b45309; }
+  </style>
 </head>
 <body>
-<header>
-  <div class="wrap">
-    <div class="top">
-      <div class="logo"><i>◆</i> NextBasket Studio</div>
-      <div style="display:flex;gap:10px;align-items:center">
-        <span class="pill"><span class="dot" id="dot"></span><span id="engine" data-i="boot1"></span></span>
-        <div class="lang"><button data-l="vi" class="on">VI</button><button data-l="en">EN</button></div>
-      </div>
-    </div>
-    <h1 data-i="title"></h1>
-    <p class="sub" data-i="subtitle"></p>
+  <h1>Gợi ý sản phẩm cho kỳ mua tiếp theo — demo v0</h1>
+  <p>Tải lên CSV lịch sử mua (<code>member_id, country_code, model_id, purchase_date, quantity</code>) hoặc dùng
+     <a href="reference/sample_purchases.csv" download>file mẫu</a> (khách tổng hợp). Mỗi gợi ý kèm nguồn và lý do. Mã sản phẩm
+     và ngành hàng đã được ẩn danh; mọi xử lý chạy trong trình duyệt của bạn, dữ liệu tải lên không rời máy.</p>
+  <div class="row">
+    <input type="file" id="file" accept=".csv" />
+    <label>Top-K <input type="number" id="k" value="10" min="5" max="30" style="width:4rem" /></label>
+    <button id="go" disabled>Đang tải mô hình…</button>
+    <a id="dl" style="display:none" download="recommendations.csv">Tải kết quả CSV</a>
   </div>
-</header>
-
-<main class="wrap">
-  <section class="kpis">
-    <div class="kpi" style="animation-delay:.05s"><b data-count="1.8" data-fmt="x">×0</b><span data-i="kpi1"></span></div>
-    <div class="kpi" style="animation-delay:.1s"><b data-count="1.5" data-fmt="x">×0</b><span data-i="kpi2"></span></div>
-    <div class="kpi" style="animation-delay:.15s"><b data-count="79" data-fmt="%">0%</b><span data-i="kpi3"></span></div>
-    <div class="kpi" style="animation-delay:.2s"><b data-count="24" data-fmt="%">0%</b><span data-i="kpi4"></span></div>
-  </section>
-  <p class="note" data-i="kpinote"></p>
-
-  <section class="bar">
-    <label class="drop" id="drop"><input type="file" id="file" accept=".csv" hidden /><span>⬆</span><span id="dropText" data-i="drop"></span></label>
-    <button class="btn ghost" id="sample" disabled data-i="sample"></button>
-    <a class="btn ghost" href="reference/sample_purchases.csv" download data-i="template" style="text-decoration:none"></a>
-    <span class="k"><span data-i="topk"></span> <input type="range" id="k" min="6" max="20" value="12" /> <b id="kv">12</b></span>
-  </section>
-
-  <nav class="tabs">
-    <button class="tab on" data-v="customers" data-i="tab1"></button>
-    <button class="tab" data-v="campaigns" data-i="tab2"></button>
-    <button class="tab" data-v="about" data-i="tab3"></button>
-  </nav>
-
-  <section class="view on" id="customers">
-    <div class="grid3">
-      <div class="panel">
-        <input class="search" id="q" data-ph="search" />
-        <div class="members" id="members"><div class="skel"></div></div>
-      </div>
-      <div class="panel" id="detail"><div class="skel" style="height:420px"></div></div>
-      <div>
-        <div class="phone"><div class="screen"><div class="notch"></div><div class="app" id="app"></div></div></div>
-        <p class="cap" data-i="phonecap"></p>
-      </div>
-    </div>
-  </section>
-
-  <section class="view" id="campaigns">
-    <div class="ctypes" id="ctypes"></div>
-    <div class="filters" id="filters"></div>
-    <div class="sum">
-      <div class="stat"><b id="cMembers">0</b><span data-i="cMembers"></span></div>
-      <div class="stat"><b id="cShare">0%</b><span data-i="cShare"></span></div>
-      <div class="stat"><b id="cItems">0</b><span data-i="cItems"></span></div>
-      <button class="btn" id="export" data-i="export"></button>
-    </div>
-    <div class="panel"><table><thead><tr><th data-i="thMember"></th><th data-i="thSeg"></th><th data-i="thItems"></th><th data-i="thMsg"></th></tr></thead>
-      <tbody id="audience"></tbody></table></div>
-  </section>
-
-  <section class="view" id="about"><div class="panel about" id="aboutText"></div></section>
-  <footer data-i="footer"></footer>
-</main>
-<div class="toast" id="toast"></div>
-
+  <p id="status">Đang khởi động Python trong trình duyệt (lần đầu ~10–20 giây)…</p>
+  <div id="out"></div>
+  <details id="about" style="margin-top:2rem"><summary>Về mô hình và kết quả offline</summary><div id="aboutText"></div></details>
 <script>
 const FILES = __FILES__;
-const T = {
-  vi: {
-    boot1: "Đang khởi động Python trong trình duyệt…", boot2: "Đang tải pandas…", boot3: "Đang tải dữ liệu tham chiếu…", ready: "Sẵn sàng",
-    title: "Gợi ý đúng món, đúng lúc cho từng khách hàng",
-    subtitle: "Bảng điều khiển cho đội CRM/marketing: xem khách sắp mua lại món gì, món mới nào nên giới thiệu, và tạo ngay danh sách khách cho chiến dịch. Mọi xử lý chạy trong trình duyệt; dữ liệu bạn tải lên không rời máy.",
-    kpi1: "khả năng trúng so với danh sách “bán chạy”", kpi2: "so với “mua lại đúng món cũ”", kpi3: "trúng khi khách sắp mua lại một món", kpi4: "khách có mua ít nhất 1 món trong top 10",
-    kpinote: "Kết quả offline của mô hình tốt nhất trên dữ liệu test 02–07/2026 (TH + VN, 30 ngày sau ngày gợi ý). Là mức trúng quan sát được, không phải hiệu quả nhân quả; demo này chạy tầng gợi ý ứng viên.",
-    drop: "Kéo thả CSV lịch sử mua vào đây (member_id, country_code, model_id, purchase_date, quantity) hoặc bấm để chọn",
-    sample: "Dùng dữ liệu mẫu", template: "Tải file mẫu", topk: "Số gợi ý", tab1: "Khách hàng", tab2: "Chiến dịch", tab3: "Về mô hình",
-    search: "Tìm khách…", phonecap: "Khách sẽ thấy trong app", members: "khách", purchases: "sản phẩm đã mua", models: "mẫu khác nhau",
-    lastBuy: "ngày từ lần mua cuối", visits: "lần mua trong 12 tháng", topDepts: "Ngành hàng hay mua",
-    secRepeat: "Nhắc mua lại", secRepeatSub: "món khách đã mua, xếp theo tần suất và độ gần", secExplore: "Gợi ý món mới", secExploreSub: "bán chéo: mua kèm và xu hướng trong ngành khách quan tâm",
-    seg_new: "Mới", seg_mid: "Đang tăng", seg_loyal: "Trung thành", due: "Đến hạn", newDept: "Ngành mới", cross: "món mới",
-    src_repeat: "Mua lại", src_co_purchase: "Mua kèm", src_trend: "Xu hướng", band: "Giá", priority: "Mức ưu tiên",
-    why_repeat: (r) => `Đã mua ${r.n} lần · lần cuối ${r.last} ngày trước` + (r.cycle ? ` · chu kỳ ~${r.cycle} ngày` : ""),
-    why_co: (r) => `Thường được mua cùng ${r.because} (khách đã mua)`, why_trend: (r) => `Đang tăng ×${(+r.trend).toFixed(1)} so với quý trước trong ${r.department}`,
-    appHi: "Chào bạn 👋", appHs: "Chọn riêng cho bạn hôm nay", appDue: "Sắp hết rồi? Mua lại ngay", appRepeat: "Mua lại món quen", appNew: "Có thể bạn sẽ thích", cta: "Xem ngay",
-    c_due: "Nhắc mua lại đến hạn", c_due_d: "Khách có món đã tới chu kỳ mua lại. Gửi nhắc đúng lúc để giữ chân.",
-    c_cross: "Bán chéo món mới", c_cross_d: "Giới thiệu món khách chưa từng mua, dựa trên mua kèm và xu hướng.",
-    c_nd: "Mở rộng ngành hàng", c_nd_d: "Món thuộc ngành hàng khách chưa từng mua: tăng độ rộng giỏ hàng.",
-    country: "Quốc gia", segment: "Phân khúc", all: "Tất cả", perMember: "Món mỗi khách",
-    cMembers: "khách trong nhóm", cShare: "trên tổng số khách", cItems: "gợi ý sẽ gửi", export: "Xuất danh sách CSV",
-    thMember: "Khách", thSeg: "Phân khúc", thItems: "Món gợi ý", thMsg: "Thông điệp gợi ý",
-    msg_due: "Đã đến lúc mua lại món quen của bạn — đặt ngay để không bị gián đoạn.", msg_cross: "Dành cho bạn: vài món mới hợp với những gì bạn đã chọn.",
-    msg_nd: "Khám phá thêm một ngành hàng mới, chọn riêng theo sở thích của bạn.",
-    noAud: "Không có khách nào khớp bộ lọc.", noMember: "Chưa có khách nào. Tải CSV hoặc dùng dữ liệu mẫu.",
-    loaded: (n, rows, bad) => `Đã xử lý ${n} khách, ${rows} dòng hợp lệ${bad ? `, ${bad} dòng bị loại` : ""}`, exported: "Đã xuất CSV",
-    footer: "Mã sản phẩm là hash có muối, ngành hàng dùng nhãn chung, khách mẫu là dữ liệu tổng hợp. Đồ án môn học; không đại diện cho tổ chức nào.",
-    error: "Lỗi: ",
-  },
-  en: {
-    boot1: "Starting Python in your browser…", boot2: "Loading pandas…", boot3: "Loading reference data…", ready: "Ready",
-    title: "The right product, at the right time, for every member",
-    subtitle: "A console for CRM / marketing teams: see what each member is about to re-buy, which new products to introduce, and build a campaign audience in one click. Everything runs in your browser; uploaded data never leaves your machine.",
-    kpi1: "hit rate vs. a “best-sellers” list", kpi2: "vs. “buy the same again”", kpi3: "hit rate when a member is about to re-buy", kpi4: "of buyers get at least 1 hit in the top 10",
-    kpinote: "Offline results of the best model on the Feb–Jul 2026 test data (TH + VN, 30 days after the recommendation). Observed hit rates, not causal uplift; this demo runs the candidate layer.",
-    drop: "Drop a purchase-history CSV here (member_id, country_code, model_id, purchase_date, quantity) or click to choose",
-    sample: "Use sample data", template: "Download template", topk: "Recommendations", tab1: "Members", tab2: "Campaigns", tab3: "About the model",
-    search: "Search members…", phonecap: "What the member sees in the app", members: "members", purchases: "items bought", models: "distinct models",
-    lastBuy: "days since last purchase", visits: "visits in 12 months", topDepts: "Favourite departments",
-    secRepeat: "Re-buy reminders", secRepeatSub: "models the member bought, by frequency and recency", secExplore: "New for this member", secExploreSub: "cross-sell: bought-together and trending in their departments",
-    seg_new: "New", seg_mid: "Growing", seg_loyal: "Loyal", due: "Due", newDept: "New dept", cross: "new items",
-    src_repeat: "Re-buy", src_co_purchase: "Bought together", src_trend: "Trending", band: "Price", priority: "Priority",
-    why_repeat: (r) => `Bought ${r.n}× · last ${r.last} days ago` + (r.cycle ? ` · cycle ~${r.cycle} days` : ""),
-    why_co: (r) => `Often bought with ${r.because} (already bought)`, why_trend: (r) => `Up ×${(+r.trend).toFixed(1)} vs. last quarter in ${r.department}`,
-    appHi: "Hi there 👋", appHs: "Picked for you today", appDue: "Running low? Re-order now", appRepeat: "Your favourites", appNew: "You might also like", cta: "View",
-    c_due: "Due re-buy reminder", c_due_d: "Members with a model at its re-buy cycle. Remind them at the right time to retain them.",
-    c_cross: "Cross-sell new items", c_cross_d: "Introduce models the member never bought, from bought-together and trends.",
-    c_nd: "Department expansion", c_nd_d: "Models in a department the member never bought from: wider baskets.",
-    country: "Country", segment: "Segment", all: "All", perMember: "Items per member",
-    cMembers: "members in the audience", cShare: "of all members", cItems: "recommendations to send", export: "Export audience CSV",
-    thMember: "Member", thSeg: "Segment", thItems: "Recommended", thMsg: "Suggested message",
-    msg_due: "Time to restock your favourite — order now so you never run out.", msg_cross: "For you: a few new picks that go with what you already love.",
-    msg_nd: "Discover a new department, picked for your taste.",
-    noAud: "No member matches these filters.", noMember: "No members yet. Upload a CSV or use the sample data.",
-    loaded: (n, rows, bad) => `Processed ${n} members, ${rows} valid rows${bad ? `, ${bad} rejected` : ""}`, exported: "CSV exported",
-    footer: "Product codes are salted hashes, departments carry generic labels, sample members are synthetic. Course project; does not represent any organisation.",
-    error: "Error: ",
-  },
-};
-let L = "vi", py, DATA = null, SEL = null, CAMP = { type: "due", country: "all", segment: "all", per: 3 };
-const t = (k) => T[L][k] ?? k;
-const $ = (s) => document.querySelector(s);
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-
-function hue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
-function tile(d) { const h = hue(d); return `background:linear-gradient(135deg,hsl(${h} 70% 48%),hsl(${(h + 40) % 360} 75% 60%))`; }
-function short(d) { return String(d ?? "").replace(/^Dept\s*/, "D"); }
-function dots(b) { b = +b || 0; return "●".repeat(b) + "○".repeat(Math.max(0, 5 - b)); }
-function toast(m) { const e = $("#toast"); e.textContent = m; e.classList.add("on"); setTimeout(() => e.classList.remove("on"), 2200); }
-function count(el, to, fmt, ms = 900) {
-  const t0 = performance.now(), dec = fmt === "x" ? 1 : 0;
-  const f = (now) => { const p = Math.min(1, (now - t0) / ms), v = (to * (1 - Math.pow(1 - p, 3))).toFixed(dec);
-    el.textContent = fmt === "x" ? `×${v}` : fmt === "%" ? `${v}%` : v; if (p < 1) requestAnimationFrame(f); };
-  requestAnimationFrame(f);
-}
-
-function i18n() {
-  document.documentElement.lang = L;
-  document.querySelectorAll("[data-i]").forEach((e) => { const v = t(e.dataset.i); if (typeof v === "string") e.textContent = v; });
-  document.querySelectorAll("[data-ph]").forEach((e) => (e.placeholder = t(e.dataset.ph)));
-  document.querySelectorAll(".lang button").forEach((b) => b.classList.toggle("on", b.dataset.l === L));
-  if (py) $("#engine").textContent = t("ready");
-  if (DATA) { renderMembers(); renderDetail(); renderCampaign(); }
-}
-
-function reason(r) { return r.source === "repeat" ? t("why_repeat")(r) : r.source === "co_purchase" ? t("why_co")(r) : t("why_trend")(r); }
-
-function card(r, i, k) {
-  const badge = r.due ? `<span class="badge due">${t("due")}</span>` : r.new_department ? `<span class="badge nd">${t("newDept")}</span>` : "";
-  return `<div class="card" style="--i:${i}"><div class="thumb" style="${tile(r.department)}"><span class="rk">#${r.rank}</span>${badge}
-    <span class="dp">${esc(r.department)}</span><span class="pr" title="${t("band")} ${r.price_band}/5">${dots(r.price_band)}</span></div>
-    <div class="body"><span class="src ${r.source}">${t("src_" + r.source)}</span><span class="why">${esc(reason(r))}</span>
-    <span class="code">${esc(r.model_id)}</span><div class="meter" title="${t("priority")}"><i data-w="${Math.round(100 * (1 - (r.rank - 1) / k))}"></i></div></div></div>`;
-}
-
-function renderMembers() {
-  const q = $("#q").value.trim().toLowerCase();
-  const el = $("#members");
-  const list = DATA.profiles.filter((p) => p.member_id.toLowerCase().includes(q));
-  if (!list.length) { el.innerHTML = `<div class="empty">${t("noMember")}</div>`; return; }
-  el.innerHTML = list.map((p) => {
-    const recs = DATA.byMember[p.member_id] || [];
-    const due = recs.filter((r) => r.due).length, x = recs.filter((r) => r.source !== "repeat").length;
-    return `<button class="mem ${p.member_id === SEL ? "on" : ""}" data-m="${esc(p.member_id)}"><div class="id">${esc(p.member_id)}</div>
-      <div class="tags"><span class="tag ${p.segment}">${t("seg_" + p.segment)}</span><span class="tag">${p.country_code}</span>
-      ${due ? `<span class="tag due">${due} ${t("due").toLowerCase()}</span>` : ""}<span class="tag x">${x} ${t("cross")}</span></div></button>`;
-  }).join("");
-  el.querySelectorAll(".mem").forEach((b) => b.addEventListener("click", () => { SEL = b.dataset.m; renderMembers(); renderDetail(); }));
-}
-
-function renderDetail() {
-  const p = DATA.profiles.find((x) => x.member_id === SEL);
-  if (!p) { $("#detail").innerHTML = `<div class="empty">${t("noMember")}</div>`; $("#app").innerHTML = ""; return; }
-  const recs = DATA.byMember[SEL] || [], k = recs.length || 1;
-  const rep = recs.filter((r) => r.source === "repeat").sort((a, b) => b.due - a.due || a.rank - b.rank), exp = recs.filter((r) => r.source !== "repeat");
-  $("#detail").innerHTML = `
-    <div class="profile">
-      <div class="stat"><b>${p.purchases}</b><span>${t("purchases")}</span></div><div class="stat"><b>${p.models}</b><span>${t("models")}</span></div>
-      <div class="stat"><b>${p.last_days}</b><span>${t("lastBuy")}</span></div><div class="stat"><b>${p.visits_365d}</b><span>${t("visits")}</span></div></div>
-    <div class="code" style="margin-bottom:4px">${t("topDepts")}</div>
-    <div class="depts">${p.departments.map((d) => `<span class="tag" style="${tile(d.department)};color:#fff">${esc(d.department)} · ${d.count}</span>`).join("")}</div>
-    <h3>🔁 ${t("secRepeat")} <small>${t("secRepeatSub")}</small></h3><div class="cards">${rep.map((r, i) => card(r, i, k)).join("") || `<div class="empty">—</div>`}</div>
-    <h3>✨ ${t("secExplore")} <small>${t("secExploreSub")}</small></h3><div class="cards">${exp.map((r, i) => card(r, i + rep.length, k)).join("") || `<div class="empty">—</div>`}</div>`;
-  requestAnimationFrame(() => document.querySelectorAll("#detail .meter i").forEach((e) => (e.style.width = e.dataset.w + "%")));
-  const mini = (r, i) => `<div class="mini" style="--i:${i}"><div class="t" style="${tile(r.department)}">${short(r.department)}</div>
-    <div class="c">${esc(r.department)}<br>${dots(r.price_band)}</div><div class="cta">${t("cta")}</div></div>`;
-  const due = rep.filter((r) => r.due), other = rep.filter((r) => !r.due);
-  $("#app").innerHTML = `<div class="hi">${t("appHi")}</div><div class="hs">${t("appHs")}</div>
-    ${due.length ? `<div class="sec">⏰ ${t("appDue")}</div><div class="row">${due.slice(0, 4).map(mini).join("")}</div>` : ""}
-    ${exp.length ? `<div class="sec">✨ ${t("appNew")}</div><div class="row">${exp.slice(0, 6).map(mini).join("")}</div>` : ""}
-    ${other.length ? `<div class="sec">🔁 ${t("appRepeat")}</div><div class="row">${other.slice(0, 6).map(mini).join("")}</div>` : ""}`;
-}
-
-const CTYPES = [["due", "⏰"], ["cross", "✨"], ["nd", "🧭"]];
-function pick(type, r) { return type === "due" ? r.due : type === "cross" ? r.source !== "repeat" : r.new_department; }
-function audience() {
-  return DATA.profiles.filter((p) => (CAMP.country === "all" || p.country_code === CAMP.country) && (CAMP.segment === "all" || p.segment === CAMP.segment))
-    .map((p) => ({ p, items: (DATA.byMember[p.member_id] || []).filter((r) => pick(CAMP.type, r)).slice(0, CAMP.per) }))
-    .filter((a) => a.items.length);
-}
-function renderCampaign() {
-  $("#ctypes").innerHTML = CTYPES.map(([k, ic]) => `<button class="ctype ${CAMP.type === k ? "on" : ""}" data-c="${k}"><span class="ic">${ic}</span>
-    <b>${t("c_" + k)}</b><span>${t("c_" + k + "_d")}</span></button>`).join("");
-  const countries = ["all", ...new Set(DATA.profiles.map((p) => p.country_code))], segs = ["all", "new", "mid", "loyal"];
-  const chips = (key, vals, lab) => `<span class="k">${lab}</span>` + vals.map((v) => `<button class="chip ${CAMP[key] === v ? "on" : ""}" data-f="${key}" data-v="${v}">
-    ${v === "all" ? t("all") : key === "segment" ? t("seg_" + v) : v}</button>`).join("");
-  $("#filters").innerHTML = chips("country", countries, t("country")) + "&nbsp;&nbsp;" + chips("segment", segs, t("segment")) +
-    `&nbsp;&nbsp;<span class="k">${t("perMember")} <input type="range" id="per" min="1" max="6" value="${CAMP.per}" /> <b>${CAMP.per}</b></span>`;
-  const aud = audience(), n = aud.length, items = aud.reduce((s, a) => s + a.items.length, 0);
-  count($("#cMembers"), n, ""); count($("#cShare"), DATA.profiles.length ? Math.round((100 * n) / DATA.profiles.length) : 0, "%"); count($("#cItems"), items, "");
-  $("#audience").innerHTML = n ? aud.map((a, i) => `<tr class="in" style="--i:${i}"><td><b>${esc(a.p.member_id)}</b><br><span class="code">${a.p.country_code}</span></td>
-    <td><span class="tag ${a.p.segment}">${t("seg_" + a.p.segment)}</span></td>
-    <td><div class="tags">${a.items.map((r) => `<span class="tag" style="${tile(r.department)};color:#fff" title="${esc(reason(r))}">${esc(r.department)} · ${dots(r.price_band)}</span>`).join("")}</div></td>
-    <td class="msg">${t("msg_" + CAMP.type)}</td></tr>`).join("") : `<tr><td colspan="4" class="empty">${t("noAud")}</td></tr>`;
-  document.querySelectorAll(".ctype").forEach((b) => b.addEventListener("click", () => { CAMP.type = b.dataset.c; renderCampaign(); }));
-  document.querySelectorAll(".chip").forEach((b) => b.addEventListener("click", () => { CAMP[b.dataset.f] = b.dataset.v; renderCampaign(); }));
-  $("#per").addEventListener("input", (e) => { CAMP.per = +e.target.value; renderCampaign(); });
-}
-function exportCsv() {
-  const head = ["campaign", "member_id", "country_code", "segment", "rank", "model_id", "department", "price_band", "source", "reason", "message"];
-  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const lines = audience().flatMap((a) => a.items.map((r) => [CAMP.type, a.p.member_id, a.p.country_code, a.p.segment, r.rank, r.model_id, r.department,
-    r.price_band, r.source, reason(r), t("msg_" + CAMP.type)].map(q).join(",")));
-  const url = URL.createObjectURL(new Blob(["\ufeff" + [head.join(","), ...lines].join("\n")], { type: "text/csv" }));
-  Object.assign(document.createElement("a"), { href: url, download: `audience_${CAMP.type}.csv` }).click();
-  toast(t("exported"));
-}
-
+let py;
 async function boot() {
-  py = null; $("#engine").textContent = t("boot1");
-  const pyo = await loadPyodide();
-  $("#engine").textContent = t("boot2"); await pyo.loadPackage("pandas");
-  $("#engine").textContent = t("boot3"); pyo.FS.mkdir("reference");
-  for (const f of FILES) { const r = await fetch(f); if (!r.ok) throw new Error(`cannot load ${f}`); pyo.FS.writeFile(f, new Uint8Array(await r.arrayBuffer())); }
-  pyo.runPython(`
+  py = await loadPyodide();
+  await py.loadPackage("pandas");
+  py.FS.mkdir("reference");
+  for (const f of FILES) {
+    const r = await fetch(f);
+    if (!r.ok) throw new Error(`cannot load ${f}`);
+    py.FS.writeFile(f, new Uint8Array(await r.arrayBuffer()));
+  }
+  py.runPython(`
 import sys, io, json
 sys.path.insert(0, ".")
 import pandas as pd
-from recommend import load_refs, recommend, validate, profiles
+from recommend import load_refs, recommend, validate
 REFS = load_refs("reference")
 def run(text, k):
     df, rejected = validate(pd.read_csv(io.StringIO(text)))
     out = recommend(df, REFS, int(k))
-    for c in ("n", "last", "cycle"):
-        out[c] = out[c].astype("Int64")
-    out["due"] = out["due"].fillna(False).astype(bool)
-    return json.dumps({"members": int(df["member_id"].nunique()), "rows": len(df), "rejected": rejected,
-                       "recs": json.loads(out.to_json(orient="records")), "profiles": json.loads(profiles(df, REFS).to_json(orient="records"))})
+    note = (f"{df['member_id'].nunique()} khách, {len(df)} dòng hợp lệ, {rejected} dòng bị loại. "
+            f"Dữ liệu tham chiếu tại {next(iter(REFS.values())).asof}. Quốc gia hỗ trợ: {', '.join(REFS)}.")
+    return json.dumps({"note": note, "rows": out.to_dict("records"), "csv": out.to_csv(index=False)}, default=str)
 `);
-  py = pyo;
-  try { $("#aboutText").textContent = await (await fetch("ABOUT.md")).text(); } catch (e) {}
-  $("#dot").classList.add("ok"); $("#engine").textContent = t("ready"); $("#sample").disabled = false;
-  await runText(await (await fetch("reference/sample_purchases.csv")).text());
+  try { document.getElementById("aboutText").innerHTML = "<pre style='white-space:pre-wrap'>" +
+        (await (await fetch("ABOUT.md")).text()).replace(/</g, "&lt;") + "</pre>"; } catch (e) {}
+  const b = document.getElementById("go"); b.disabled = false; b.textContent = "Gợi ý";
+  document.getElementById("status").textContent = "Sẵn sàng. Chọn file hoặc bấm Gợi ý để dùng file mẫu.";
 }
-async function runText(text) {
+function esc(s) { return String(s ?? "").replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c])); }
+async function go() {
+  const b = document.getElementById("go"); b.disabled = true;
+  const f = document.getElementById("file").files[0];
+  const text = f ? await f.text() : await (await fetch("reference/sample_purchases.csv")).text();
   try {
-    const res = JSON.parse(py.globals.get("run")(text, $("#k").value));
-    DATA = { profiles: res.profiles, byMember: {} };
-    for (const r of res.recs) (DATA.byMember[r.member_id] ||= []).push(r);
-    DATA.profiles.sort((a, b) => (DATA.byMember[b.member_id] || []).filter((r) => r.due).length - (DATA.byMember[a.member_id] || []).filter((r) => r.due).length
-      || a.member_id.localeCompare(b.member_id));
-    SEL = DATA.profiles[0]?.member_id ?? null;
-    renderMembers(); renderDetail(); renderCampaign();
-    toast(t("loaded")(res.members, res.rows, res.rejected));
-  } catch (e) { toast(t("error") + String(e.message).split("\n").filter(Boolean).pop()); }
+    const res = JSON.parse(py.globals.get("run")(text, document.getElementById("k").value));
+    document.getElementById("status").textContent = res.note;
+    let html = "<table><tr><th>#</th><th>model_id</th><th>ngành hàng</th><th>bậc giá</th><th>nguồn</th><th>lý do</th></tr>";
+    let last = null;
+    for (const r of res.rows) {
+      if (r.member_id !== last) { html += `<tr class="member"><td colspan="6">${esc(r.member_id)} · ${esc(r.country_code)}</td></tr>`; last = r.member_id; }
+      html += `<tr><td>${r.rank}</td><td>${esc(r.model_id)}</td><td>${esc(r.department)}</td><td>${esc(r.price_band)}</td>` +
+              `<td class="src-${esc(r.source)}">${esc(r.source)}</td><td>${esc(r.reason)}</td></tr>`;
+    }
+    document.getElementById("out").innerHTML = html + "</table>";
+    const dl = document.getElementById("dl");
+    dl.href = URL.createObjectURL(new Blob([res.csv], {type: "text/csv"})); dl.style.display = "inline";
+  } catch (e) {
+    document.getElementById("status").textContent = "Lỗi: " + e.message.split("\n").filter(Boolean).pop();
+  }
+  b.disabled = false;
 }
-
-let LAST = null;
-async function useFile(f) { LAST = await f.text(); $("#dropText").textContent = f.name; if (py) runText(LAST); }
-$("#file").addEventListener("change", (e) => e.target.files[0] && useFile(e.target.files[0]));
-const drop = $("#drop");
-["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
-["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", (e) => e.dataTransfer.files[0] && useFile(e.dataTransfer.files[0]));
-$("#sample").addEventListener("click", async () => { LAST = null; $("#dropText").textContent = t("drop"); runText(await (await fetch("reference/sample_purchases.csv")).text()); });
-$("#k").addEventListener("input", (e) => ($("#kv").textContent = e.target.value));
-$("#k").addEventListener("change", async () => py && runText(LAST ?? (await (await fetch("reference/sample_purchases.csv")).text())));
-$("#q").addEventListener("input", () => DATA && renderMembers());
-$("#export").addEventListener("click", () => DATA && exportCsv());
-document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => {
-  document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("on", x === b));
-  document.querySelectorAll(".view").forEach((v) => v.classList.toggle("on", v.id === b.dataset.v));
-}));
-document.querySelectorAll(".lang button").forEach((b) => b.addEventListener("click", () => { L = b.dataset.l; i18n(); }));
-i18n();
-document.querySelectorAll("[data-count]").forEach((e, i) => setTimeout(() => count(e, +e.dataset.count, e.dataset.fmt, 1200), 300 + i * 120));
-boot().catch((e) => { $("#engine").textContent = t("error") + e.message; });
+document.getElementById("go").addEventListener("click", go);
+boot().catch(e => { document.getElementById("status").textContent = "Không khởi động được: " + e.message; });
 </script>
 </body>
 </html>

@@ -3,16 +3,12 @@
 Three sources, as R1 / R6 / R13 of ml/retrieval: repeat (the member's own models, frequency × recency decay), co-purchase (EASE
 item-item weights summed over her history) and trend (models rising in her departments). Explore sources skip the models she
 already bought (explore-only, ml/DECISIONS.md). Lists are merged with the mixer's weighted rank quotas: key = min_s (rank_s − 0.5) / w_s.
-The offline ranker (P1 / P3) is evaluated in the report; the demo serves the candidate layer only.
-Besides the Vietnamese `reason`, every row carries the structured facts behind it (times bought, days since the last purchase,
-purchase cycle, due flag, the model it is bought with, trend, new department) so the page can phrase it in either language."""
+The offline ranker (P1 / P3) is evaluated in the report; v0 serves the candidate layer only."""
 import datetime as dt
 import numpy as np, pandas as pd
 
 WEIGHTS = {"repeat": 1.0, "co_purchase": 0.8, "trend": 0.4}
 HALF_LIFE = 180
-DUE = (0.8, 2.0)   # a repeat is due between 80 % and 200 % of the member's own cycle for that model; later it has lapsed
-EXTRA = ["n", "last", "cycle", "due", "because", "trend", "popularity"]
 REQUIRED = ("member_id", "country_code", "model_id", "purchase_date")
 
 
@@ -37,12 +33,9 @@ def validate(df):
 def repeat(h, ref):
     days = np.array([(ref.asof - d).days for d in h["purchase_date"]])
     h = h.assign(w=h["quantity"] * 0.5 ** (days / HALF_LIFE), days=days)
-    g = h.groupby("model_id").agg(score=("w", "sum"), n=("quantity", "sum"), last=("days", "min"), first=("days", "max"),
-                                  visits=("purchase_date", "nunique")).reset_index()
-    g["cycle"] = np.where(g["visits"] > 1, (g["first"] - g["last"]) / (g["visits"] - 1).clip(lower=1), np.nan).round()
-    g["due"] = g["cycle"].notna() & g["last"].between(DUE[0] * g["cycle"], DUE[1] * g["cycle"])
+    g = h.groupby("model_id").agg(score=("w", "sum"), n=("quantity", "sum"), last=("days", "min")).reset_index()
     g["reason"] = [f"Mua lại: bạn đã mua {int(n)} lần, lần gần nhất {d} ngày trước" for n, d in zip(g["n"], g["last"])]
-    return g[["model_id", "score", "reason", "n", "last", "cycle", "due"]]
+    return g[["model_id", "score", "reason"]]
 
 
 def co_purchase(h, ref, seen):
@@ -53,7 +46,7 @@ def co_purchase(h, ref, seen):
     top = nb.sort_values("weight", ascending=False).drop_duplicates("neighbour_id")[["neighbour_id", "model_id"]]
     s = nb.groupby("neighbour_id")["weight"].sum().rename("score").reset_index().merge(top, on="neighbour_id")
     s["reason"] = [f"Hay được mua cùng {m} (bạn đã mua)" for m in s["model_id"]]
-    return s.rename(columns={"model_id": "because", "neighbour_id": "model_id"})[["model_id", "score", "reason", "because"]]
+    return s.rename(columns={"model_id": "because", "neighbour_id": "model_id"})[["model_id", "score", "reason"]]
 
 
 def trend(h, ref, seen, n=50):
@@ -66,7 +59,7 @@ def trend(h, ref, seen, n=50):
     m = m.sort_values("score", ascending=False).head(n).reset_index()
     m["reason"] = [f"Đang bán chạy trong {d}, ngành hàng bạn hay mua (×{t:.1f} so với quý trước)"
                    for d, t in zip(m["department"], m["trend"])]
-    return m[["model_id", "score", "reason", "trend"]]
+    return m[["model_id", "score", "reason"]]
 
 
 def merge(lists, k):
@@ -76,13 +69,10 @@ def merge(lists, k):
             d = df.sort_values("score", ascending=False).reset_index(drop=True)
             keys.append(d.assign(source=name, key=(np.arange(len(d)) + 0.5) / WEIGHTS[name]))
     if not keys:
-        return pd.DataFrame(columns=["rank", "model_id", "source", "reason"] + EXTRA[:-1])
+        return pd.DataFrame(columns=["rank", "model_id", "source", "reason"])
     allk = pd.concat(keys).sort_values(["key", "score"], ascending=[True, False]).drop_duplicates("model_id").head(k)
     allk["rank"] = np.arange(1, len(allk) + 1)
-    for c in EXTRA[:-1]:
-        if c not in allk:
-            allk[c] = np.nan
-    return allk[["rank", "model_id", "source", "reason"] + EXTRA[:-1]]
+    return allk[["rank", "model_id", "source", "reason"]]
 
 
 def recommend(df, refs, k=10):
@@ -95,33 +85,10 @@ def recommend(df, refs, k=10):
         h = h[h["purchase_date"] < ref.asof]
         seen = set(h["model_id"])
         r = merge({"repeat": repeat(h, ref), "co_purchase": co_purchase(h, ref, seen), "trend": trend(h, ref, seen)}, k)
-        r = r.merge(ref.models[["department", "price_band", "popularity"]], left_on="model_id", right_index=True, how="left")
-        own = set(ref.models.loc[ref.models.index.intersection(list(seen)), "department"])
-        r["new_department"] = (r["source"] != "repeat") & ~r["department"].isin(own)
+        r = r.merge(ref.models[["department", "price_band"]], left_on="model_id", right_index=True, how="left")
         out.append(r.assign(member_id=member, country_code=country))
-    cols = ["member_id", "country_code", "rank", "model_id", "department", "price_band", "source", "reason"] + EXTRA + ["new_department"]
+    cols = ["member_id", "country_code", "rank", "model_id", "department", "price_band", "source", "reason"]
     return pd.concat(out, ignore_index=True)[cols] if out else pd.DataFrame(columns=cols)
-
-
-def profiles(df, refs):
-    """One row per member: purchases, distinct models, days since the last purchase, visits in the 365 days before the as-of date,
-    segment (new ≤ 1 visit, mid 2, loyal ≥ 3, as the report's segments) and the top departments of the history."""
-    rows = []
-    for (member, country), h in df.groupby(["member_id", "country_code"], sort=True):
-        ref = refs.get(country)
-        if ref is None:
-            continue
-        h = h[h["purchase_date"] < ref.asof]
-        if h.empty:
-            continue
-        days = np.array([(ref.asof - d).days for d in h["purchase_date"]])
-        visits = h.loc[days <= 365, "purchase_date"].nunique()
-        depts = ref.models.reindex(h["model_id"])["department"].dropna().value_counts()
-        rows.append({"member_id": member, "country_code": country, "purchases": int(h["quantity"].sum()),
-                     "models": h["model_id"].nunique(), "last_days": int(days.min()), "visits_365d": int(visits),
-                     "segment": "new" if visits <= 1 else "mid" if visits == 2 else "loyal",
-                     "departments": [{"department": d, "count": int(c)} for d, c in depts.head(4).items()]})
-    return pd.DataFrame(rows)
 
 
 def load_refs(root):

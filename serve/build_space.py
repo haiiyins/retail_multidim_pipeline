@@ -18,10 +18,9 @@ pinned: false
 license: mit
 ---
 
-Demo of a course project on next-basket recommendation for retail members, built as a CRM / marketing console: upload a
-purchase CSV (`member_id, country_code, model_id, purchase_date, quantity`), browse each member's re-buy reminders (with their
-purchase cycle and a "due" flag) and new-product suggestions with the reason of each, preview what the member would see in an app,
-and build a campaign audience (due re-buys, cross-sell, department expansion) exported as CSV. Vietnamese / English. It runs in the browser (Pyodide); the first load takes a few seconds. Product codes and
+Demo v0 of a course project on next-basket recommendation for retail members: upload a purchase CSV
+(`member_id, country_code, model_id, purchase_date, quantity`) and get the top-K models of every member with the source and the
+reason of each recommendation. It runs in the browser (Pyodide); the first load takes a few seconds. Product codes and
 departments are anonymised (salted hashes, generic labels); the sample file is synthetic.
 """
 
