@@ -135,6 +135,8 @@ def main():
                 run.metrics.update({"valid_ndcg20": v, "best_epoch": ep, "train_sec": time.time() - t0,
                                     "params": int(sum(p.numel() for p in model.parameters()))})
                 tag = (variant if a.source == "v2" else f"{a.source}_{variant}") + ("" if a.seed == 0 else f"_seed{a.seed}")
+                os.makedirs(ml_path("models"), exist_ok=True)
+                torch.save({"state": model.state_dict(), "params": params, "variant": variant}, ml_path("models", f"p3_{tag}.pt"))
                 for split, d in (("valid", va), ("test", te)):
                     t1 = time.time()
                     sc = score(model, d, codes)

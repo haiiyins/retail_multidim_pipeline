@@ -139,6 +139,9 @@ def main():
                 v, _ = unconditional(con, sc, split, a.delta)
                 run.metrics[f"{split}_ndcg20"] = v
                 print(f"  {split}: NDCG@20 {v:.4f} → {path}", flush=True)
+            os.makedirs(ml_path("models"), exist_ok=True)
+            m.save_model(ml_path("models", f"{name}.txt"), num_iteration=m.best_iteration)
+            run.artifacts["model"] = ml_path("models", f"{name}.txt")
             imp = pd.DataFrame({"feature": feat, "gain": m.feature_importance("gain")}).sort_values("gain", ascending=False)
             imp.to_csv(ml_path("report", f"importance_{name}.csv"), index=False)
 

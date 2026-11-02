@@ -75,3 +75,69 @@ and runs with the defaults of `ml/config/retrieval.yml`. Unconditional coverage 
 - Exact search on the GPU replaces FAISS: 5 000 models per country, a full matrix product is cheaper than an ANN index.
 - gensim 4.4 on aarch64 prints `Exception ignored in our_dot_float` a few times per fit with several workers (one dot product
   out of ~10⁹; a single worker never shows it); the vectors are finite with normal norms, so the warning is filtered from the logs.
+
+## 2026-11-02 · Explore-only learned sources, marginal explore objective (model review, ML-11/12)
+
+R1 already holds 99.7 % of the repeat positives, while 91 % of the positives are explore models and 74.5 % of them were outside the
+list. Before this change the learned sources spent most of their slots on repeats (EASE cand_repeat 0.59, TIFU-KNN 0.97).
+- Every learned source masks the models the member bought before the anchor (`retrieval.explore_only`, `base.mask_scores`).
+- A source is tuned on the explore coverage it adds to R1–R5@200 on valid (Δ cand_explore of the union), not on its own Recall@100.
+- Two-tower (R9): several reference days per member and epoch (4), month of t in the member tower, explore targets with a
+  softmax that masks the models already seen. SASRec (R10): one step per basket (mean of its models), gap embedding, dense all-action
+  explore loss (each step predicts every explore model of (t, t + Δ], PinnerFormer-style), 8 epochs. gSASRec is dropped.
+- New cheap sources: R11 explin (supervised windowed linear model, X = decayed history ≤ t, Y = explore purchases in (t, t + Δ],
+  closed form), R12 RP3beta, R13 context-aware trend (last-window popularity reweighted by the member's departments and price band).
+- Best valid Δ cand_explore, 10 trials: EASE +0.0853, TIFU-KNN +0.0569, RP3beta +0.0877, explin +0.0738, trend +0.0692
+  (two-tower, SASRec: see below).
+
+## 2026-11-02 · Reduced run: 10 trials per model, one seed, smaller scope
+
+The end-to-end run has to finish by 2026-11-03. Agreed with the user:
+- `tuning.yml n_trials: 10` for every model with hyper-parameters (D5 keeps its meaning: the same budget for all). TPE is seeded,
+  so the first 10 trials of a 30-trial study are a 10-trial study; already-finished sources were rebuilt with their best of 10
+  (best of 30 vs best of 10 differ by ≤ 0.001, except TIFU-KNN 0.0578 vs 0.0569).
+- One seed for the deep models (D6 asked for 3).
+- Dropped: gSASRec, P4, conformal intervals, drift monitoring; P3 ablation reduced to three rows (one head, fixed gate, no
+  sequence); demo v0 (CSV → top-K with reasons, no what-if, no parity check).
+
+## 2026-11-02 · Pairs of candidates_v2 (ML-17)
+
+`ml/common/pairs.py` renders the Gold dbt SQL of `gld_fs_pair` / `gld_ranking_dataset` (Jinja, `ref()` resolved to the attached
+lakehouse or to the new candidates) and writes Parquet, because the lakehouse is read-only while jobs read it. Parity on one VN anchor
+day against `gld_ranking_dataset`: same rows and columns; differences are float noise (~1e-9) and 40 `dept_buy_cnt` values that
+come from ties in Gold's ASOF join, which is not deterministic.
+
+## 2026-11-02 · P2 signals and H2 (ML-15/16, t29, t29b)
+
+- Temporal hazard: LightGBM binary over member × department rows (departments bought before t plus the country top 10 of the last
+  90 days; 4.37 M rows, 6 % positive). WTP: LightGBM quantile regression of the log unit price paid in (t, t + Δ] (α 0.5 on the
+  median line, α 0.9 on the maximum). Fixed hyper-parameters (300 rounds): they are features of a ranker, not compared models.
+  item2vec enters P2 through the rolling R7 rank of the pairs, not as a separate model.
+- Each signal is fitted three ways (D7): rolling (quarterly cutoffs, the only point-in-time-correct variant; QC: 0 violations),
+  naive (fitted once on train and applied in-sample) and leaky (fitted on every split). Fits use at most 120 000 anchors.
+- t29, hazard AUC on train / pseudo-test (last train quarter) / test: rolling 0.681 / 0.703 / 0.708, naive 0.725 / 0.744 / 0.705,
+  leaky 0.710 / 0.717 / 0.723. Naive looks better in-sample and is no better on test; leaky stays better on test, where it has seen
+  the labels.
+- t29b (v1 pairs, P1-frozen hyper-parameters, fused on train anchors ≤ 2025-05-31; unconditional NDCG@20, TH + VN): the naive
+  fusion is +0.0019 over rolling on its training anchors, +0.0005 on the pseudo-test and −0.0011 on test. This is H2's direction,
+  but every gap lies inside the member-bootstrap intervals (± 0.002 on test). The signals add little to the pairs (rolling
+  +0.0004 over no signals on test), because Gold already has department recency/cycle and price-gap features.
+
+## 2026-11-02 · Baselines of t31 (ML-18..21)
+
+- P-TopFreq (the member's own purchase counts) and GP-TopFreq (then country popularity) score the full catalogue.
+- EASE and TIFU-KNN as NBR rankers: the same rolling models, without the explore-only mask, with their own 10-trial budget on
+  valid NDCG@20 (`ml/baselines/nbr.py`). SASRec: the R10 build also writes the unmasked top 100 of the valid and test anchors
+  (`retrieval.full_catalogue`), with the R10 parameters (no separate NDCG@20 budget, a stated limitation).
+- P1-frozen is refitted on the v2 pairs with its original feature set (`ml/rankers/frozen.py`) and stays a reference row.
+  P1-tuned and P2 get 10 trials on v2 with every pair column, source ranks included, as does P3.
+
+## 2026-11-02 · P3 UMTR design (ML-22..24)
+
+User tower: a Transformer over the last 50 purchases (shared model embedding plus a log-gap embedding) and an MLP over the member
+context. Item tower: model and department embeddings plus an MLP over the candidate's pair features. DIN-style target attention of
+each candidate over the sequence states. Two heads, repeat and explore, each with a softmax inside its group. A learned gate g(u)
+splits the probability mass: g for the repeat group, 1 − g for the explore group. The gate is trained with BCE on the repeat share
+of the member's positives. Auxiliary Δ90 BCE head. The loss is listwise (mean −log p over the positives). Early stopping uses
+unconditional valid NDCG@20. The department-hazard auxiliary head of the plan is dropped (its λ left the tuning space), because
+P2's hazard covers that signal. Ablation (t32): one head, fixed gate (g = the member's repeat share), no sequence (context only).

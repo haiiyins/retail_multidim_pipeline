@@ -7,7 +7,7 @@ import argparse, glob, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import pandas as pd
 from ml.common.data import ML_DIR, connect, ml_path
-from ml.retrieval.base import baseline_relation, candidates_relation, recall_table, show, union_relation
+from ml.retrieval.base import CFG, baseline_relation, candidates_relation, recall_table, show, union_relation
 
 SEED = re.compile(r"^(.*)_seed(\d+)$")
 
@@ -15,10 +15,11 @@ SEED = re.compile(r"^(.*)_seed(\d+)$")
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="t30a")
-    ap.add_argument("--sources", default="", help="comma-separated; default every directory of data/ml/candidates/ but seed replicas")
+    ap.add_argument("--sources", default="", help="comma-separated; default the built sources of retrieval.mixer.learned")
     a = ap.parse_args()
     built = sorted(os.path.basename(d.rstrip("/")) for d in glob.glob(os.path.join(ML_DIR, "candidates", "*", "")))
-    names = a.sources.split(",") if a.sources else [n for n in built if not SEED.match(n)]
+    learned = CFG["mixer"]["learned"]   # not the seed replicas, the unmasked baseline lists (*_full) nor the mixes (mix_*)
+    names = a.sources.split(",") if a.sources else [n for n in learned if n in built]
     con = connect()
     tables = []
     for s in ("valid", "test"):
