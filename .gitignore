@@ -7,6 +7,7 @@ data/quarantine/*
 data/audit/*
 data/duck_temp/*
 data/ml/*
+data/demo/*
 data/server_reports/*
 data/*.log
 data/*.pid
