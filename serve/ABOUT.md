@@ -14,7 +14,7 @@ Kết quả offline của pipeline (tập test 2026-02 … 07, TH + VN, Δ = 30 
 - Retrieval học được (8 nguồn, K = 300): độ phủ món khách mua 0,370 → 0,450; riêng món khám phá 0,307 → 0,400.
 - Xếp hạng: GBDT tinh chỉnh 0,101; mô hình sâu một đầu 0,102 (cao nhất, +0,0009 so với GBDT); baseline mạnh nhất TIFU-KNN 0,079.
 - So với quy tắc đơn giản (HR@10): gấp 1,8 lần "bán chạy", 1,5 lần "mua lại đúng món cũ".
-- Theo loại khách: 79 % trúng trong top 10 khi khách sắp mua lại một món cũ, nhưng chỉ khoảng 10 % khi khách chỉ mua món mới
+- Theo loại khách: 77 % sản phẩm khách mua lại nằm trong 10 gợi ý, nhưng chỉ khoảng 10 % khi khách chỉ mua món mới
   (ngang danh sách bán chạy): gợi ý món mới là phần mô hình còn yếu.
 - GMV là proxy offline, không phải hiệu quả nhân quả.
 
