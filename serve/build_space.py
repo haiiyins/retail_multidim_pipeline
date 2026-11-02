@@ -30,9 +30,7 @@ def main():
         shutil.rmtree(OUT)
     (OUT / "reference").mkdir(parents=True)
     shutil.copy(SRC / "recommend.py", OUT / "recommend.py")
-    about = ROOT / "data" / "demo" / "ABOUT.md"
-    if about.exists():
-        shutil.copy(about, OUT / "ABOUT.md")
+    shutil.copy(SRC / "ABOUT.md", OUT / "ABOUT.md")
     for p in sorted(REF.glob("*.parquet")):
         pd.read_parquet(p).to_csv(OUT / "reference" / f"{p.stem}.csv", index=False, float_format="%.5g")
     for f in ("sample_purchases.csv", "asof.txt"):

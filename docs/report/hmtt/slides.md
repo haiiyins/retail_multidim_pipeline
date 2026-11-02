@@ -1,0 +1,36 @@
+# Slide outline (18 – 20 slides, 15 min + 5 min demo)
+
+Numbers come from the drafts of this folder; a slide never shows a number that is not in a table of `docs/report/tables/ml/`.
+
+1. **Title** — Next-basket recommendation as a two-stage problem: learned retrieval, multi-task ranking, honest evaluation.
+2. **Problem** — member × Monday anchor, which models in the next 30 days; three countries, TH + VN main scope.
+3. **Starting point** — KTXLDL P1: NDCG@20 0.206 conditional → 0.095 unconditional; 40.7 % of the anchors have no purchase in the list (t28).
+4. **Where the errors are (t28b)** — stacked bar repeat / explore × top 10 / rank 11+ / capped / no source. 91 % of the positives are
+   explore, 74.5 % of explore never reaches the ranker.
+5. **Research questions** — RQ1 retrieval, RQ2 ranking, RQ3 repeat / explore heads, H2 stacking leakage, RQ4 feasibility.
+6. **Point-in-time discipline** — quarterly refits in every split, fit_cutoff / source_ts_max on every row, QC-6 = 0 violations;
+   why a single fit at the end of train loses a third of the test positives.
+7. **Learned retrieval** — eight explore-only sources, tuned on the explore coverage they add; diagram of sources → mixer → K = 300.
+8. **Coverage (t30)** — bar chart: R1–R5 0.370 → best single source 0.439 → candidates_v2 0.450 → uncapped union 0.541; explore × 1.30.
+9. **Recall–cost curve** — K ∈ {100, 200, 300, 500}; cheap sources (RP3beta, EASE) vs neural (≈ 6 GPU-h each, t37).
+10. **RQ1 to NDCG** — frozen ranker on v2: +0.0025 [0.0018, 0.0032]; explore +0.010, repeat −0.032.
+11. **Rankers** — P1-tuned (GBDT), P2 (GBDT + hazard / WTP signals), P3 UMTR (Transformer + DIN, two gated heads); one budget.
+12. **H2 (t29, t29b)** — naive vs rolling vs leaky: inflation in-sample, gone on test; signals add little over Gold features.
+13. **RQ2 headline (t31)** — table of the ten rows with CIs; paired differences P3 vs P1-tuned.
+14. **By segment (t34)** — new / mid / loyal × NDCG@20 and recall_explore@20.
+15. **RQ3 ablation (t32)** — learned gate vs fixed gate vs one head vs no sequence; paired bootstrap.
+16. **Explanations (t35)** — grouped SHAP of the GBDT; P3 gate by segment.
+17. **Feasibility (t38, t39)** — multiples over random / popular / buy-again, GMV proxy (offline, not causal), serving coverage.
+18. **Cost (t37)** — tuning and build hours per model vs gain.
+19. **Demo** — static page, CSV → top-K with reasons; privacy choices (salted ids, generic departments, synthetic members).
+20. **Limitations and next steps** — 10 trials and one seed, SASRec without its own NBR budget, explore × 1.3 not × 2, no online test.
+
+## Demo script (5 min)
+
+1. t28b: where the errors are (30 s).
+2. t30: retrieval raises coverage (30 s).
+3. t31 / t34: who wins where (1 min).
+4. Open the Space, upload `sample_purchases.csv`, pick a member, show the top 10 with the source of each item (repeat,
+   co-purchase, trend) and its popularity percentile (2 min).
+5. Edit one row of the CSV (add a purchase in another department) and re-run: the co-purchase items change (30 s).
+6. Limits: reference tables frozen at the as-of date, no prices, no what-if (30 s).
