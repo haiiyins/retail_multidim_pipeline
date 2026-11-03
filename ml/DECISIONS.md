@@ -219,3 +219,18 @@ lowered (`--budget 30`: studies and spaces `<model>_b30` in tuning.yml; GBDT lea
 trials: P1-tuned 0.1088 → 0.1089, P2 0.1089 → 0.1088, P3 two heads 0.1087 → 0.1086, P3 one head 0.1096 → 0.1092 — **10-trial fits kept**.
 Test, reported once (t31_b30_paired, 30 − 10): P1-tuned +0.0001 [−0.0003, 0.0006], P2 +0.0007 [0.0003, 0.0011], P3 two heads −0.0002
 [−0.0005, 0.0001], P3 one head −0.0000 [−0.0003, 0.0003]. The search had converged; the order of t31 stands.
+
+## 2026-11-03 · Purchase-history-only ranker (t31_hist)
+
+Question: how much of the gain over the status quo (recommending from purchase history alone) comes from the extra data dimensions,
+and how much from the pipeline (multi-source retrieval + learned ranker)? P1 re-tuned (10 trials, study `p1_v2_hist`) and refitted
+on the v2 pairs with `gbdt.py --history-only`: 39 of the 85 features kept (`HISTORY` in gbdt.py) — R1 / R2 / R5 and the learned source
+ranks, own and department history, co-purchase, sales popularity / season / model age, activity counts, country. Dropped: web (R3,
+its rank and `candidate_rank`, which mixes it), prices and promotions, stock, stores, calendar, sport affinity, member price
+profile, returns, tenure, GMV. The candidate pool is unchanged (it still holds the R3 candidates, without the features that say
+why), and the two-tower / trend sources use the paid unit price of the sales lines; both make the history-only row slightly
+optimistic. Valid, TH + VN NDCG@20: GP-TopFreq 0.0819, TIFU-KNN 0.0890, P1-hist 0.1044, P1-tuned 0.1088, P3 one head 0.1096.
+Test, reported once (t31_hist, t31_hist_paired): GP-TopFreq 0.0752, P1-hist 0.0966, P1-tuned 0.1011, P3 one head 0.1020;
+P1-hist − GP-TopFreq +0.0214 [0.0204, 0.0225], P1-tuned − P1-hist +0.0045 [0.0039, 0.0052], P3 one head − P1-hist +0.0054
+[0.0046, 0.0062]. Of the +0.0268 of P3 one head over GP-TopFreq, about 80 % is reached on history alone and 20 % needs the other
+dimensions; the multi-dimensional gain is in explore recall (+0.0077) and costs some repeat recall in the GBDT (−0.0086).

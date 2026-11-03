@@ -9,7 +9,7 @@ from ml.common.data import ROOT, ml_path
 
 TABLES = ["t28_p1_frozen_d30", "t28b_p1_frozen_d30", "t29_signals", "t29b_v1", "t29b_v2", "t30a_sources", "t30_curve", "t31",
           "t31_segments", "t31_paired", "t31_seeds", "t31_seeds_paired", "t31_v3", "t31_v3_paired", "t31_b30", "t31_b30_paired",
-          "t32", "t32_paired", "t35", "t37", "t38", "t39"]
+          "t31_hist", "t31_hist_paired", "t32", "t32_paired", "t35", "t37", "t38", "t39"]
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 

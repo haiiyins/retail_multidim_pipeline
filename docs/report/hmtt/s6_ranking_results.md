@@ -86,6 +86,25 @@ kept. Test, reported once (paired 30 − 10 trials): P1-tuned +0.0001 [−0.0003
 −0.0002 [−0.0005, 0.0001], P3 one head −0.0000 [−0.0003, 0.0003]. The search had converged: three times the budget moves no model
 by more than the seed spread, except a small P2 gain on test that valid does not show.
 
+*Purchase history only (t31_hist).* The business recommends today from purchase history alone. To separate what the extra data
+dimensions bring from what the pipeline brings, P1 was re-tuned (10 trials) and refitted on the same v2 pairs with only the 39
+features a purchase log yields: R1 / R2 / R5 and the learned source ranks, own and department history, co-purchase, sales
+popularity / season / model age, activity counts and country. Web behaviour (R3 and the mixed candidate rank), prices and
+promotions, stock, stores, calendar, sport affinity and the member price profile are removed. Test, TH + VN:
+
+| Data | Status quo / classical | Pipeline (retrieval + learned ranker) |
+|---|---|---|
+| Purchase history only | GP-TopFreq 0.0752, P-TopFreq 0.0615, TIFU-KNN 0.0788 | P1-hist 0.0966 |
+| Multi-dimensional | — | P1-tuned 0.1011, P3 one head 0.1020 |
+
+Paired (t31_hist_paired): P1-hist − GP-TopFreq +0.0214 [0.0204, 0.0225], P1-tuned − P1-hist +0.0045 [0.0039, 0.0052], P3 one
+head − P1-hist +0.0054 [0.0046, 0.0062]; valid gives the same order (0.0819, 0.1044, 0.1088, 0.1096). Of the +0.0268 that P3 one
+head gains over the status quo, about four fifths are reached on purchase history alone, by multi-source retrieval and a learned
+ranker; the remaining fifth needs the other dimensions and shows up in explore recall (P1-tuned − P1-hist +0.0077), i.e. in
+recommending models the member has not bought yet. Two choices make the history-only row slightly optimistic: the candidate pool
+is the multi-dimensional one (it still holds the web-intent candidates, without the features that explain them), and the
+two-tower and trend sources use the unit price paid on the sales lines.
+
 ## B. By country and segment (t34)
 
 NDCG@20 on test (segments by transactions in the 365 days before the anchor: new ≤ 1, mid 2, loyal ≥ 3; all countries):
