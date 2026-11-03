@@ -3,7 +3,8 @@ early stopping on the unconditional valid NDCG@20 after every epoch; tuning = th
 Variants (t32 ablation, with the tuned parameters of full): full · onehead (no gating) · fixedgate (g = repeat share) · noseq (context
 only, no sequence encoder nor attention) · nodin (no target attention).
 Usage: python ml/umtr/train.py --source v2 --tune
-       python ml/umtr/train.py --source v2 --final --variants full,onehead,fixedgate,noseq   →  data/ml/scores/p3_<variant>_<split>_d30.parquet"""
+       python ml/umtr/train.py --source v2 --final --variants full,onehead,fixedgate,noseq   →  data/ml/scores/p3_<variant>_<split>_d30.parquet
+       python ml/umtr/train.py --source v2 --budget 30 --tune --final --variants full,onehead  →  p3_<variant>_b30 (30 trials, space p3_b30)"""
 import argparse, copy, json, os, sys, time
 import numpy as np, pandas as pd, torch
 
@@ -87,16 +88,16 @@ def fit(tr, va, params, variant, con, codes, seed=0, log=""):
     return model, best, best_ep
 
 
-def study(source):
-    return "p3" if source == "v2" else f"p3_{source}"
+def study(source, budget=None):
+    return ("p3" if source == "v2" else f"p3_{source}") + (f"_b{budget}" if budget else "")
 
 
-def tuned_params(source):
+def tuned_params(source, budget=None):
     p = dict(C["params"])
-    path = ml_path("tuning", f"{study(source)}.parquet")
+    path = ml_path("tuning", f"{study(source, budget)}.parquet")
     if os.path.exists(path):
         t = pd.read_parquet(path)
-        t = t[(t["state"] == "COMPLETE") & (t["trial"] < N_TRIALS)]
+        t = t[(t["state"] == "COMPLETE") & (t["trial"] < (budget or N_TRIALS))]
         if len(t):
             p.update(json.loads(t.loc[t["value"].idxmax(), "params"]))
     return p
@@ -110,6 +111,7 @@ def main():
     ap.add_argument("--final", action="store_true")
     ap.add_argument("--variants", default="full")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--budget", type=int, default=None, help="study p3_b<N>, space p3_b<N> of tuning.yml")
     a = ap.parse_args()
     con = connect()
     tr, va = get(a.source, "train"), get(a.source, "valid")
@@ -122,19 +124,21 @@ def main():
             trial.set_user_attr("best_epoch", ep)
             print(f"  trial {trial.number}: NDCG@20 (valid, unconditional) {v:.4f}  epoch {ep}  {params}", flush=True)
             return v
-        st, _ = tune(study(a.source), objective, n_trials=a.trials, space=load_config("tuning")["p3"]["space"],
+        cfg = load_config("tuning")
+        st, _ = tune(study(a.source, a.budget), objective, n_trials=a.trials or a.budget, space=cfg.get(f"p3_b{a.budget}", cfg["p3"])["space"],
                      tag="" if a.trials is None else f"_smoke{a.trials}")
         print(f"best {st.best_value:.4f}  {st.best_params}", flush=True)
     if a.final:
         te = get(a.source, "test")
-        params = tuned_params(a.source)
+        params = tuned_params(a.source, a.budget)
         for variant in a.variants.split(","):
-            with Run(f"p3:{a.source}:{variant}", config={"umtr": C, "variant": variant, "source": a.source, "seed": a.seed}, params=params) as run:
+            with Run(f"p3:{a.source}:{variant}", config={"umtr": C, "variant": variant, "source": a.source, "seed": a.seed, "budget": a.budget}, params=params) as run:
                 t0 = time.time()
                 model, v, ep = fit(tr, va, params, variant, con, codes, seed=a.seed, log=variant)
                 run.metrics.update({"valid_ndcg20": v, "best_epoch": ep, "train_sec": time.time() - t0,
                                     "params": int(sum(p.numel() for p in model.parameters()))})
-                tag = (variant if a.source == "v2" else f"{a.source}_{variant}") + ("" if a.seed == 0 else f"_seed{a.seed}")
+                tag = ((variant if a.source == "v2" else f"{a.source}_{variant}") + (f"_b{a.budget}" if a.budget else "")
+                       + ("" if a.seed == 0 else f"_seed{a.seed}"))
                 os.makedirs(ml_path("models"), exist_ok=True)
                 torch.save({"state": model.state_dict(), "params": params, "variant": variant}, ml_path("models", f"p3_{tag}.pt"))
                 for split, d in (("valid", va), ("test", te)):
