@@ -149,8 +149,22 @@ tr.in { animation: up .35s both; animation-delay: calc(var(--i) * 30ms); }
 .guide { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
 .guide h4 { margin: 0 0 6px; } .guide ol, .guide ul { margin: 0; padding-left: 18px; } .guide li { margin: 4px 0; }
 .about { white-space: pre-wrap; font: .9rem/1.6 system-ui, sans-serif; }
+/* best model (back-test) */
+.bt-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+.bt-kpis .stat b { font-size: 1.35rem; } .bt-kpis .stat b.best { color: var(--brand); } .bt-kpis .stat b.sq { color: var(--muted); }
+.bt-grid { display: grid; grid-template-columns: 290px 1fr; gap: 16px; align-items: start; }
+.cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.lst { display: flex; flex-direction: column; gap: 6px; }
+.li { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; font-size: .84rem; animation: up .35s both; animation-delay: calc(var(--i) * 30ms); }
+.li.hit { border-color: #34d399; background: #ecfdf5; }
+.li .sw { width: 34px; height: 26px; border-radius: 7px; display: grid; place-items: center; color: #fff; font-size: .72rem; font-weight: 700; }
+.li .nm { line-height: 1.25; } .li .nm small { display: block; color: var(--muted); font-size: .74rem; }
+.ok { color: #047857; font-weight: 700; font-size: .78rem; white-space: nowrap; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; max-height: 150px; overflow: auto; }
+.colh { font-weight: 700; margin: 0 0 8px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.colh .n { font-size: .82rem; color: var(--muted); font-weight: 600; }
 footer { color: var(--muted); font-size: .8rem; padding: 26px 0 40px; }
-@media (max-width: 1100px) { .grid3 { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, 1fr); } .ctypes { grid-template-columns: 1fr; }
+@media (max-width: 1100px) { .grid3, .bt-grid, .cmp, .bt-kpis { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, 1fr); } .ctypes { grid-template-columns: 1fr; }
   .profile { grid-template-columns: repeat(2, 1fr); } .sum { grid-template-columns: 1fr 1fr; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
@@ -187,6 +201,7 @@ footer { color: var(--muted); font-size: .8rem; padding: 26px 0 40px; }
   <nav class="tabs" role="tablist">
     <button class="tab on" data-v="customers" data-i="tab1"></button>
     <button class="tab" data-v="campaigns" data-i="tab2"></button>
+    <button class="tab" data-v="best" data-i="tab5"></button>
     <button class="tab" data-v="guide" data-i="tab3"></button>
     <button class="tab" data-v="about" data-i="tab4"></button>
   </nav>
@@ -218,6 +233,14 @@ footer { color: var(--muted); font-size: .8rem; padding: 26px 0 40px; }
       <tbody id="audience"></tbody></table></div>
   </section>
 
+  <section class="view" id="best">
+    <div class="panel" style="margin-bottom:14px"><h3 style="margin-top:0">🏆 <span data-i="btTitle"></span></h3><p class="note" style="margin:0 0 12px" data-i="btIntro"></p>
+      <div class="bt-kpis" id="btKpis"></div></div>
+    <div class="bt-grid">
+      <div class="panel"><input class="search" id="bq" data-ph="search" aria-label="search" /><div class="members" id="btMembers"><div class="skel"></div></div></div>
+      <div class="panel" id="btDetail"><div class="skel" style="height:420px"></div></div>
+    </div>
+  </section>
   <section class="view" id="guide"><div class="guide" id="guideBody"></div></section>
   <section class="view" id="about"><div class="panel about" id="aboutText"></div></section>
   <footer data-i="footer"></footer>
@@ -241,7 +264,14 @@ const T = {
     prodRef: "sản phẩm", names: "Nạp tên sản phẩm (tuỳ chọn)", namesHelp: "File CSV gồm 2 cột: model_id và product_name. Khi có tên, thẻ gợi ý sẽ hiện tên sản phẩm thay vì chỉ có mã.",
     namesLoaded: (n) => `Đã nạp tên cho ${n} sản phẩm`, namesBad: "File tên sản phẩm cần có cột model_id và product_name",
     topk: "Số sản phẩm gợi ý mỗi khách", topkHelp: "Mặc định 10, giống cách đo các chỉ số phía trên. Tổng số gợi ý gồm cả nhắc mua lại và sản phẩm mới.",
-    tab1: "Khách hàng", tab2: "Chiến dịch", tab3: "Hướng dẫn", tab4: "Về mô hình",
+    tab1: "Khách hàng", tab2: "Chiến dịch", tab3: "Hướng dẫn", tab4: "Về mô hình", tab5: "Mô hình tốt nhất (kiểm chứng)",
+    btTitle: "Mô hình tốt nhất so với cách làm hiện tại, trên khách thật",
+    btIntro: "Mô hình sâu một đầu (P3), chọn trên tập valid, dùng đủ dữ liệu đa chiều (85 đặc trưng, 13 nguồn ứng viên), chấm theo lô trên kho dữ liệu nội bộ. Bên cạnh là cách làm hiện tại: gợi ý lại món khách mua nhiều nhất, bù bằng món bán chạy (GP-TopFreq). Mỗi khách là một khách thật lấy ngẫu nhiên trong giai đoạn kiểm tra 02–07/2026, đã ẩn danh; ✓ là món khách thực sự mua trong 30 ngày sau ngày gợi ý.",
+    btAll: "Toàn tập kiểm tra (41 734 lượt, TH + VN): khách mua ít nhất 1 món trong 10 gợi ý", btNdcg: "Độ chính xác xếp hạng NDCG@20, toàn tập kiểm tra",
+    btSample: (n) => `Trên ${num(n)} khách mẫu ở đây: khách mua ít nhất 1 món trong 10 gợi ý`,
+    btBest: "Mô hình tốt nhất (P3)", btSq: "Cách hiện tại (GP-TopFreq)", btHist: "Lịch sử mua trước ngày gợi ý", btHistSub: (n) => `${n} dòng gần nhất`,
+    btBought: "Thực tế khách mua trong 30 ngày sau", btHits: (n) => `trúng ${n}/10`, btRepeat: "mua lại", btNew: "món mới", btDaysAgo: (d) => `${d} ngày trước`,
+    btDaysAfter: (d) => `sau ${d} ngày`, btOk: "✓ đã mua", btNone: "Không có món nào trong 10 gợi ý được mua.",
     search: "Tìm theo mã khách…", phonecap: "Khách sẽ thấy trên ứng dụng như thế này",
     purchases: "Sản phẩm đã mua", models: "Mẫu sản phẩm khác nhau", lastBuy: "Ngày kể từ lần mua gần nhất", visits: "Lần mua trong 12 tháng qua",
     topDepts: "Ngành hàng khách hay mua", times: "lần",
@@ -293,7 +323,7 @@ const T = {
       ["Lưu ý khi sử dụng", ["Gợi ý nhắc mua lại đáng tin cậy hơn gợi ý sản phẩm mới. Nên thử nghiệm A/B với chiến dịch bán chéo trước khi triển khai rộng.",
         "Mã sản phẩm và tên ngành hàng đã được ẩn danh; khách trong dữ liệu mẫu là khách giả lập.",
         "Danh mục sản phẩm được cập nhật đến ngày 28/07/2026; các lần mua sau ngày này không được tính."]]],
-    footer: "Mã sản phẩm đã được ẩn danh, ngành hàng dùng tên chung, khách trong dữ liệu mẫu là khách giả lập. Đồ án môn học, không đại diện cho tổ chức nào.",
+    footer: "Mã sản phẩm đã được ẩn danh, ngành hàng dùng tên chung. Khách trong dữ liệu mẫu (tab Khách hàng, Chiến dịch) là khách giả lập; tab Mô hình tốt nhất dùng một mẫu khách thật đã ẩn danh, công bố với sự đồng ý của bên sở hữu dữ liệu. Đồ án môn học, không đại diện cho tổ chức nào.",
     error: "Có lỗi: ",
   },
   en: {
@@ -309,7 +339,14 @@ const T = {
     prodRef: "SKU", names: "Load product names (optional)", namesHelp: "A CSV with 2 columns: model_id and product_name. Cards then show the product name instead of the SKU only.",
     namesLoaded: (n) => `Product names loaded for ${n} SKUs`, namesBad: "The product-name file needs model_id and product_name columns",
     topk: "Recommendations per customer", topkHelp: "Default 10, the same as the metrics above. The total includes both repurchase reminders and new products.",
-    tab1: "Customers", tab2: "Campaigns", tab3: "How to use", tab4: "About the model",
+    tab1: "Customers", tab2: "Campaigns", tab3: "How to use", tab4: "About the model", tab5: "Best model (back-test)",
+    btTitle: "The best model against today's approach, on real customers",
+    btIntro: "The single-head deep model (P3), selected on validation, uses the full multi-dimensional data (85 features, 13 candidate sources) and is batch-scored in the internal warehouse. Next to it is today's approach: re-recommend the customer's most-bought products, filled with best-sellers (GP-TopFreq). Each customer is a real, anonymised customer drawn at random from the Feb–Jul 2026 test period; ✓ marks a product the customer actually bought within 30 days.",
+    btAll: "Whole test set (41,734 anchors, TH + VN): customers who bought at least 1 of the 10 recommendations", btNdcg: "Ranking accuracy NDCG@20, whole test set",
+    btSample: (n) => `On the ${num(n)} sample customers here: bought at least 1 of the 10 recommendations`,
+    btBest: "Best model (P3)", btSq: "Today's approach (GP-TopFreq)", btHist: "Purchases before the recommendation date", btHistSub: (n) => `latest ${n} lines`,
+    btBought: "Actually bought in the next 30 days", btHits: (n) => `${n}/10 hits`, btRepeat: "repeat", btNew: "new", btDaysAgo: (d) => `${d} days before`,
+    btDaysAfter: (d) => `after ${d} days`, btOk: "✓ bought", btNone: "None of the 10 recommendations was bought.",
     search: "Search by customer ID…", phonecap: "What the customer sees in the app",
     purchases: "Items purchased", models: "Distinct products", lastBuy: "Days since last purchase", visits: "Orders in the last 12 months",
     topDepts: "Top departments", times: "×",
@@ -360,7 +397,7 @@ const T = {
       ["Good to know", ["Repurchase reminders are more reliable than new-product picks; A/B test cross-sell campaigns before a wide roll-out.",
         "Product and department names are anonymised; sample customers are synthetic.",
         "The catalogue is as of 28 Jul 2026; purchases after that date are ignored."]]],
-    footer: "Product IDs are anonymised, departments use generic names, sample customers are synthetic. Course project; does not represent any organisation.",
+    footer: "Product IDs are anonymised, departments use generic names. Sample customers (Customers, Campaigns tabs) are synthetic; the Best model tab uses an anonymised sample of real customers, published with the data owner's consent. Course project; does not represent any organisation.",
     error: "Error: ",
   },
 };
@@ -393,6 +430,7 @@ function loadNames(text) {
   NAMES = Object.fromEntries(rows.map((r) => [String(r[i] ?? "").trim(), String(r[j] ?? "").trim()]).filter(([a, b]) => a && b));
   toast(t("namesLoaded")(Object.keys(NAMES).length));
   if (DATA) { renderDetail(); renderCampaign(); }
+  renderBest();
 }
 function hue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
 function tile(d) { const h = hue(d); return `background:linear-gradient(135deg,hsl(${h} 65% 40%),hsl(${(h + 40) % 360} 70% 50%))`; }
@@ -425,6 +463,7 @@ function i18n() {
     `<div class="kpi" style="animation-delay:${0.05 * (i + 1)}s"><b data-v="${v}" data-f="${f}">${f === "×" ? "×" + num(v, 1) : num(v) + "%"}</b>${help(tip)}<span class="lbl">${lbl}</span></div>`).join("");
   $("#guideBody").innerHTML = t("guide").map(([h, items]) => `<div class="panel"><h4>${h}</h4><ul>${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`).join("");
   if (DATA) { renderMembers(); renderDetail(); renderCampaign(); }
+  renderBest();
 }
 
 function reason(r) { return r.source === "repeat" ? t("why_repeat")(r) : r.source === "co_purchase" ? t("why_co")(r) : t("why_trend")(r); }
@@ -522,6 +561,50 @@ function exportCsv() {
   toast(t("exported"));
 }
 
+let BT = null, BSEL = null;
+const TEST = { hr10: { best: 0.240, status_quo: 0.184 }, ndcg: { best: 0.1020, status_quo: 0.0752 } };
+const hits = (m, k) => m[k].filter((x) => x.bought).length;
+function btItem(x, i) {
+  const nm = NAMES[x.model_id] ? `${esc(NAMES[x.model_id])}<small>${esc(t("dept")(x.department))} · <code>${esc(x.model_id)}</code></small>`
+    : `${esc(t("dept")(x.department))}<small><code>${esc(x.model_id)}</code>${x.price_band ? " · " + PRICE[L][x.price_band - 1] : ""}</small>`;
+  return `<div class="li ${x.bought ? "hit" : ""}" style="--i:${i}"><span class="sw" style="${tile(x.department)}">#${i + 1}</span><span class="nm">${nm}</span>
+    <span>${x.bought ? `<span class="ok">${t("btOk")}</span> ` : ""}<span class="tag ${x.repeat ? "" : "x"}">${x.repeat ? t("btRepeat") : t("btNew")}</span></span></div>`;
+}
+function renderBest() {
+  if (!BT) return;
+  const pct = (v) => `${num(100 * v, 1)}%`, n = BT.members.length;
+  $("#btKpis").innerHTML = [[t("btAll"), pct(TEST.hr10.best), pct(TEST.hr10.status_quo)], [t("btNdcg"), num(TEST.ndcg.best, 3), num(TEST.ndcg.status_quo, 3)],
+    [t("btSample")(n), pct(BT.sample_hr10.best), pct(BT.sample_hr10.status_quo)]].map(([lbl, b, q]) =>
+    `<div class="stat"><span>${lbl}</span><div style="display:flex;gap:14px;align-items:baseline;margin-top:4px"><b class="best">${b}</b><span class="code">${t("btBest")}</span>
+      <b class="sq">${q}</b><span class="code">${t("btSq")}</span></div></div>`).join("");
+  const q = $("#bq").value.trim().toLowerCase();
+  $("#btMembers").innerHTML = BT.members.filter((m) => m.member_id.toLowerCase().includes(q)).map((m) =>
+    `<button class="mem ${m.member_id === BSEL ? "on" : ""}" data-m="${esc(m.member_id)}"><div class="id">${esc(m.member_id)}</div>
+      <div class="tags"><span class="tag ${m.segment}">${t("seg_" + m.segment)}</span><span class="tag">${t("cty")[m.country_code] ?? m.country_code}</span>
+      <span class="tag x">P3 ${hits(m, "best")}</span><span class="tag">GP ${hits(m, "status_quo")}</span></div></button>`).join("");
+  $("#btMembers").querySelectorAll(".mem").forEach((b) => b.addEventListener("click", () => { BSEL = b.dataset.m; renderBest(); }));
+  const m = BT.members.find((x) => x.member_id === BSEL);
+  if (!m) { $("#btDetail").innerHTML = ""; return; }
+  const chip = (x, sub) => `<span class="tag" style="${tile(x.department)};color:#fff" title="${esc(x.model_id)}">${esc(NAMES[x.model_id] ?? t("dept")(x.department))} · ${sub}</span>`;
+  const col = (k, title) => `<div><div class="colh">${title}<span class="n">${t("btHits")(hits(m, k))}</span></div>
+    <div class="lst">${m[k].map(btItem).join("")}</div>${hits(m, k) ? "" : `<p class="note">${t("btNone")}</p>`}</div>`;
+  $("#btDetail").innerHTML = `<h3 style="margin-top:0">${esc(m.member_id)} <span class="tag ${m.segment}">${t("seg_" + m.segment)}</span>${help(t("segHelp"))}
+      <span class="tag">${t("cty")[m.country_code] ?? m.country_code}</span></h3>
+    <div class="code" style="margin-bottom:4px">${t("btHist")} · ${t("btHistSub")(m.history.length)}</div>
+    <div class="chips">${m.history.map((x) => chip(x, t("btDaysAgo")(x.days_before))).join("")}</div>
+    <div class="code" style="margin-bottom:4px">${t("btBought")}</div>
+    <div class="chips">${m.bought.map((x) => chip(x, `${x.repeat ? t("btRepeat") : t("btNew")}, ${t("btDaysAfter")(x.days_after)}`)).join("")}</div>
+    <div class="cmp">${col("best", "🏆 " + t("btBest"))}${col("status_quo", t("btSq"))}</div>`;
+}
+async function loadBest() {
+  try {
+    BT = await (await fetch("reference/showcase.json")).json();
+    BT.members.sort((a, b) => a.member_id.localeCompare(b.member_id));
+    BSEL = BT.members[0]?.member_id ?? null; renderBest();
+  } catch (e) { $("#btDetail").innerHTML = `<div class="empty">${t("error")}${esc(e.message)}</div>`; }
+}
+$("#bq").addEventListener("input", renderBest);
+
 async function boot() {
   $("#engine").textContent = t("boot1");
   const pyo = await loadPyodide();
@@ -580,10 +663,12 @@ $("#export").addEventListener("click", () => DATA && exportCsv());
 document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => {
   document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("on", x === b));
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("on", v.id === b.dataset.v));
+  $(".bar").style.display = b.dataset.v === "best" ? "none" : "";
 }));
 document.querySelectorAll(".lang button").forEach((b) => b.addEventListener("click", () => { L = b.dataset.l; i18n(); }));
 i18n();
 document.querySelectorAll(".kpi b").forEach((e, i) => setTimeout(() => count(e, +e.dataset.v, e.dataset.f, 1200), 300 + i * 120));
+loadBest();
 boot().catch((e) => { $("#engine").textContent = t("error") + e.message; });
 </script>
 </body>

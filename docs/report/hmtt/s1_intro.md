@@ -26,7 +26,7 @@ orderings, because a GBDT win is a valid outcome:
 Contributions: (1) an unconditional evaluation protocol with a repeat / explore split and a positive-level error decomposition that
 locates 58 % of the missed purchases in retrieval rather than ranking; (2) an explore-only retrieval layer of eight learned sources
 refitted quarterly in every split, with a rank-quota mixer; (3) a fair-budget comparison of P1-tuned, P2, P3 and five baselines on the
-same candidates; (4) a controlled measurement of stacking leakage (naive / rolling / leaky); (5) a static, privacy-preserving demo.
+same candidates; (4) a controlled measurement of stacking leakage (naive / rolling / leaky); (5) a static demo with privacy safeguards that also shows the best model's batch output on real, anonymised members.
 
 # II. Related work
 

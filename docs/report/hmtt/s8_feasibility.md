@@ -56,9 +56,16 @@ A static page on a public Hugging Face Space runs the recommender in the browser
 source of each item — repeat (own history with time decay), co-purchase (EASE neighbours), trend (recent country popularity) — merged
 with the same rank-quota rule as the mixer, and the reason in words (number of past purchases and days since the last one; the purchased model it is often bought with; the
 department it is trending in and its growth over the previous quarter). Privacy choices: model ids are salted hashes, departments carry generic labels, popularity is shown as a
-percentile, the sample members are synthetic, and the salt never leaves the server. The demo uses reference tables frozen at
-2026-07-28 and does not run the trained rankers: it shows the retrieval layer and its explanations, not the measured accuracy of
-t31.
+percentile, the sample members are synthetic, and the salt never leaves the server. This part uses reference tables frozen at
+2026-07-28 and shows the retrieval layer and its explanations.
+
+The best model needs inputs a purchase CSV does not hold (web, price, promotion, stock and store features; the ranks of eight
+learned sources, two of them and P3 itself PyTorch networks), so it is served as in production, by batch scoring in the warehouse.
+The tab "Best model (back-test)" shows that output (`serve/export_showcase.py`): for 500 random test anchors (250 per country, one
+per member), the top 10 of P3 one head next to GP-TopFreq, the member's purchases before the anchor and what she bought in the next
+30 days. Sample HR@10: P3 0.240, GP-TopFreq 0.190 (whole test 0.240 / 0.184). Published with the data owner's consent and
+minimised: sequential member ids in shuffled order, salted model hashes and generic departments of the reference, days relative to
+the anchor, the last 40 history lines, no price, store, web or member attribute.
 
 # IX. Discussion and limitations
 

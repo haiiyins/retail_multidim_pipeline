@@ -22,7 +22,8 @@ Figures are in `docs/figures/ml/` (`make ml-figures`). Numbers come from the dra
 16. **Explanations (t35)** — grouped SHAP of the GBDT; P3 gate by segment.
 17. **Feasibility (t38, t39)** — multiples over random / popular / buy-again, GMV proxy (offline, not causal), serving coverage.
 18. **Cost (t37)** — tuning and build hours per model vs gain.
-19. **Demo** — static page, CSV → top-K with reasons; privacy choices (salted ids, generic departments, synthetic members).
+19. **Demo** — static page, CSV → top-K with reasons; best-model tab: batch-scored P3 vs GP-TopFreq on 500 real, anonymised test
+    members with what they bought next; privacy choices (salted ids, generic departments, consent, minimised sample).
 20. **Limitations and next steps** — 10 trials and one seed, SASRec without its own NBR budget, explore × 1.3 not × 2, no online test.
 
 ## Demo script (5 min)
@@ -33,4 +34,6 @@ Figures are in `docs/figures/ml/` (`make ml-figures`). Numbers come from the dra
 4. Open the Space, upload `sample_purchases.csv`, pick a member, show the top 10 with the source of each item (repeat,
    co-purchase, trend) and its popularity percentile (2 min).
 5. Edit one row of the CSV (add a purchase in another department) and re-run: the co-purchase items change (30 s).
-6. Limits: reference tables frozen at the as-of date, no prices, no what-if (30 s).
+6. Tab "Best model (back-test)": pick a member, compare P3 and GP-TopFreq against what she bought in the next 30 days (✓);
+   why batch scoring: the best model needs warehouse features and PyTorch sources (1 min).
+7. Limits: reference tables frozen at the as-of date, no prices, no what-if (30 s).

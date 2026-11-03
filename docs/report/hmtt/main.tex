@@ -107,7 +107,7 @@ The contributions are: (1) an unconditional evaluation protocol with a repeat / 
 decomposition that locates \nNoSource{}\,\% of the missed purchases in retrieval rather than ranking; (2) an explore-only retrieval
 layer of eight learned sources refitted quarterly in every split, with a rank-quota mixer; (3) a fair-budget comparison of P1-tuned,
 P2, P3 and five baselines on the same candidates; (4) a controlled measurement of stacking leakage (naive, rolling, leaky); and (5) a
-static, privacy-preserving demonstrator.
+static demonstrator with privacy safeguards that also shows the best model's batch output on real, anonymised members.
 
 % ---------------------------------------------------------------------------------------------------------------------------------
 \section{Related Work}
@@ -702,9 +702,18 @@ A static page on a public Hugging Face Space runs the recommender in the browser
 (member, country, model, purchase date, quantity); the page validates it and returns the top $K$ of each member with the source of
 each item (repeat with time decay, co-purchase from EASE neighbours, recent country trend), merged with the same rank-quota rule as
 the mixer, and a reason in words. Model identifiers are salted hashes, departments carry generic labels, popularity is shown as a
-percentile, the sample members are synthetic, and the salt never leaves the server. The demonstrator uses reference tables frozen at
-2026-07-28 and does not run the trained rankers: it shows the retrieval layer and its explanations, not the accuracy of
-Table~\ref{tab:t31}.
+percentile, the sample members are synthetic, and the salt never leaves the server. This part uses reference tables frozen at
+2026-07-28 and shows the retrieval layer and its explanations.
+
+The best model needs inputs an uploaded purchase file does not hold: the web, price, promotion, stock and store features of the
+Gold layer and the ranks of eight learned sources, two of them (and P3 itself) PyTorch networks that do not run in the browser. It
+is therefore served as a real retailer would serve it, by batch scoring in the warehouse. A second tab shows that batch output:
+for 500 test anchors drawn at random (250 per country, one per member), the top 10 of P3 one head next to the top 10 of
+GP-TopFreq, the member's purchases before the anchor, and the models she bought in the next 30 days. On this sample the share of
+members with at least one of the ten bought is 0.240 for P3 against 0.190 for GP-TopFreq (whole test: 0.240 against 0.184). The
+sample is published with the data owner's consent and minimised: members get sequential identifiers in shuffled order, models
+the salted hashes and departments the generic labels of the reference, dates become days before the anchor, the history is cut to
+the last 40 lines, and no price, store, web or member attribute is included.
 
 % ---------------------------------------------------------------------------------------------------------------------------------
 \section{Discussion and Limitations}

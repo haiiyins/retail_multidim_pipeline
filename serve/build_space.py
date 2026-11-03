@@ -1,6 +1,6 @@
 """Stage the demo as a static Hugging Face Space: serve/index.html runs serve/recommend.py in the browser with Pyodide (pandas from
 the Pyodide distribution; Gradio-Lite 5.45 no longer installs, its dependencies cannot be resolved from PyPI), on the anonymised
-reference as CSV (Pyodide has no pyarrow). serve/app.py is the same demo with a Gradio UI, for local runs.
+reference as CSV (Pyodide has no pyarrow), plus the back-test showcase (serve/export_showcase.py), read by the page itself. serve/app.py is the same demo with a Gradio UI, for local runs.
 Usage: python serve/build_space.py  →  data/demo/space/  (then `make demo-push`)"""
 import json, pathlib, shutil, sys
 import pandas as pd
@@ -22,7 +22,9 @@ Demo of a course project on next-basket recommendation for sporting-goods retail
 purchase CSV (`member_id, country_code, model_id, purchase_date, quantity`), browse each member's re-buy reminders (with their
 purchase cycle and a "due" flag) and new-product suggestions with the reason of each, preview what the member would see in an app,
 and build a campaign audience (due re-buys, cross-sell, department expansion) exported as CSV. Vietnamese / English. It runs in the browser (Pyodide); the first load takes a few seconds. Product codes and
-departments are anonymised (salted hashes, generic labels); the sample file is synthetic.
+departments are anonymised (salted hashes, generic labels); the sample file is synthetic. The "Best model (back-test)" tab shows the
+batch-scored output of the best model next to today's approach for an anonymised random sample of real test customers, published
+with the data owner's consent.
 """
 
 
@@ -34,10 +36,10 @@ def main():
     shutil.copy(SRC / "ABOUT.md", OUT / "ABOUT.md")
     for p in sorted(REF.glob("*.parquet")):
         pd.read_parquet(p).to_csv(OUT / "reference" / f"{p.stem}.csv", index=False, float_format="%.5g")
-    for f in ("sample_purchases.csv", "asof.txt"):
+    for f in ("sample_purchases.csv", "asof.txt", "showcase.json"):
         shutil.copy(REF / f, OUT / "reference" / f)
     assert not any("salt" in p.name for p in OUT.rglob("*")), "the salt must never be published"
-    mounts = ["recommend.py"] + [f"reference/{p.name}" for p in sorted((OUT / "reference").iterdir())]
+    mounts = ["recommend.py"] + [f"reference/{p.name}" for p in sorted((OUT / "reference").iterdir()) if p.name != "showcase.json"]
     html = (SRC / "index.html").read_text(encoding="utf-8").replace("__FILES__", json.dumps(mounts))
     (OUT / "index.html").write_text(html, encoding="utf-8")
     (OUT / "README.md").write_text(CARD, encoding="utf-8")
