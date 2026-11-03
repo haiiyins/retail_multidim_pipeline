@@ -284,7 +284,11 @@ weighted 1 / |positives in the list|, early stopping on 10 % of them). Train lis
   [−0.0002, 0.0009], explore +0.0021 [0.0007, 0.0035], repeat −0.0243 [−0.0296, −0.0192].
 - Decision: candidates_v2 and the fixed mixer are kept. As with K = 500 and r1_first, more coverage does not reach NDCG@20: the
   extra positives are explore candidates the ranker places below rank 20, and the extra repeat candidates dilute the repeat ranking.
-  The P1 parameters were tuned on v2; a re-tune on v2lm was not run.
+- Re-tune on v2lm (study p1_v2lm, 10 trials, `p1_retuned_v2lm`): best valid 0.1030 at trial 9, the same parameters as p1_v2, so the
+  final fit equals `p1_tuned_v2lm`. Optuna's TPESampler starts with 10 random trials (n_startup_trials default), so with a 10-trial
+  budget and sampler seed 0 every study of one model draws the same 10 configurations: the 10-trial budget is a seeded random
+  search, and a re-tune on other candidates only re-ranks those 10. The 30-trial check (t31_b30) is the one that goes past the
+  start-up phase. Stated in the report (Section III-D).
 
 ## 2026-11-06 · REX, a single-stage Repeat–Explore network (t31_rex, t32_rex)
 
