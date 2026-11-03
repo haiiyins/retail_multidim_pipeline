@@ -139,7 +139,7 @@ under-weights the repeat group for the anchors where a repeat is due, which the 
 calibrated — it is about twice the observed repeat share (0.12, 0.08, 0.06; t35c) — and correlates only weakly with the per-anchor
 target (0.11 – 0.19). The sequence encoder adds repeat recall (+0.024) but no NDCG: the pair features already summarise the history.
 
-## D. H2: stacking leakage (t29, t29b)
+## D. H1: stacking leakage (t29, t29b)
 
 The department hazard, fitted three ways (t29, AUC on train / pseudo-test / test): rolling 0.681 / 0.703 / 0.708, naive 0.725 /
 0.744 / 0.705, leaky 0.710 / 0.717 / 0.723. The in-sample fit looks 0.04 AUC better on the anchors it has seen and loses that lead on
@@ -154,7 +154,7 @@ Fused into a ranker (P1-frozen parameters, fitted on train anchors ≤ 2025-05-3
 | naive | 0.1246 | 0.1095 | 0.0934 | 0.1281 | 0.1126 | 0.0959 |
 | leaky | 0.1232 | 0.1087 | 0.0944 | 0.1256 | 0.1091 | 0.0975 |
 
-H2 holds in direction on both candidate sets, more clearly on v2: the naive fusion is ahead of rolling on its own training anchors
+H1 holds in direction on both candidate sets, more clearly on v2: the naive fusion is ahead of rolling on its own training anchors
 (+0.0026) and on the pseudo-test (+0.0029), and behind it on test (−0.0004; v1: +0.0019 / +0.0005 / −0.0011). The leaky fusion is the
 only one ahead on test (+0.0011 on v2), because its signals were fitted on the test labels. The inflation is small because the
 signals are weak given the Gold features, and the gaps are of the order of the member-bootstrap intervals (± 0.002 on test,

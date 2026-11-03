@@ -118,7 +118,7 @@ and the model family?
 \item \textbf{RQ4 (value).} How many times better than ``best-sellers'' and ``buy the same again'' is the best system, for whom, at
 what compute cost, what purchase value does it capture (offline proxy), and how much of its gain needs data beyond the purchase
 history?
-\item \textbf{H2 (hypothesis).} Naive stacking inflates metrics on training and pseudo-test anchors relative to a rolling protocol;
+\item \textbf{H1 (hypothesis).} Naive stacking inflates metrics on training and pseudo-test anchors relative to a rolling protocol;
 on the real test the gap narrows but does not vanish.
 \end{itemize}
 
@@ -572,7 +572,7 @@ between P3 one head and P1-tuned ($+0.0009$).
 \item The deep model and the GBDT are within a thousandth. P3 with one head is the only model significantly above P1-tuned ($+0.0009$,
 about 1\,\%), and only just above P2. The two-head P3 ties with P1-tuned: it keeps more repeats ($+0.029$ recall\_repeat@20) and finds
 fewer explore purchases ($-0.003$).
-\item Stacking adds nothing measurable (P2 $-$ P1-tuned $+0.0002$, interval across zero), consistent with Section~\ref{sec:h2}: the Gold
+\item Stacking adds nothing measurable (P2 $-$ P1-tuned $+0.0002$, interval across zero), consistent with Section~\ref{sec:h1}: the Gold
 pair features already hold department recency, cycles and price gaps.
 \end{itemize}
 On valid, over the three countries of the tuning objective, the order is the same (P3 one head 0.1049, P3 two heads 0.1037, P2
@@ -688,8 +688,8 @@ the context. The learned gate ranks segments correctly (mean $g$: loyal 0.23, mi
 twice the observed repeat share (0.12, 0.08, 0.06) and correlates only weakly with the per-anchor target (0.11--0.19). The sequence
 encoder adds repeat recall ($+0.024$) but no NDCG: the pair features already summarize the history.
 
-\subsection{H2: Stacking Leakage}
-\label{sec:h2}
+\subsection{H1: Stacking Leakage}
+\label{sec:h1}
 The department hazard is fitted three ways: rolling (quarterly cutoffs, the only point-in-time-correct variant), naive (fitted once on
 train and applied in-sample) and leaky (fitted on every split). Every fit samples at most 120\,000 anchors, so that the variants
 differ in which anchors they see, not in how many: naive samples 80\,\% of the 150\,000 train anchors, leaky 120\,000 of the 345\,000
@@ -699,7 +699,7 @@ anchors of the three splits, i.e., about 35\,\% of the train anchors. The pseudo
 better on the anchors it has seen and loses that lead on test; the leaky fit stays better on test because it has seen those labels.
 
 Fused into a ranker (P1-frozen parameters, fitted on train anchors up to 2025-05-31), the signals give the NDCG@20 of
-Table~\ref{tab:t29b}. H2 holds in direction on both candidate sets, more clearly on v2: the naive fusion is ahead of rolling on its own
+Table~\ref{tab:t29b}. H1 holds in direction on both candidate sets, more clearly on v2: the naive fusion is ahead of rolling on its own
 training anchors ($+0.0026$) and on the pseudo-test ($+0.0029$), and behind it on test ($-0.0004$). The leaky fusion is the only one
 ahead on test ($+0.0011$ on v2), because its signals were fitted on the test labels. On train and pseudo-test the leaky fusion is
 below the naive one although it also fits in-sample: it has seen the labels of about 35\,\% of those anchors against 80\,\% for naive,
@@ -932,7 +932,7 @@ gave more than tuning, and tuning more than the model family: a deep two-head ra
 a single-head version does by 1\,\% (RQ3). The learned gate is essential; the explicit
 split is not. The best model is 1.8 times the best-sellers and 1.5 times ``buy the same again'' in one list of ten, and reaches
 about two thirds of the sales value; on purchase history alone the pipeline keeps about four fifths of its gain over the frequency
-rules, and the other data dimensions add the rest (RQ4). Naive stacking shows the inflation H2 predicted, small because the signals add little over a good feature store.
+rules, and the other data dimensions add the rest (RQ4). Naive stacking shows the inflation H1 predicted, small because the signals add little over a good feature store.
 
 \section*{Acknowledgment}
 This work was carried out as the project of the course Advanced Machine Learning and Applications (IT2043.26.1.CH.01) of the

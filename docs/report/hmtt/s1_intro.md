@@ -18,7 +18,7 @@ orderings, because a GBDT win is a valid outcome:
   GBDT (P1-tuned), stacking (P2) and next-basket baselines, overall and by segment?
 - **RQ3 (repeat / explore).** Do explicit repeat and explore heads with a learned gate improve explore without hurting repeat, compared
   with a single head?
-- **H2 (hypothesis).** Naive stacking inflates metrics on training and pseudo-test anchors relative to a rolling protocol; on the real
+- **H1 (hypothesis).** Naive stacking inflates metrics on training and pseudo-test anchors relative to a rolling protocol; on the real
   test the gap narrows but does not vanish.
 - **RQ4 (feasibility).** How many members and how much revenue can the best system serve; how many times better than "best-sellers"
   and "buy the same again" is it; what GMV does it capture (offline proxy)?
