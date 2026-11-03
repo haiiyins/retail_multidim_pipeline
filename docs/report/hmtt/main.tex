@@ -96,7 +96,7 @@ only where the candidate list already holds a purchase says nothing about the me
 top-$K$ list; a hit is a model bought and not returned, and every feature uses only data recorded before $t$. A natural baseline is a
 rule-based two-stage recommender: five hand-written candidate rules (R1 repeat, R2 co-purchase, R3 web department, R4 sport $\times$
 offer, R5 national best-sellers) propose 200 models per (member, Monday) anchor, and a LightGBM LambdaRank
-ranker~\cite{ke2017lightgbm,burges2010lambdamart} (P1), tuned once over the Gold pair features, orders them. Scored the usual way, on
+ranker~\cite{ke2017lightgbm,burges2010lambdamart} (P1), tuned once over 73 Gold pair features, orders them. Scored the usual way, on
 the anchors whose list holds a purchase, it reaches a normalized discounted cumulative gain NDCG@20 of \nRefCond{}. Scored over every
 anchor with a purchase, counting purchases outside the list as misses, the same model scores 0.090 (TH + VN: \nRefUncond{}), and
 \nNoPosShare{}\,\% of the anchors have no purchase in the list at all. That gap is the research problem.
@@ -469,8 +469,9 @@ the train anchors with a positive in their list: 44\,795 of the 150\,000 sampled
 trained on the conditional population and selected and evaluated on the unconditional one.
 \begin{itemize}
 \item \textbf{P1-frozen}: the baseline LambdaRank of Section~\ref{sec:protocol}, with its hyper-parameters (tuned once on R1--R5
-candidates) and Gold pair features kept fixed, refitted on the v2 pairs; a reference row, not a tuned competitor.
-\item \textbf{P1-tuned}: LightGBM LambdaRank over every pair column (85 features, the source ranks of R6--R13 included).
+candidates) and its 73 Gold pair features kept fixed, refitted on the v2 pairs; a reference row, not a tuned competitor.
+\item \textbf{P1-tuned}: LightGBM LambdaRank over every pair column of candidates\_v2 (85 features: the 73 of
+the baseline and 12 new columns, among them the ranks of the eight learned sources R6--R13).
 \item \textbf{P2}: P1-tuned plus five stacked signal columns from three models fitted with the rolling protocol: a LightGBM department
 hazard over member $\times$ department rows, $P(\text{buy in } (t, t+\Delta])$, and two LightGBM quantile models of willingness to pay
 (log unit price, quantiles 0.5 and 0.9), with the gaps between the candidate's log price and each quantile.
