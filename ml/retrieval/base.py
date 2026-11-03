@@ -282,7 +282,7 @@ def recall_table(con, sources, split, ks=KS, ranked=None):
     rows = []
     for name, rel in sources.items():
         res = evaluate(con, rel, pos, ks=ks + (ALL_K,))
-        size = con.execute(f"SELECT COUNT(*) / COUNT(DISTINCT (member_id, anchor_date)) FROM {rel}").fetchone()[0]
+        size = con.execute(f"SELECT COUNT(*) / COUNT(DISTINCT (member_id, anchor_date)) FROM {rel}").fetchall()[0][0]
         for scope, d in (("ALL", res), ("MAIN (TH+VN)", res[res["country_code"].isin(MAIN_COUNTRIES)])):
             mean = lambda c: d.groupby("member_id")[c].mean().mean()
             row = {"split": split, "source": name, "scope": scope, "anchors": len(d), "list_size": size,

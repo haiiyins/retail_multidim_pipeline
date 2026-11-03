@@ -108,6 +108,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0, help="final refit with LightGBM seed 42 + SEED (seed variance)")
     ap.add_argument("--history-only", action="store_true", help="keep the HISTORY features only; study <model>_hist")
     ap.add_argument("--budget", type=int, default=None, help="tuning budget: study <model>_b<N>, space <model>_b<N> of tuning.yml")
+    ap.add_argument("--params-from", default=None, help="final refit with the best trial of this study (e.g. p1_v2 on other pairs)")
     a = ap.parse_args()
     from ml.rankers.frozen import relation
     con = connect()
@@ -143,9 +144,10 @@ def main():
         print(f"best {study.best_value:.4f}  {study.best_params}", flush=True)
     if a.final:
         from ml.common.registry import Run
-        params = best_params(study_name, budget) | ({"seed": BASE["seed"] + a.seed} if a.seed else {})
+        params = best_params(a.params_from or study_name, budget) | ({"seed": BASE["seed"] + a.seed} if a.seed else {})
         name = a.name or f"{study_name}"
-        with Run(name, config={"source": a.source, "signals": a.signals, "seed": a.seed, "budget": a.budget, "history_only": a.history_only}, params=params) as run:
+        with Run(name, config={"source": a.source, "signals": a.signals, "seed": a.seed, "budget": a.budget, "history_only": a.history_only,
+                               "params_from": a.params_from}, params=params) as run:
             m = fit(params, tr, va, feat, a.delta)
             run.metrics["best_iteration"] = m.best_iteration
             te = load(con, "test", a.delta, rel)

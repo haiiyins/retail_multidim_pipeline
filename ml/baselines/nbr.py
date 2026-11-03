@@ -1,9 +1,11 @@
 """NBR baselines of t31 (plan §7, ML-19/20): EASE and TIFU-KNN as stand-alone rankers over the full catalogue (repeat models not
 masked, unlike their explore-only candidate sources), with their own tuning budget (tuning.yml space of the source, n_trials trials,
 objective unconditional NDCG@20 on valid); SASRec = the unmasked top-100 list written by the R10 build (retrieval.full_catalogue),
-with the R10 parameters. Every list comes from the rolling model of cutoff_for(anchor) and keeps the anchor_model_grid filter.
+with the R10 parameters (trained on the explore target only); sasrec_all = the R10 network and parameters trained on every model
+bought in the window, repeats included (ml/retrieval/sasrec.py SASRecAll). Every list comes from the rolling model of
+cutoff_for(anchor) and keeps the anchor_model_grid filter.
 Usage: python ml/baselines/nbr.py --source ease|tifuknn [--tune] [--build]
-       python ml/baselines/nbr.py --source sasrec --build        →  data/ml/scores/<source>_nbr_{valid,test}_d30.parquet"""
+       python ml/baselines/nbr.py --source sasrec|sasrec_all --build   →  data/ml/scores/<source>_nbr_{valid,test}_d30.parquet"""
 import argparse, glob, importlib, json, os, sys, time
 import pandas as pd
 
@@ -56,7 +58,12 @@ def main():
             to_scores(df).to_parquet(os.path.join(ML_DIR, "scores", f"{name}_{split}_d30.parquet"), index=False)
             print(f"  {split}: NDCG@20 {unconditional(con, to_scores(df), split, 30)[0]:.4f}", flush=True)
         return
-    src = source(a.source)
+    if a.source == "sasrec_all":
+        from ml.retrieval.sasrec import SASRecAll
+        assert not a.tune, "sasrec_all keeps the R10 parameters"
+        src = SASRecAll()
+    else:
+        src = source(a.source)
     loaded = {}
 
     def events(country):
@@ -78,7 +85,7 @@ def main():
         study, _ = tune(name, objective, space=space)
         print(f"best {study.best_value:.4f}  {study.best_params}", flush=True)
     if a.build:
-        params = tuned(a.source)
+        params = base.tuned_params("sasrec") if a.source == "sasrec_all" else tuned(a.source)
         with Run(f"baseline:{name}", config={"source": a.source}, params=params) as run:
             for split in ("valid", "test"):
                 t0 = time.time()

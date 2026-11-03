@@ -3,11 +3,13 @@ per anchor, capped at mixer.k_max; ml.candidates_v2 is this list cut at mixer.k 
 
 Rank merge with quotas: a candidate gets key = min over the sources that propose it of (rank_in_source − 0.5) / w_source, and the list is
 sorted by key, so a source of weight 2 fills two slots for every slot of a source of weight 1. w_source = the stand-alone valid Recall@100
-of the source (hits per slot). Two policies (plan §5.1):
+of the source (hits per slot). Policies (plan §5.1):
   fixed       the same weights for every member;
   per_member  w_r1 × ρ_u / mean ρ, ρ_u = the member's share of repeat purchases before the anchor (member × model × day rows whose
               model she had bought on an earlier day, smoothed towards the country mean with mixer.rho_prior rows), clipped to
-              mixer.rho_clip: members who mostly repeat keep more of R1, explorers get more learned candidates.
+              mixer.rho_clip: members who mostly repeat keep more of R1, explorers get more learned candidates;
+  r1_first    the whole R1 list first (every model bought before the anchor, at most 200), then the fixed quotas for the rest:
+              the repeat coverage of R1–R5 is kept whatever the weights.
 Every input reads strictly before the anchor, so the merged list is point-in-time when its sources are. Train anchors before the first
 rolling cutoff have R1–R5 only. Output: data/ml/candidates/mix_<policy>/<split>_<country>.parquet with mix_rank, the rank in every
 source (NULL when the source does not propose the model) and fit_cutoff / source_ts_max of the learned sources.
@@ -81,7 +83,7 @@ def mix(con, split, sources, w, policy, rho=None):
     cols = ",\n".join(f"MIN(rk) FILTER (WHERE s = '{s}') AS rank_{s}" for s in sources)
     parts = " UNION ALL ".join(f"SELECT *, '{s}' AS s FROM {source_relation(s, split)}" for s in sources)
     con.register("_w", pd.DataFrame({"s": list(w), "w": list(w.values())}))
-    r1 = "w.w * COALESCE(rho.rho_ratio, 1.0)" if policy == "per_member" else "w.w"
+    r1 = {"per_member": "w.w * COALESCE(rho.rho_ratio, 1.0)", "r1_first": "1e6"}.get(policy, "w.w")
     if policy == "per_member":
         con.register("_rho", rho)
     rho_join = "LEFT JOIN _rho rho USING (member_id, anchor_date)" if policy == "per_member" else ""
