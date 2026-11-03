@@ -266,5 +266,7 @@ Test, TH + VN, Δ = 30 unless stated; valid is the decision data.
 - Serving coverage of the real test-window sales (business.py, t39): identified members 93 % / 81 % of the GMV (TH / VN), members
   with a prior purchase (personalised path) 71 % / 56 %. GMV per 1 000 recommendations over every anchor: P3 one head 112 EUR,
   buy-again 77, popular 33 (268 / 184 / 79 over the anchors with a purchase).
-- `serve/check_public.py` scans the Space files for raw model codes, member ids and the REDACT_TERMS tokens (plus the optional
-  data/demo/blocked_terms.txt) before an upload: 11 files, 0 hits on the current Space.
+- `serve/check_public.py` gates every upload of the Space: structure in CI (deploy-space.yml, after staging: salted-hash model ids
+  in the CSVs and showcase.json, only the published showcase fields, member ids `<country>-NNN`, no UUID / local path / salt) and,
+  in `make demo-push`, also the raw model codes and member ids of the lakehouse (`--db`) and the REDACT_TERMS tokens
+  (`--require-terms`). Current Space (11 files, showcase included): 0 hits; a tampered copy is caught (serve/tests).

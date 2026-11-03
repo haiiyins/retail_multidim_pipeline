@@ -69,5 +69,6 @@ demo-reference:
 	python serve/export_showcase.py
 demo-push:
 	python serve/build_space.py
+	python serve/check_public.py --db --require-terms
 	hf repos create $(DEMO_SPACE) --type space --sdk static --public --exist-ok
 	hf upload $(DEMO_SPACE) data/demo/space . --repo-type space --delete "*"

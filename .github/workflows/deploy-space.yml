@@ -30,5 +30,7 @@ jobs:
           python -m pytest serve/tests -q
           test -f data/demo/space/index.html && test -f data/demo/space/reference/showcase.json
           ! grep -q "__FILES__" data/demo/space/index.html
+      - name: Check the published files (hashed ids, showcase fields, no UUID / local path / salt)
+        run: python serve/check_public.py --dir data/demo/space
       - name: Upload
         run: hf upload "$SPACE" data/demo/space . --repo-type space --delete "*" --commit-message "deploy ${{ github.sha }}"
