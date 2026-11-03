@@ -8,7 +8,7 @@
 \usepackage{adjustbox}
 \usepackage[hidelinks]{hyperref}
 
-\graphicspath{{../../figures/ml/}}
+\graphicspath{{../../figures/ml/}{../../figures/}}
 
 % Headline numbers (test, TH + VN, Delta = 30, unconditional protocol). Every value comes from docs/report/tables/ml/;
 % update this block and the tables below when a rerun replaces a table.
@@ -39,8 +39,6 @@ Data}
 \uppercase{Kha Nguyen}\authorrefmark{1,*}}
 \address[1]{University of Information Technology, Vietnam National University, Ho Chi Minh City, Vietnam}
 \address[*]{Corresponding authors}
-\tfootnote{This work builds on the data pipeline of the course Data Processing Engineering (IT2047.26.1.CH.01) of the same
-programme.}
 
 \markboth
 {Y. Phan \headeretal: Evaluating and Improving Personalized Product Recommendation}
@@ -50,24 +48,29 @@ programme.}
 Kha Nguyen (e-mail: 26848091@grad.uit.edu.vn).}
 
 \begin{abstract}
-Recommender evaluations of retail next-basket prediction often score a ranker only on the users whose candidate list already holds
-a purchase. On a loyalty data set of a multi-country sporting-goods retailer, this conditional protocol reported a normalized
-discounted cumulative gain at 20 of \nRefCond{} for a gradient-boosted ranker over 200 rule-based candidates. Counting every purchase,
-including those the candidate generator never proposed, the same model scores \nRefUncond{}, and a positive-level error decomposition
-shows that \nNoSource{}\,\% of the missed purchases were never retrieved, almost all of them items the member had not bought before.
+An omnichannel retailer records purchases, web and app behaviour, prices, promotions, stock and stores, yet recommends one list to
+everyone: the best-sellers, or the items a member bought before. Turning these signals into a personal weekly list meets three
+obstacles: each signal lives in its own table with its own grain and clock, a feature may only use what was known when the
+recommendation was made, and the usual offline score skips the members a list misses. On eleven operational exports of a
+multi-country sporting-goods retailer (66.1\,M sale lines, 1.0\,B web events, 4.7\,M buying members), a Bronze / Silver / Gold
+lakehouse with seven quality gates builds a point-in-time feature store with zero leakage violations. On it, a rule-based two-stage
+recommender scores a normalized discounted cumulative gain at 20 of \nRefCond{} when, as usual, only the members whose candidate list
+holds a purchase are scored; counting every purchase, it scores \nRefUncond{}, and \nNoSource{}\,\% of the missed purchases were never
+retrieved, almost all of them items new to the member.
 We therefore treat retrieval as a model: eight learned candidate sources, including linear auto-encoders, random-walk, nearest-neighbour,
 two-tower and self-attentive sequential models, are restricted to items new to the member, refitted every quarter in every split, tuned
 on the explore coverage they add, and merged by a rank-quota mixer under a cap of \nK{} candidates. Coverage rises from \nCandOld{}
 to \nCandNew{}. Under one tuning budget, a tuned gradient-boosted ranker, a stacked variant and a deep multi-task ranker with
 repeat and explore heads and a learned gate are compared with five next-basket baselines. All two-stage rankers beat the strongest
-baseline by more than a quarter; the deep model gains about one percent over the tuned trees only in its single-head form, and the
-learned gate, not the explicit split, carries the benefit. Restricted to features a purchase log yields, the pipeline keeps about four
+baseline by more than a quarter. Over the baseline ranker on the same candidates, new features give about 70\,\% of the gain and
+hyper-parameter tuning the rest; the model family adds least: the deep model gains about one percent over the tuned trees only in its single-head form, and the learned gate, not
+the explicit split, carries the benefit. Restricted to features a purchase log yields, the pipeline keeps about four
 fifths of its gain over the frequency rules a retailer uses today; the other data dimensions add the rest, mostly on new items. A
 controlled study confirms that naive stacking inflates in-sample metrics.
 \end{abstract}
 
 \begin{keywords}
-Evaluation methodology, gradient boosting, learning to rank, multi-task learning, next-basket recommendation, recommender systems,
+Data lakehouse, evaluation methodology, gradient boosting, learning to rank, multi-task learning, next-basket recommendation, recommender systems,
 retail analytics, two-stage retrieval.
 \end{keywords}
 
@@ -79,39 +82,62 @@ retail analytics, two-stage retrieval.
 \section{Introduction}
 \label{sec:introduction}
 
-\PARstart{A}{} loyalty member of a multi-country sporting-goods retailer opens the app on a Monday: which product models will
-they buy in the next 30 days? A previous project built a point-in-time feature store over eleven exported tables and a LightGBM
-LambdaRank ranker~\cite{ke2017lightgbm,burges2010lambdamart} (P1) over 200 candidates per (member, Monday) anchor. It reported a
-normalized discounted cumulative gain NDCG@20 of \nRefCond{}, but only on anchors whose candidate list contained at least one purchase.
-Measured over every anchor with a purchase, counting purchases outside the list as misses, the same model scores 0.090 (TH + VN:
-\nRefUncond{}), and \nNoPosShare{}\,\% of the anchors have no purchase in the list at all.
+\PARstart{A}{n} omnichannel retailer knows a great deal about its loyalty members: what they bought and returned, what they looked at
+on the web site and in the app, which sports they follow, and, for every product, its price, promotions, stock and season. Yet the
+list a member sees is usually the same for everyone, the national best-sellers, or a reminder to buy the same items again. The
+business goal of this work is a personal top-$K$ list for every member, every week, and an honest number for how good it is.
 
-This paper asks where those errors are and what it takes to fix them. It reformulates next-basket recommendation (NBR) as a
-two-stage problem in which retrieval is a model with its own objective, and compares a deep multi-task ranker against tuned
-gradient-boosted trees (GBDT) and strong NBR baselines under one tuning budget. The research questions are phrased as questions,
-not as expected orderings, because a GBDT win is a valid outcome~\cite{grinsztajn2022tabular}:
+Three obstacles stand between the raw data and that list. \emph{Data}: each signal lives in its own operational table with its own
+grain, keys and clock, and the click-stream alone holds a billion events. \emph{Time}: a feature may only use what was known before
+the recommendation was made, otherwise offline scores promise gains that vanish in production. \emph{Measurement}: a score computed
+only where the candidate list already holds a purchase says nothing about the members the list misses.
+
+\textit{Problem.} Given a member $u$ at an anchor $t$ (a Monday), predict the product models $u$ buys in $(t, t+30]$ as an ordered
+top-$K$ list; a hit is a model bought and not returned, and every feature uses only data recorded before $t$. A natural baseline is a
+rule-based two-stage recommender: five hand-written candidate rules (R1 repeat, R2 co-purchase, R3 web department, R4 sport $\times$
+offer, R5 national best-sellers) propose 200 models per (member, Monday) anchor, and a LightGBM LambdaRank
+ranker~\cite{ke2017lightgbm,burges2010lambdamart} (P1), tuned once over the Gold pair features, orders them. Scored the usual way, on
+the anchors whose list holds a purchase, it reaches a normalized discounted cumulative gain NDCG@20 of \nRefCond{}. Scored over every
+anchor with a purchase, counting purchases outside the list as misses, the same model scores 0.090 (TH + VN: \nRefUncond{}), and
+\nNoPosShare{}\,\% of the anchors have no purchase in the list at all. That gap is the research problem.
+
+This paper therefore builds the data foundation first and then measures what each modelling step is worth. It turns eleven
+operational exports into a leakage-controlled lakehouse, reformulates next-basket recommendation (NBR) as a two-stage problem in
+which retrieval is a model with its own objective, and compares gradient-boosted trees (GBDT), a stacked variant and a deep
+multi-task ranker with strong NBR baselines under one candidate list, one protocol and one tuning budget. The research questions are
+phrased as questions, not as expected orderings, because a GBDT win is a valid outcome~\cite{grinsztajn2022tabular}:
 \begin{itemize}
-\item \textbf{RQ1 (retrieval).} How much do learned candidate sources raise unconditional recall over the rule-based sources R1--R5,
-separately for repeat and explore purchases, at what cost, and how much of that gain reaches NDCG@20 when the ranker is unchanged?
-\item \textbf{RQ2 (ranking).} With the same tuning budget and candidates, how does an end-to-end deep multi-task ranker (P3) compare
-with a tuned GBDT (P1-tuned), stacking (P2) and NBR baselines, overall and by segment?
-\item \textbf{RQ3 (repeat / explore).} Do explicit repeat and explore heads with a learned gate improve explore without hurting
-repeat, compared with a single head?
+\item \textbf{RQ1 (data).} Can eleven raw operational exports become a point-in-time, leakage-free feature store at member--week
+grain on one machine, and what does it hand to the models?
+\item \textbf{RQ2 (retrieval).} Scored on every purchase, where does the rule-based baseline fail, and how much do learned candidate
+sources raise candidate recall and explore coverage over R1--R5, at what cost, and how much of that gain reaches NDCG@20 when the
+ranker is unchanged?
+\item \textbf{RQ3 (ranking and tuning).} On the same candidates and the same budget, which ranker wins (tuned GBDT, stacking, a deep
+multi-task ranker with repeat and explore heads, NBR baselines), and how much of the gain comes from features, hyper-parameter tuning
+and the model family?
+\item \textbf{RQ4 (value).} How many times better than ``best-sellers'' and ``buy the same again'' is the best system, for whom, at
+what compute cost, what purchase value does it capture (offline proxy), and how much of its gain needs data beyond the purchase
+history?
 \item \textbf{H2 (hypothesis).} Naive stacking inflates metrics on training and pseudo-test anchors relative to a rolling protocol;
 on the real test the gap narrows but does not vanish.
-\item \textbf{RQ4 (feasibility).} How many times better than ``best-sellers'' and ``buy the same again'' is the best system, and what
-purchase value does it capture (offline proxy), and how much of its gain needs data beyond the purchase history?
 \end{itemize}
 
-The contributions are: (1) an unconditional evaluation protocol with a repeat / explore split and a positive-level error
-decomposition that locates \nNoSource{}\,\% of the missed purchases in retrieval rather than ranking; (2) an explore-only retrieval
-layer of eight learned sources refitted quarterly in every split, with a rank-quota mixer; (3) a fair-budget comparison of P1-tuned,
-P2, P3 and five baselines on the same candidates; (4) a controlled measurement of stacking leakage (naive, rolling, leaky); and (5) a
-static demonstrator with privacy safeguards that also shows the best model's batch output on real, anonymised members.
+The contributions are: (1) a Bronze / Silver / Gold lakehouse with seven quality gates and a point-in-time ledger that turns the
+exports into model inputs with zero leakage violations; (2) an unconditional evaluation protocol with a repeat / explore split and a
+positive-level error decomposition that locates \nNoSource{}\,\% of the missed purchases in retrieval rather than ranking; (3) an
+explore-only retrieval layer of eight learned sources refitted quarterly in every split, with a rank-quota mixer; (4) a fair-budget
+comparison of P1-tuned, P2, P3 and five baselines on the same candidates that separates features, tuning and model family, with a
+controlled measurement of stacking leakage (naive, rolling, leaky); and (5) a static demonstrator with privacy safeguards that also
+shows the best model's batch output on real, anonymised members.
 
 % ---------------------------------------------------------------------------------------------------------------------------------
 \section{Related Work}
 \label{sec:related}
+
+\textit{Lakehouse and leakage control.} The lakehouse architecture~\cite{armbrust2021lakehouse} keeps open columnar files as the
+storage layer and adds managed tables and transformations on top; DuckDB~\cite{raasveldt2019duckdb} runs such analytical SQL in
+process on one machine. Leakage, a feature that uses information unavailable at prediction time, is a common cause of inflated and
+irreproducible results in applied machine learning~\cite{kapoor2023leakage}; we test for it at every anchor.
 
 \textit{Next-basket recommendation.} The reality check of Li et al.~\cite{li2023nbr} showed that repeat purchases dominate common NBR
 metrics and that simple frequency baselines (P-TopFreq, GP-TopFreq) are hard to beat; it introduced the repeat / explore recall split
@@ -135,20 +161,79 @@ with a learned member-level probability.
 measure the inflation of an in-sample fit directly.
 
 % ---------------------------------------------------------------------------------------------------------------------------------
-\section{Data and Infrastructure}
+\section{Data Foundation}
 \label{sec:data}
 
-The data set is an export of eleven tables from the retailer's data platform: point-of-sale and e-commerce lines (89.3\,M lines),
-catalogue, price timeline, stock, loyalty members, favourite sports, stores, calendar, and 999.7\,M web and app events, for
-Singapore (SG), Thailand (TH) and Vietnam (VN) from 2023-01 to 2026-10. A DuckDB / dbt lakehouse turns them into Bronze, Silver and Gold
-layers with seven quality gates (QC-1 to QC-7). After cleaning, the fact table holds 66.1\,M sale lines in 26.3\,M transactions by
-4.7\,M buying members. The unit of prediction is a (member, anchor Monday) pair; a positive is any non-returned model bought in
-$(t, t+\Delta]$ with $\Delta = 30$ days ($\Delta = 90$ as an auxiliary label).
+This section answers RQ1: how the raw exports become model inputs, and what the processing leaves for the models.
+Fig.~\ref{fig:overview} gives the overview.
 
-Splits are by anchor date with a 42-day purge gap: train up to 2025-09-15, valid anchors 2025-10-27 to 2025-12-22, test anchors
-2026-02-02 to 2026-07-27. Anchors are capped per country by hash rank (50\,000 train, 15\,000 valid, 50\,000 test). The main scope
-is TH + VN; SG labels are reported but flagged REVIEW because of label quality. Unless stated otherwise, every number below is on
-the test split, TH + VN, $\Delta = 30$.
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.95\textwidth]{architecture_overview.png}{Data foundation: Bronze, Silver and Gold tiers of the DuckDB lakehouse, with the quality gates QC-1 to QC-7 across every layer.\label{fig:overview}}
+
+\subsection{Sources}
+The data set is an export of eleven operational tables for Singapore (SG), Thailand (TH) and Vietnam (VN) from 2023-01 to 2026-10,
+about 230\,GB raw: transactions (89.3\,M sale, cancel and return lines, 29.7\,M payment lines, 63.0\,M transaction--member links),
+master data (5.7\,M loyalty accounts, 4.4\,M SKUs, 275 stores and web sites, a calendar), price and stock timelines (42.4\,M and
+36.7\,M rows), 0.8\,M favourite-sport events, and 999.7\,M web and app events in 1\,774 parts. Every table has its own grain, keys and
+clock. Nothing was transformed before its assumptions were measured: a full scan of every file found the facts that shaped the
+processing, among them 9.5\,\% duplicate sales rows from overlapping extracts, cancellations recorded as separate lines that net a sale
+to zero, sale times in local clocks while version stamps are in UTC, only 34\,\% of the web events carrying a member, a stock table
+that tracks spare parts only (the stock signal is therefore switched off), and store fixtures and carrier bags in the catalogue.
+
+\subsection{Through the Tiers}
+\textit{Bronze keeps.} A data contract per table declares its key, required columns, join-key types and partition. The loader writes
+ZSTD Parquet partitioned by country, year and month (127\,GB, full load in 1\,h\,51\,min, the click-stream alone 87\,min); rows the
+parser cannot read go to a quarantine table with a reason instead of being dropped (65 rows).
+
+\textit{Silver corrects.} Fifteen dbt models clean and harmonise, one technique per data problem: versioned deduplication and signed
+sale $-$ cancel netting per transaction and item, with the status derived from the net amount; UTC through each unit's time zone,
+which removed a seven-hour shift of the online lines; EUR conversion; a member bridge (one member per transaction, staff and business
+accounts excluded); SKU $\to$ model mapping; national price intervals per SKU; a sales calendar inferred from peaks of the
+promotion share plus public holidays (SG 53, TH 106, VN 58 days); and identity stitching that links web cookies to members through
+web orders and logins, valid within $\pm 90$ days of the link. 5.58\,M netted lines are refused with one of six reasons (mostly
+non-merchandise and cancelled orders) and kept in quarantine.
+
+\textit{Gold respects time.} Eight Gold models build the anchor grid (Mondays after a member's second purchase), three feature
+entities, member at $t$ (recency, frequency, monetary value, price profile, web activity), model $\times$ country at $t$ (price,
+promotion, season, popularity; 4.29\,M rows) and pair $(u, m, t)$ (own and department history, co-purchase, web intent), the rule
+candidates R1--R5, and the labels: every non-returned model bought in $(t, t+\Delta]$ with $\Delta = 30$ days ($\Delta = 90$ as an
+auxiliary label). Prices at an anchor come from an ASOF join on the SKU intervals. Every feature reads only data recorded before
+its anchor, and a web event counts only if its member link was known at the anchor.
+
+\textit{Quality gates.} Seven checks run across the tiers: null keys (QC-1), referential integrity (QC-2), value domains (QC-3),
+uniqueness (QC-4), volume drift (QC-5), point in time (QC-6: six singular tests and a leakage ledger in which every violating row is
+logged) and batch--stream reconciliation for an optional streaming lane (QC-7). The 31 dbt models carry 182 tests in five layers.
+
+\subsection{After Processing}
+The fact table keeps 66.1\,M net sale lines of the 89.3\,M raw lines, in 26.3\,M transactions by 4.7\,M buying members. Stitching
+raises the share of web events linked to a member by 6--8 points (SG 36 to 42\,\%, TH 34 to 40\,\%, VN 30 to 38\,\%). The 64 Gold
+tests pass and the QC-6 ledger holds zero point-in-time violations in all three countries. Per country and year, go / no-go gates
+on member link ($\ge 60\,\%$), item match ($\ge 95\,\%$), price coverage ($\ge 90\,\%$) and members with two or more transactions
+($\ge 20\,000$) group the countries (Table~\ref{tab:gates}): TH and VN pass every year and form the main evaluation set; SG is
+processed in full but flagged REVIEW, because its member link is low and its labels miss the repeat purchases of unlinked
+transactions. Unless stated otherwise, every number below is on the test split, TH + VN, $\Delta = 30$.
+
+\begin{table}[t]
+\caption{Go / no-go gates per country and year (QC-2 to QC-4) and the share of transactions linked to a member.}
+\label{tab:gates}
+\setlength{\tabcolsep}{4pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lccccr}
+\toprule
+Country & 2023 & 2024 & 2025 & 2026 & member link \\
+\midrule
+TH & PASS   & PASS   & PASS & PASS   & 86--100\,\% \\
+VN & PASS   & PASS   & PASS & PASS   & 62--76\,\% \\
+SG & REVIEW & REVIEW & PASS & REVIEW & 50--64\,\% \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Model Inputs and Splits}
+The unit of prediction is a (member, anchor Monday) pair. Splits are by anchor date with a 42-day purge gap: train up to
+2025-09-15, valid anchors 2025-10-27 to 2025-12-22, test anchors 2026-02-02 to 2026-07-27. Anchors are capped per country by hash
+rank (50\,000 train, 15\,000 valid, 50\,000 test).
 
 Every model-generated table carries its fit cutoff, the latest source timestamp it read and a model version, and is checked by QC-6:
 no row may read an event at or after its anchor, and no fit may use a cutoff later than the anchor. Learned candidate sources and
@@ -158,18 +243,21 @@ $\le t$. A single fit at the end of train would leave 27--34\,\% of the test pos
 valid or test reads the purchases of that split before the cutoff, so the 42-day purge gap separates the splits for the rankers but
 not for the candidate sources and signals; their protection is the point-in-time rule above. Each country has its own sources,
 universe and history: a member's purchases in another country are not read. Rankers are trained once on train and selected on
-valid. Fig.~\ref{fig:arch} shows the system.
+valid. Fig.~\ref{fig:arch} shows the two-stage system that the following sections build on these inputs.
 
 \Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_arch.png}{Two-stage system. The candidate sources and signal models are refitted at quarterly cutoffs before the anchors they score; the rankers are fitted once on train.\label{fig:arch}}
 
-The hardware is one shared GH200 node (72 Arm cores and one Hopper-class GPU); deep models use bfloat16 mixed precision. Every model
-with hyper-parameters receives the same budget of 10 Optuna~\cite{akiba2019optuna} TPE~\cite{bergstra2011tpe} trials on valid. The
-course plan asked for 30 trials and three seeds; the rankers were re-tuned with 30 trials as a check (Section~\ref{sec:results})
-and the final fits repeated with three seeds.
+The lakehouse (DuckDB 2.0, dbt 1.12) runs on a single machine: one country on a laptop, the three countries on a 16-thread server
+with the same commands. The models run on one shared GH200 node (72 Arm cores and one Hopper-class GPU); deep models use bfloat16
+mixed precision. Every model with hyper-parameters receives
+the same budget of 10 Optuna~\cite{akiba2019optuna} TPE~\cite{bergstra2011tpe} trials on valid; as a check, the rankers were
+re-tuned with 30 trials (Section~\ref{sec:results}) and the final fits repeated with three seeds.
 
 % ---------------------------------------------------------------------------------------------------------------------------------
 \section{Unconditional Evaluation and Error Analysis}
 \label{sec:protocol}
+
+With the inputs fixed, the first half of RQ2 asks where the rule-based baseline fails when every purchase counts.
 
 \subsection{Protocol}
 The evaluated unit is every used anchor $a$ with at least one non-returned purchase in $(t, t+\Delta]$; its positives $P_a$ are all of
@@ -189,7 +277,7 @@ that have positives of that kind. We also report HR@10 (at least one hit in the 
 anywhere in $C_a$). Metrics are member means; confidence intervals come from a bootstrap over members~\cite{efron1993bootstrap}
 (500 resamples) and model differences from a paired bootstrap over the same members (1\,000 resamples).
 
-\subsection{The Reference Model Under the New Protocol}
+\subsection{The Rule-Based Baseline Under the New Protocol}
 Table~\ref{tab:t28} puts both protocols side by side. The conditional protocol drops the anchors whose list holds no purchase
 (\nNoPosShare{}\,\% of the anchors with a purchase over the three countries, 38.8\,\% in TH + VN), which doubles the headline number.
 
@@ -233,7 +321,7 @@ all     & 213\,289 & 0.082 & 0.236 & 0.103 & 0.580 \\
 \end{adjustbox}
 \end{table}
 
-\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_t28b_errors.png}{Where the test positives of the reference model end up.\label{fig:t28b}}
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_t28b_errors.png}{Where the test positives of the rule-based baseline end up.\label{fig:t28b}}
 
 Repeat is largely solved; explore is 91\,\% of the positives and 74.5\,\% of it never reaches the ranker. Of the capped positives,
 95\,\% come from R5 (the national top 300), whose lower ranks do not fit the cap. The positives without a source are mid-tail, not
@@ -243,7 +331,7 @@ the test positives (TH + VN, 83.4\,\% of the explore ones), which is the ceiling
 only 1.07\,\% of the anchors have a favourite sport. These facts set the agenda of Section~\ref{sec:retrieval}.
 
 % ---------------------------------------------------------------------------------------------------------------------------------
-\section{Learned Retrieval}
+\section{Learned Retrieval (RQ2)}
 \label{sec:retrieval}
 
 \subsection{Sources}
@@ -380,8 +468,8 @@ the selection objective averages the three countries (SG included), the tables r
 the train anchors with a positive in their list: 44\,795 of the 150\,000 sampled anchors (30\,\%, 13.2\,M pairs). The rankers are thus
 trained on the conditional population and selected and evaluated on the unconditional one.
 \begin{itemize}
-\item \textbf{P1-frozen}: the previous LambdaRank with its frozen hyper-parameters and original features, refitted on the v2 pairs; a
-reference row, not a tuned competitor.
+\item \textbf{P1-frozen}: the baseline LambdaRank of Section~\ref{sec:protocol}, with its hyper-parameters (tuned once on R1--R5
+candidates) and Gold pair features kept fixed, refitted on the v2 pairs; a reference row, not a tuned competitor.
 \item \textbf{P1-tuned}: LightGBM LambdaRank over every pair column (85 features, the source ranks of R6--R13 included).
 \item \textbf{P2}: P1-tuned plus five stacked signal columns from three models fitted with the rolling protocol: a LightGBM department
 hazard over member $\times$ department rows, $P(\text{buy in } (t, t+\Delta])$, and two LightGBM quantile models of willingness to pay
@@ -414,7 +502,7 @@ two group softmaxes by one softmax over $C_a$.
 \section{Results}
 \label{sec:results}
 
-\subsection{RQ2: Model Comparison}
+\subsection{RQ3: Model Comparison}
 
 \begin{table*}[t]
 \caption{Ranking on test (TH + VN, 41\,734 anchors, $\Delta = 30$, unconditional), with 95\,\% member-bootstrap intervals of NDCG@20.
@@ -667,7 +755,7 @@ web behaviour                           & 0.013 & 0.013 & 0.013 \\
 \end{table}
 
 % ---------------------------------------------------------------------------------------------------------------------------------
-\section{Feasibility and Demonstrator}
+\section{Value, Cost and Demonstrator (RQ4)}
 \label{sec:feasibility}
 
 \subsection{Value Over Simple Rules}
@@ -834,13 +922,16 @@ model such as HSTU~\cite{zhai2024hstu}, target the explore purchases that no co-
 \section{Conclusion}
 \label{sec:conclusion}
 
-Measured over every purchase, the reference recommender was half as good as reported, and most of its misses were purchases it never
-saw. Treating retrieval as a model, with eight explore-only sources refitted quarterly and mixed under a 300-candidate cap, raised the
-share of purchases within reach from \nCandOld{} to \nCandNew{}; with tuned rankers that see the source ranks, NDCG@20 rose from
-\nRefUncond{} to \nTuned{}--\nBest{} (+7--8\,\%), more than 25\,\% ahead of the best next-basket baseline (\nBaseline{}). A deep two-head
-ranker with a learned gate does not beat a tuned GBDT; a single-head version does by 1\,\%. The learned gate is essential; the explicit
-split is not. On purchase history alone the pipeline keeps about four fifths of its gain over the frequency rules; the other data
-dimensions add the rest. Naive stacking shows the inflation H2 predicted, small because the signals add little over a good feature store.
+Eleven operational exports became a point-in-time feature store on one machine: 66.1\,M sale lines kept with every refused row
+traceable, 182 tests and zero leakage violations (RQ1). Measured over every purchase, the rule-based recommender built on it was half
+as good as the usual protocol says, and most of its misses were purchases it never saw. Treating retrieval as a model, with eight explore-only sources refitted quarterly and mixed under a 300-candidate cap, raised the
+share of purchases within reach from \nCandOld{} to \nCandNew{} (RQ2); with tuned rankers that see the source ranks, NDCG@20 rose from
+\nRefUncond{} to \nTuned{}--\nBest{} (+7--8\,\%), more than 25\,\% ahead of the best next-basket baseline (\nBaseline{}). Features
+gave more than tuning, and tuning more than the model family: a deep two-head ranker with a learned gate does not beat a tuned GBDT,
+a single-head version does by 1\,\% (RQ3). The learned gate is essential; the explicit
+split is not. The best model is 1.8 times the best-sellers and 1.5 times ``buy the same again'' in one list of ten, and reaches
+about two thirds of the sales value; on purchase history alone the pipeline keeps about four fifths of its gain over the frequency
+rules, and the other data dimensions add the rest (RQ4). Naive stacking shows the inflation H2 predicted, small because the signals add little over a good feature store.
 
 \section*{Acknowledgment}
 This work was carried out as the project of the course Advanced Machine Learning and Applications (IT2043.26.1.CH.01) of the
