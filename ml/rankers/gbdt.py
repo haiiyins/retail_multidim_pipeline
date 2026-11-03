@@ -7,7 +7,8 @@ P2 = the same GBDT with the rolling P2 signal features (ml/signals/run_leakage_s
 Usage (tuning smoke, ML-07 DoD): python ml/rankers/gbdt.py --tune p1 --trials 3
        python ml/rankers/gbdt.py --tune p1 --source v2 [--final --name p1_tuned_v2]      (P1-tuned on ml.candidates_v2)
        python ml/rankers/gbdt.py --tune p2 --source v2 --signals [--final --name p2_v2]  (P2)
-       python ml/rankers/gbdt.py --tune p1 --source v2 --final --skip-tune --seed 1 --name p1_tuned_v2_seed1  (seed variance)"""
+       python ml/rankers/gbdt.py --tune p1 --source v2 --final --skip-tune --seed 1 --name p1_tuned_v2_seed1  (seed variance)
+       python ml/rankers/gbdt.py --tune p1 --source v2 --budget 30 --final --name p1_tuned_v2_b30  (30 trials, space p1_b30)"""
 import argparse, json, os, sys
 import lightgbm as lgb, numpy as np, pandas as pd
 
@@ -59,7 +60,7 @@ def groups(df):
     return df.groupby(["member_id", "anchor_date"], sort=False).size().values
 
 
-def fit(params, tr, va, feat, delta, max_rounds=3000, early_stop=100):
+def fit(params, tr, va, feat, delta, max_rounds=6000, early_stop=100):
     cats = [c for c in CATEGORICAL if c in feat]
     p = {**BASE, "num_threads": threads(), **params}
     dtr = lgb.Dataset(tr[feat], tr[f"label_{delta}"], group=groups(tr), categorical_feature=cats, free_raw_data=False)
@@ -80,9 +81,9 @@ def unconditional(con, scores, split, delta, metric="NDCG@20"):
     return float(res.groupby("member_id")[metric].mean().mean()), res
 
 
-def best_params(name):
+def best_params(name, budget=N_TRIALS):
     t = pd.read_parquet(ml_path("tuning", f"{name}.parquet"))
-    t = t[(t["state"] == "COMPLETE") & (t["trial"] < N_TRIALS)]
+    t = t[(t["state"] == "COMPLETE") & (t["trial"] < budget)]
     return json.loads(t.loc[t["value"].idxmax(), "params"])
 
 
@@ -97,6 +98,7 @@ def main():
     ap.add_argument("--name", default=None)
     ap.add_argument("--skip-tune", action="store_true")
     ap.add_argument("--seed", type=int, default=0, help="final refit with LightGBM seed 42 + SEED (seed variance)")
+    ap.add_argument("--budget", type=int, default=None, help="tuning budget: study <model>_b<N>, space <model>_b<N> of tuning.yml")
     a = ap.parse_args()
     from ml.rankers.frozen import relation
     con = connect()
@@ -108,7 +110,8 @@ def main():
     feat = features(tr)
     print(f"train {len(tr):,} rows · valid {len(va):,} rows · {len(feat)} features · {threads()} threads", flush=True)
     tag = "" if a.source == "v1" else f"_{a.source}"
-    study_name = f"{a.tune}{tag}"
+    study_name = f"{a.tune}{tag}" + (f"_b{a.budget}" if a.budget else "")
+    budget = a.budget or N_TRIALS
 
     def objective(params, trial):
         m = fit(params, tr, va, feat, a.delta)
@@ -119,16 +122,17 @@ def main():
 
     if not a.skip_tune:
         from ml.common.data import load_config
-        space = load_config("tuning")[a.tune]["space"]
-        study, trials = tune(study_name, objective, n_trials=a.trials, space=space,
+        cfg = load_config("tuning")
+        space = cfg.get(f"{a.tune}_b{a.budget}", cfg[a.tune])["space"]
+        study, trials = tune(study_name, objective, n_trials=a.trials or a.budget, space=space,
                              tag="" if a.trials is None else f"_smoke{a.trials}")
         print(trials[["trial", "value", "state", "wall_sec"]].to_string(index=False))
         print(f"best {study.best_value:.4f}  {study.best_params}", flush=True)
     if a.final:
         from ml.common.registry import Run
-        params = best_params(study_name) | ({"seed": BASE["seed"] + a.seed} if a.seed else {})
+        params = best_params(study_name, budget) | ({"seed": BASE["seed"] + a.seed} if a.seed else {})
         name = a.name or f"{study_name}"
-        with Run(name, config={"source": a.source, "signals": a.signals, "seed": a.seed}, params=params) as run:
+        with Run(name, config={"source": a.source, "signals": a.signals, "seed": a.seed, "budget": a.budget}, params=params) as run:
             m = fit(params, tr, va, feat, a.delta)
             run.metrics["best_iteration"] = m.best_iteration
             te = load(con, "test", a.delta, rel)

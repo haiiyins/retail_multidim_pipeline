@@ -209,3 +209,13 @@ Decision on valid, TH + VN NDCG@20: P1-tuned 0.1088 → 0.1079, P3 two heads 0.1
 supported on valid and is not used for selection (it would be selection on test). The GBDT loses 0.025 repeat recall to the extra
 negatives. Conclusion: the cap is not binding; ranking the hard explore candidates is.
 Also tried on valid only: rank-averaging the final fits (P1-tuned, P2, P3, seeds) — 0.1096 → 0.1103 at best; not adopted.
+
+## 2026-11-03 · Tuning budget 30 trials (t31_b30)
+
+Question: was the 10-trial budget binding? The best GBDT trial was the last one and sat near the learning-rate floor (0.029 vs 0.02);
+the best P3 trial sat at its floor (0.0001). P1-tuned, P2 and P3 re-tuned on the v2 pairs with the plan's 30 trials each and the floor
+lowered (`--budget 30`: studies and spaces `<model>_b30` in tuning.yml; GBDT learning rate ≥ 0.005, P3 lr ≥ 0.00002; GBDT max rounds
+3 000 → 6 000, no earlier fit reached 3 000). Same budget for every ranker, as D5 requires. Decision on valid, TH + VN NDCG@20, 10 → 30
+trials: P1-tuned 0.1088 → 0.1089, P2 0.1089 → 0.1088, P3 two heads 0.1087 → 0.1086, P3 one head 0.1096 → 0.1092 — **10-trial fits kept**.
+Test, reported once (t31_b30_paired, 30 − 10): P1-tuned +0.0001 [−0.0003, 0.0006], P2 +0.0007 [0.0003, 0.0011], P3 two heads −0.0002
+[−0.0005, 0.0001], P3 one head −0.0000 [−0.0003, 0.0003]. The search had converged; the order of t31 stands.

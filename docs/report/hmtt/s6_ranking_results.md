@@ -78,6 +78,14 @@ The seed spread (≤ 0.0003) is below the gap between P3 one head and P1-tuned, 
 (+0.0011, +0.0018, +0.0011). The two-head model is the least stable: its repeat recall moves from 0.79 to 0.85 across seeds, i.e.
 the learned gate lands in different places from one run to the next.
 
+*Tuning budget (t31_b30).* The best of the 10-trial studies sat at the learning-rate floor (GBDT 0.029 against 0.02, P3 0.0001 = the
+floor) and was the last GBDT trial, so P1-tuned, P2 and P3 were re-tuned with the plan's 30 trials each and the floor lowered (GBDT
+0.005, P3 0.00002); about 3.2 wall-hours on 32 threads for each GBDT study and 0.75 GPU-hour for P3. Valid, TH + VN NDCG@20, 10 → 30 trials:
+P1-tuned 0.1088 → 0.1089, P2 0.1089 → 0.1088, P3 two heads 0.1087 → 0.1086, P3 one head 0.1096 → 0.1092 — the 10-trial fits are
+kept. Test, reported once (paired 30 − 10 trials): P1-tuned +0.0001 [−0.0003, 0.0006], P2 +0.0007 [0.0003, 0.0011], P3 two heads
+−0.0002 [−0.0005, 0.0001], P3 one head −0.0000 [−0.0003, 0.0003]. The search had converged: three times the budget moves no model
+by more than the seed spread, except a small P2 gain on test that valid does not show.
+
 ## B. By country and segment (t34)
 
 NDCG@20 on test (segments by transactions in the 365 days before the anchor: new ≤ 1, mid 2, loyal ≥ 3; all countries):
