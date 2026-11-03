@@ -628,6 +628,8 @@ loses 0.025 repeat recall to the extra negatives. The cap is not what limits acc
 repeat coverage (0.972 to 0.997 on test) for $-0.001$ explore coverage. P1-tuned refitted on its pairs with the same
 hyper-parameters gives the same valid NDCG@20 (TH + VN: 0.1087 against 0.1088), so the fixed weights are kept; on test the paired
 difference is $+0.0004$ $[-0.0001, +0.0009]$. The repeats the quotas cut sit at the end of long R1 lists and rarely reach the top 20.
+A learned mixer (LightGBM over the source ranks, top 300 of the union) lifts valid coverage to 0.502, but P1-tuned on its pairs
+gives 0.1084 on valid and $+0.0004$ $[-0.0002, +0.0009]$ on test.
 
 \textit{Is the tuning budget binding?} With 10 trials the best GBDT trial was the last one and sat near the learning-rate floor, and the
 best P3 trial sat at its floor. P1-tuned, P2 and P3 were therefore re-tuned on the same v2 pairs with 30 trials each and lower floors
