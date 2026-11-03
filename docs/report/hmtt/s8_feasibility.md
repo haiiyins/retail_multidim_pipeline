@@ -86,5 +86,5 @@ the anchor, the last 40 history lines, no price, store, web or member attribute.
 Measured honestly, the reference recommender was half as good as reported, and most of its misses were purchases it never saw.
 Treating retrieval as a model — eight explore-only sources refitted quarterly and mixed under a 300-candidate cap — raised the share of
 purchases within reach from 0.370 to 0.450, and with tuned rankers that see the source ranks, NDCG@20 from 0.095 to 0.101 – 0.102 (+7 – 8 %), ahead of every next-basket baseline by more than 25 %. A deep two-head ranker with a learned gate does not beat a tuned GBDT; a
-single-head version does by 1 %. The learned gate is essential, the explicit split is not. Naive stacking shows the inflation H2
+single-head version does by 1 %. The learned gate is essential, the explicit split is not. Naive stacking shows the inflation H1
 predicted, small because the signals add little over a good feature store.

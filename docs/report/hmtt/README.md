@@ -8,7 +8,7 @@ and the tables that quote it, then rerun `make ml-figures` and `make report-pdf`
 placeholders to complete.
 
 Drafts of the IEEE Access paper of the course plan (§13): I Introduction · II Related work · III Data and infrastructure · IV
-Unconditional evaluation protocol and error analysis · V Learned retrieval · VI Ranking · VII Results (RQ1–RQ3, H2) · VIII Feasibility
+Unconditional evaluation protocol and error analysis · V Learned retrieval · VI Ranking · VII Results (RQ1–RQ3, H1) · VIII Feasibility
 and demo · IX Discussion and limitations · X Conclusion. The slide outline is [`slides.md`](slides.md).
 
 Every number comes from a table in [`../tables/ml/`](../tables/ml/), copied from `data/ml/report/` by
