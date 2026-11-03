@@ -5,6 +5,7 @@ fig_t30_curve       unconditional candidate coverage against the list size K (te
 fig_t31_ndcg        NDCG@20 with 95 % member-bootstrap intervals of every t31 model (test, TH + VN)
 fig_t32_ablation    paired differences of the P3 variants against P3 two heads (NDCG@20, recall_explore@20)
 fig_t31_seeds       NDCG@20 of the three seeds of P1-tuned and P3
+fig_arch            the two-stage system (feature store → candidate sources → mixer → rankers → unconditional evaluation)
 Usage: python ml/analysis/figures.py"""
 import io, os, re, sys
 import matplotlib
@@ -141,9 +142,41 @@ def seeds():
     save(fig, "fig_t31_seeds")
 
 
+def arch():
+    boxes = {   # name: (x, y, width, text, colour)
+        "fs": (0.0, 1.2, 2.2, "Feature store\nBronze / Silver / Gold\nQC-1…7, point in time", "#e9ecef"),
+        "rules": (2.8, 2.1, 2.2, "Rules R1–R5\nrepurchase, co-purchase,\nweb, best-sellers", "#ffe8cc"),
+        "learned": (2.8, 0.3, 2.2, "Learned R6–R13\nexplore-only,\nquarterly refits", "#ffc078"),
+        "mix": (5.6, 1.2, 1.6, "Mixer\nrank quotas\nK = 300", "#fff3bf"),
+        "rank": (7.8, 1.2, 2.2, "Rankers\nP1 GBDT, P2 stacking,\nP3 two heads + gate", "#d0ebff"),
+        "eval": (10.6, 1.2, 2.0, "Unconditional\nevaluation,\nrepeat / explore", "#d3f9d8"),
+    }
+    h = 1.2
+    fig, ax = plt.subplots(figsize=(9, 2.6))
+    for x, y, w, text, colour in boxes.values():
+        ax.add_patch(matplotlib.patches.FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.05", fc=colour, ec="#495057"))
+        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=8)
+
+    def arrow(a, b):
+        xa, ya, wa = boxes[a][:3]
+        xb, yb, _ = boxes[b][:3]
+        ax.annotate("", xy=(xb, yb + h / 2), xytext=(xa + wa, ya + h / 2),
+                    arrowprops=dict(arrowstyle="-|>", color="#495057", lw=1.2, shrinkA=2, shrinkB=2))
+
+    for a, b in (("fs", "rules"), ("fs", "learned"), ("rules", "mix"), ("learned", "mix"), ("mix", "rank"), ("rank", "eval")):
+        arrow(a, b)
+    ax.annotate("", xy=(8.9, 1.15), xytext=(1.1, 1.15), arrowprops=dict(arrowstyle="-|>", color="#adb5bd", lw=1, ls="--",
+                connectionstyle="arc3,rad=0.3", shrinkA=2, shrinkB=2))
+    ax.text(5.0, -0.55, "pair features", fontsize=7, color="#868e96", ha="center")
+    ax.set_xlim(-0.1, 12.7)
+    ax.set_ylim(-0.8, 3.4)
+    ax.axis("off")
+    save(fig, "fig_arch")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    for f in (errors, curve, ndcg, ablation, seeds):
+    for f in (errors, curve, ndcg, ablation, seeds, arch):
         f()
 
 

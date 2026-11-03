@@ -9,7 +9,7 @@ export
 # in every recipe shell that opens the lakehouse; the fallback covers hosts with a small hard limit.
 NOFILE = ulimit -n 65536 2>/dev/null || ulimit -n 4096 2>/dev/null || true
 PYTHONUNBUFFERED = 1   # stream the loaders' per-table lines into a redirected log instead of flushing them at exit
-.PHONY: probe probe-full bronze bronze-views gates test-volume-drift holidays silver gold train ablation docs docs-figures report-tables ml-test ml-seq ml-eval ml-views ml-retrieval ml-figures all
+.PHONY: probe probe-full bronze bronze-views gates test-volume-drift holidays silver gold train ablation docs docs-figures report-tables ml-test ml-seq ml-eval ml-views ml-retrieval ml-figures report-pdf all
 probe:
 	python ingestion/probe_csv_format.py
 probe-full:
@@ -52,6 +52,8 @@ ml-views:
 ml-figures:
 	python ml/analysis/export_tables.py
 	python ml/analysis/figures.py
+report-pdf:
+	cd docs/report/hmtt && pdflatex -interaction=nonstopmode main.tex >/dev/null && bibtex -terse main && pdflatex -interaction=nonstopmode main.tex >/dev/null && pdflatex -interaction=nonstopmode -halt-on-error main.tex | grep -E 'Output written|^!'
 ml-retrieval:
 	$(NOFILE); for s in ease tifuknn rp3beta explin trend; do python ml/retrieval/$$s.py --tune --build || exit 1; done
 	$(NOFILE); for c in SG TH VN; do python ml/retrieval/item2vec.py --build --countries $$c & done; wait

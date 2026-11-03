@@ -37,3 +37,11 @@ dbt_multidim/.user.yml
 *.tar.gz
 *.tgz
 *.zip
+
+# LaTeX build of docs/report/hmtt (main.pdf is committed)
+docs/report/hmtt/*.aux
+docs/report/hmtt/*.bbl
+docs/report/hmtt/*.blg
+docs/report/hmtt/*.log
+docs/report/hmtt/*.out
+docs/report/hmtt/*.toc
