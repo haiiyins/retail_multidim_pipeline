@@ -47,8 +47,8 @@ def build(con, split, country, cand_glob, version="v2"):
     t0 = time.time()
     con.execute(f"COPY ({ranking_sql(cand)}) TO '{out}' (FORMAT parquet)")
     rel = f"read_parquet('{out}')"
-    n_pair, leak = con.execute(f"SELECT COUNT(*), COUNT(*) FILTER (WHERE last_source_ts > CAST(anchor_date AS TIMESTAMP)) FROM {rel}").fetchone()
-    n_cand = con.execute(f"SELECT COUNT(*) FROM {cand}").fetchone()[0]
+    n_pair, leak = con.execute(f"SELECT COUNT(*), COUNT(*) FILTER (WHERE last_source_ts > CAST(anchor_date AS TIMESTAMP)) FROM {rel}").fetchall()[0]
+    n_cand = con.execute(f"SELECT COUNT(*) FROM {cand}").fetchall()[0][0]
     if leak or n_pair != n_cand:
         raise PairCheckFailed(f"{out}: {leak} rows with last_source_ts after the anchor, {n_pair:,} pair rows for {n_cand:,} candidates")
     pit = assert_pit(con, rel, require=())

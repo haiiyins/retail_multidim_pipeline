@@ -51,7 +51,7 @@ def main():
         ) TO '{ml_path(out_name, f"{split}_{country}.parquet")}' (FORMAT parquet)""")
     rel = f"read_parquet('{ml_path(out_name, '*.parquet')}')"
     pit = assert_pit(con, rel, require=())
-    cap = con.execute(f"SELECT MAX(n) FROM (SELECT COUNT(*) AS n FROM {rel} GROUP BY member_id, anchor_date)").fetchone()[0]
+    cap = con.execute(f"SELECT MAX(n) FROM (SELECT COUNT(*) AS n FROM {rel} GROUP BY member_id, anchor_date)").fetchall()[0][0]
     assert cap <= k, f"cap violated: {cap} > {k}"
     n = con.execute(f"SELECT split, COUNT(*), COUNT(DISTINCT (member_id, anchor_date)) FROM {rel} GROUP BY 1 ORDER BY 1").fetchall()
     print(f"{out_name} ({policy}, k = {k}): {n}; pit {pit}; max per anchor {cap}")

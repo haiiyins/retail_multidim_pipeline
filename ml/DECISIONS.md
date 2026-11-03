@@ -245,3 +245,28 @@ drawn uniformly (seed 0), with P3 one head and GP-TopFreq top 10, the history be
 days. Sample HR@10 0.240 vs 0.190 (whole test 0.240 vs 0.184). The sample of real members is published with the data owner's
 consent and minimised: sequential member ids in shuffled order (no hash of the real id), the reference's salted model hashes and
 generic departments, days relative to the anchor, the last 40 history lines, no price, store, web or member attribute.
+
+## 2026-11-03 · Report review experiments (t28c, epochs_*, t31 rows, r1_first)
+
+Test, TH + VN, Δ = 30 unless stated; valid is the decision data.
+- Features against tuning (`frozen.py --features all`, `p1_frozen_allfeat_v2`): the frozen parameters with the 85 v2 features give
+  0.1001; P1-frozen v2 0.0973, P1-tuned 0.1011. Paired: new features +0.0028 [0.0021, 0.0035] (explore +0.0069), tuning +0.0011
+  [0.0005, 0.0016] (repeat +0.0235). The +0.0039 of P1-tuned over P1-frozen is mostly features, not tuning.
+- Fate of the positives on candidates_v2 + P3 one head and universe ceiling (`eval/error_analysis_v2.py`, t28c): top 20 13.2 %,
+  rank 21+ 28.1 %, capped 9.4 % (R5 proposes 42 % of them), no source inside the universe 35.2 %, outside it 14.0 %. The universe of
+  the anchor's cutoff holds 84.5 % of the positives (85.9 % member mean), 86.0 % are reachable by some source; the anchor_model_grid
+  filter loses 0.04 %. The "3 %" of t28b was the popularity rank at the anchor, not the universe at the cutoff.
+- Mixer weights (`mixer.py --policies r1_first`, candidates_v2r1, `p1_tuned_v2r1` with the p1_v2 parameters): repeat coverage
+  0.972 → 0.997, explore −0.001; valid NDCG@20 0.1087 against 0.1088, test +0.0004 [−0.0001, 0.0009]. Fixed weights kept.
+- Epoch budget of the neural sources (`retrieval/epochs_check.py`, TH, valid cutoff): Δ cand_explore 4 / 8 / 16 epochs two-tower
+  0.074 / 0.077 / 0.082, SASRec 0.077 / 0.084 / 0.090. Both are under-trained at 8 epochs; candidates not rebuilt (limitation).
+- SASRec NBR with full targets (`baselines/nbr.py --source sasrec_all`, SASRecAll: R10 network and parameters, repeats in the
+  target, nothing masked): 0.0751 against 0.0606 for the R10 unmasked list (+0.0146 [0.0135, 0.0157], repeat recall 0.43 → 0.57);
+  ties with GP-TopFreq (0.0752), below TIFU-KNN (−0.0036 [−0.0049, −0.0025]). Added to t31 as a second SASRec row.
+- Serving coverage of the real test-window sales (business.py, t39): identified members 93 % / 81 % of the GMV (TH / VN), members
+  with a prior purchase (personalised path) 71 % / 56 %. GMV per 1 000 recommendations over every anchor: P3 one head 112 EUR,
+  buy-again 77, popular 33 (268 / 184 / 79 over the anchors with a purchase).
+- `serve/check_public.py` gates every upload of the Space: structure in CI (deploy-space.yml, after staging: salted-hash model ids
+  in the CSVs and showcase.json, only the published showcase fields, member ids `<country>-NNN`, no UUID / local path / salt) and,
+  in `make demo-push`, also the raw model codes and member ids of the lakehouse (`--db`) and the REDACT_TERMS tokens
+  (`--require-terms`). Current Space (11 files, showcase included): 0 hits; a tampered copy is caught (serve/tests).

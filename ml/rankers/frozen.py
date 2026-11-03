@@ -1,14 +1,16 @@
 """P1-frozen (reference row, D5): the KTXLDL LambdaRank with the hyper-parameters and round count of evaluation/frozen_params.json,
 refitted on the train split of a ranking dataset (v1 = gold.gld_ranking_dataset, v2 = the pairs of ml.candidates_v2) with the
 original feature set (columns of gld_ranking_dataset only: the source ranks and point-in-time columns of v2 are not features).
-Usage: python ml/rankers/frozen.py --source v2 --name p1_frozen_v2   →  data/ml/scores/<name>_{valid,test}_d30.parquet"""
+--features all keeps the frozen parameters but uses the P1-tuned feature set (gbdt.features), which separates the effect of the
+new features from the effect of tuning.
+Usage: python ml/rankers/frozen.py --source v2 --name p1_frozen_v2 [--features all]  →  data/ml/scores/<name>_{valid,test}_d30.parquet"""
 import argparse, json, os, sys, time
 import lightgbm as lgb
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from ml.common.data import ML_DIR, ROOT, connect, ml_path
 from ml.common.registry import Run
-from ml.rankers.gbdt import CATEGORICAL, NONFEAT, groups, load, threads
+from ml.rankers.gbdt import CATEGORICAL, NONFEAT, features, groups, load, threads
 
 FROZEN = json.load(open(ROOT / "evaluation" / "frozen_params.json"))
 V1 = "lh.gold.gld_ranking_dataset"
@@ -42,14 +44,14 @@ def main():
     ap.add_argument("--source", default="v2")
     ap.add_argument("--name", default="p1_frozen_v2")
     ap.add_argument("--delta", type=int, default=30)
+    ap.add_argument("--features", choices=("v1", "all"), default="v1")
     a = ap.parse_args()
     con = connect()
     rel = relation(a.source)
-    feat = [c for c in v1_features(con)]
-    with Run(a.name, config={"source": a.source, "frozen": FROZEN}) as run:
+    with Run(a.name, config={"source": a.source, "features": a.features, "frozen": FROZEN}) as run:
         t0 = time.time()
         tr = load(con, "train", a.delta, rel)
-        feat = [c for c in feat if c in tr.columns]
+        feat = features(tr) if a.features == "all" else [c for c in v1_features(con) if c in tr.columns]
         m = train(tr, feat, a.delta)
         run.metrics.update(train_rows=len(tr), features=len(feat), train_sec=time.time() - t0)
         print(f"train {len(tr):,} rows · {len(feat)} features · {time.time() - t0:.0f}s", flush=True)

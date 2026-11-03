@@ -19,7 +19,8 @@ from ml.common.data import ROOT, ml_path
 OUT = ROOT / "docs" / "figures" / "ml"
 MAIN = "MAIN (TH+VN)"
 LABELS = {"ptopfreq": "P-TopFreq", "gptopfreq": "GP-TopFreq", "ease_nbr": "EASE NBR", "tifuknn_nbr": "TIFU-KNN NBR",
-          "sasrec_nbr": "SASRec NBR", "p1_frozen": "P1-frozen (R1–R5)", "p1_frozen_v2": "P1-frozen (v2)",
+          "sasrec_nbr": "SASRec NBR", "sasrec_all_nbr": "SASRec NBR (all targets)", "p1_frozen": "P1-frozen (R1–R5)",
+          "p1_frozen_v2": "P1-frozen (v2)", "p1_frozen_allfeat_v2": "P1-frozen (v2, 85 features)",
           "p1_tuned_v2": "P1-tuned", "p2_v2": "P2", "p3_full": "P3 two heads", "p3_onehead": "P3 one head",
           "p3_fixedgate": "P3 fixed gate", "p3_noseq": "P3 no sequence"}
 CELLS = [("top10", "top 10", "#2b8a3e"), ("rank_11_plus", "rank 11+", "#94d82d"), ("out_capped", "cut by the cap", "#fab005"),

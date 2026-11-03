@@ -11,6 +11,7 @@ import numpy as np, pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from ml.common.data import ML_DIR, connect, ml_path, split_windows
+from ml.eval.protocol import MAIN_COUNTRIES
 
 UNIVERSE = 5000
 DELTA = 30
@@ -97,11 +98,17 @@ def t38(con, best, label, pos, seg):
             r["× buy-again"] = r[f"HR@10 {label}"] / max(r["HR@10 buy-again (P-TopFreq)"], 1e-9)
             rows.append(r)
     mult = pd.DataFrame(rows)
+    used = con.execute("SELECT country_code, COUNT(*) FROM lh.gold.anchor_grid WHERE split = 'test' AND is_used GROUP BY 1").fetchall()
+    used = dict(used)
+    n_used = {"ALL": sum(used.values()), "MAIN (TH+VN)": sum(v for c, v in used.items() if c in MAIN_COUNTRIES), **used}
     gmv_rows = []
     for lab in models:
         for scope, d in scopes(per[lab]["all"]):
-            gmv_rows.append({"model": lab, "scope": scope, "GMV-weighted Recall@10": d["gmv_hit"].sum() / d["gmv"].sum(),
-                             "GMV captured / 1 000 recommendations (EUR)": d["gmv_hit"].sum() / (len(d) * 10) * 1000})
+            row = {"model": lab, "scope": scope, "GMV-weighted Recall@10": d["gmv_hit"].sum() / d["gmv"].sum(),
+                   "GMV captured / 1 000 recommendations (EUR)": d["gmv_hit"].sum() / (len(d) * 10) * 1000}
+            if scope in n_used:   # every used anchor receives 10 recommendations, buyers or not
+                row["GMV / 1 000 recommendations, every anchor (EUR)"] = d["gmv_hit"].sum() / (n_used[scope] * 10) * 1000
+            gmv_rows.append(row)
     return mult, pd.DataFrame(gmv_rows)
 
 
@@ -124,6 +131,22 @@ def t39(con, pos):
         GROUP BY ROLLUP (a.country_code) ORDER BY a.country_code NULLS LAST""").df().fillna({"country_code": "ALL"})
 
 
+def sales_coverage(con):
+    """Coverage of the real sales of the test window (first test anchor + 1 … last test anchor + Δ), not of the anchor grid: GMV share
+    of identified members, GMV share of members with a purchase before the sale day (the personalised path), and the share of the
+    buying members that have such a history; the rest gets the country best-sellers."""
+    sw = split_windows()
+    return con.execute(f"""
+        WITH f AS (SELECT country_code, member_id, transaction_date AS d, gmv_eur FROM lh.silver.slv_fact_sales_line
+                   WHERE transaction_date > DATE '{sw["test_lo"]}' AND transaction_date <= DATE '{sw["test_hi"]}' + {DELTA}),
+        fb AS (SELECT member_id, MIN(transaction_date) AS first_d FROM lh.silver.slv_fact_sales_line WHERE member_id IS NOT NULL GROUP BY 1)
+        SELECT f.country_code, SUM(gmv_eur) FILTER (WHERE f.member_id IS NOT NULL) / SUM(gmv_eur) AS gmv_share_members,
+               SUM(gmv_eur) FILTER (WHERE fb.first_d < f.d) / SUM(gmv_eur) AS gmv_share_personalised,
+               COUNT(DISTINCT f.member_id) FILTER (WHERE fb.first_d < f.d) / COUNT(DISTINCT f.member_id) AS buyers_with_history
+        FROM f LEFT JOIN fb USING (member_id)
+        GROUP BY ROLLUP (f.country_code) ORDER BY f.country_code NULLS LAST""").df().fillna({"country_code": "ALL"})
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--best", required=True)
@@ -135,7 +158,7 @@ def main():
     seg = segments(con)
     mult, gmv = t38(con, a.best, label, pos, seg)
     con.register("_p", pos)
-    cov = t39(con, pos)
+    cov, sales = t39(con, pos), sales_coverage(con)
     with open(ml_path("report", "t38.md"), "w") as f:
         f.write(f"# t38 — {label} against business references (test, Δ = 30, unconditional, member means)\n\n"
                 f"random = 10 slots drawn uniformly from the {UNIVERSE}-model universe (analytic). GMV figures are an offline proxy, "
@@ -145,13 +168,16 @@ def main():
     with open(ml_path("report", "t39.md"), "w") as f:
         f.write("# t39 — serving coverage (test anchors)\n\nPersonalised path: the member has a purchase before the anchor; "
                 "the others get the fallback (country best-sellers).\n\n")
-        f.write(cov.to_markdown(index=False, floatfmt=".4f") + "\n")
+        f.write(cov.to_markdown(index=False, floatfmt=".4f") + "\n\n")
+        f.write("Real sales of the test window: the anchor grid holds members with a history by construction, so its coverage is 1; "
+                "these shares are over all sale lines.\n\n" + sales.to_markdown(index=False, floatfmt=".4f") + "\n")
     mult.to_csv(ml_path("report", "t38.csv"), index=False)
     cov.to_csv(ml_path("report", "t39.csv"), index=False)
     pd.set_option("display.width", 250)
     print(mult[mult["scope"].isin(["ALL", "MAIN (TH+VN)"])].round(4).to_string(index=False))
     print(gmv[gmv["scope"] == "MAIN (TH+VN)"].round(4).to_string(index=False))
     print(cov.round(4).to_string(index=False))
+    print(sales.round(4).to_string(index=False))
 
 
 if __name__ == "__main__":

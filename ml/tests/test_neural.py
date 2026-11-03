@@ -58,6 +58,14 @@ def test_sasrec_training_is_point_in_time():
     assert float(sasrec_loss(model, (x.long(), days, lens, c)).detach()) > 0
 
 
+def test_sasrec_all_targets_include_repeats():
+    # one member buys the same model twice: no explore target, one full (repeat) target
+    model = SASRecNet(5, 8, 1, 0.0)
+    b = (torch.tensor([[[OFFSET], [OFFSET]]]), torch.tensor([[0, 5]], dtype=torch.int32), torch.tensor([2]), 100)
+    assert float(sasrec_loss(model, b).detach()) == 0.0
+    assert float(sasrec_loss(model, b, explore=False).detach()) > 0
+
+
 def test_two_tower_examples_are_point_in_time_and_explore_only():
     ev = events()
     uni = Universe(ev, dt.date(2024, 6, 1), size=5, window_days=365)

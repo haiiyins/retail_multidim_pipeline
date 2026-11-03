@@ -7,7 +7,7 @@ universe models first bought in (d_j, d_j + Δ] (explore: not in the baskets up 
 already bought masked out, averaged over the targets. Only steps whose window closes before the cutoff carry loss, so inputs and
 targets are both point-in-time. Fit per country × cutoff on the last max_len baskets before the cutoff of every member with two or
 more; at the anchor the state of the latest basket scores the universe. d, blocks, dropout, lr are tuned on valid (tuning.yml).
-The SASRec baseline of t31 (next-item loss, all models) is a separate model (ML-20).
+SASRecAll is the same network trained on every model of the window (repeats included), the full-target SASRec NBR baseline of t31.
 Usage: python ml/retrieval/sasrec.py --tune | --build [--seed N --splits test]"""
 import os, sys
 import numpy as np, torch, torch.nn as nn
@@ -42,7 +42,7 @@ def multi_hot(x, size):
     return torch.zeros(*x.shape[:2], size + OFFSET, dtype=torch.bool, device=x.device).scatter_(2, x, True)[..., OFFSET:]
 
 
-def loss_fn(model, b):
+def loss_fn(model, b, explore=True):
     x, days, lens, c = b
     h = model.states(x, days, lens)
     basket = multi_hot(x, model.size)                                   # (n, L, V)
@@ -51,7 +51,11 @@ def loss_fn(model, b):
     valid = steps[None] < lens[:, None]
     later = (steps[None, :] > steps[:, None])[None] & valid[:, None, :] & \
             (days[:, None, :] <= days[:, :, None] + CFG["delta"])        # (n, j, k): basket k is in the window of step j
-    target = (torch.bmm(later.to(torch.bfloat16), basket.to(torch.bfloat16)) > 0) & ~seen
+    target = torch.bmm(later.to(torch.bfloat16), basket.to(torch.bfloat16)) > 0
+    if explore:
+        target &= ~seen
+    else:
+        seen = torch.zeros_like(seen)
     ok = valid & (days + CFG["delta"] < c) & target.any(2)
     if not ok.any():
         return h.sum() * 0.0
@@ -60,6 +64,7 @@ def loss_fn(model, b):
 
 class SASRec(Source):
     name = "sasrec"
+    explore = True
 
     def prepare(self, ev, uni, cutoff):
         m = np.arange(len(ev.members), dtype=np.int64)
@@ -83,7 +88,8 @@ class SASRec(Source):
                 n = int(lens[i].max())
                 yield x[i, :n].long(), days[i, :n], lens[i], prep[3]
 
-        return train(model, batches, loss_fn, C["epochs"], params["lr"], log=f"sasrec {ev.country} {str(cutoff)[:10]}")
+        return train(model, batches, lambda m, b: loss_fn(m, b, self.explore), C["epochs"], params["lr"],
+                     log=f"sasrec{'' if self.explore else '_all'} {ev.country} {str(cutoff)[:10]}")
 
     def scores(self, model, q):
         x, days, lens = basket_windows(q.ev, q.uni, q.all_row, q.all_idx, q.n, C["max_len"], C["width"])
@@ -96,6 +102,12 @@ class SASRec(Source):
                 h = model.states(xs, ds, ns)
                 out.append(model.logits(h[torch.arange(len(ns), device=DEVICE), ns - 1]).float())
         return torch.cat(out)
+
+
+class SASRecAll(SASRec):
+    """SASRec NBR baseline (ml/baselines/nbr.py --source sasrec_all): the R10 network and parameters trained on every model bought
+    in (d_j, d_j + Δ], repeats included and nothing masked, so it can rank repeats as well as new models."""
+    version, explore = 2, False
 
 
 if __name__ == "__main__":
