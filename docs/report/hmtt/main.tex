@@ -61,7 +61,9 @@ on the explore coverage they add, and merged by a rank-quota mixer under a cap o
 to \nCandNew{}. Under one tuning budget, a tuned gradient-boosted ranker, a stacked variant and a deep multi-task ranker with
 repeat and explore heads and a learned gate are compared with five next-basket baselines. All two-stage rankers beat the strongest
 baseline by more than a quarter; the deep model gains about one percent over the tuned trees only in its single-head form, and the
-learned gate, not the explicit split, carries the benefit. A controlled study confirms that naive stacking inflates in-sample metrics.
+learned gate, not the explicit split, carries the benefit. Restricted to features a purchase log yields, the pipeline keeps about four
+fifths of its gain over the frequency rules a retailer uses today; the other data dimensions add the rest, mostly on new items. A
+controlled study confirms that naive stacking inflates in-sample metrics.
 \end{abstract}
 
 \begin{keywords}
@@ -98,7 +100,7 @@ repeat, compared with a single head?
 \item \textbf{H2 (hypothesis).} Naive stacking inflates metrics on training and pseudo-test anchors relative to a rolling protocol;
 on the real test the gap narrows but does not vanish.
 \item \textbf{RQ4 (feasibility).} How many times better than ``best-sellers'' and ``buy the same again'' is the best system, and what
-purchase value does it capture (offline proxy)?
+purchase value does it capture (offline proxy), and how much of its gain needs data beyond the purchase history?
 \end{itemize}
 
 The contributions are: (1) an unconditional evaluation protocol with a repeat / explore split and a positive-level error
@@ -617,6 +619,40 @@ As an offline proxy, not a causal estimate, the GMV-weighted Recall@10 is 0.077 
 i.e., 268\,EUR of observed next-30-day purchase value per 1\,000 recommendations against 184 and 79. These purchases happened anyway;
 an online test is needed to know how many a recommendation would cause.
 
+\textit{Purchase history only.} The status quo recommends from purchase history alone. To separate what the extra data dimensions
+bring from what the two-stage pipeline brings, P1 was re-tuned (10 trials) and refitted on the same pairs with only the 39 of 85
+features a purchase log yields: R1, R2, R5 and the learned source ranks, own and department history, co-purchase, sales popularity,
+season and model age, activity counts and country. Web behaviour (R3 and the mixed candidate rank), prices and promotions, stock,
+stores, calendar, sport affinity and the member price profile are removed. Table~\ref{tab:hist} crosses data and method. The
+pipeline on history alone gains $+0.0214$ $[+0.0204, +0.0225]$ NDCG@20 over GP-TopFreq; the other dimensions add $+0.0045$
+$[+0.0039, +0.0052]$ for P1-tuned and $+0.0054$ $[+0.0046, +0.0062]$ for P3 one head over P1-hist (paired, test; valid gives the
+same order: 0.0819, 0.1044, 0.1088, 0.1096). Of the $+0.0268$ of P3 one head over GP-TopFreq, about four fifths are therefore reached
+by retrieval and a learned ranker on the purchase log, and one fifth needs the other data, mostly as explore recall (P1-tuned $-$
+P1-hist $+0.0077$, repeat $-0.0086$). The history-only row is slightly optimistic: its candidate pool is the multi-dimensional one
+(it still holds the web-intent candidates, without the features that explain them), and the two-tower and trend sources use the
+unit price paid on the sales lines.
+
+\begin{table}[t]
+\caption{Data $\times$ method on test (TH + VN, NDCG@20). P1-hist: P1 re-tuned on the 39 purchase-history features.}
+\label{tab:hist}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lllr}
+\toprule
+Data & Method & Model & NDCG@20 \\
+\midrule
+purchase history & frequency rule & GP-TopFreq & 0.0752 \\
+                 & NBR            & TIFU-KNN   & 0.0788 \\
+                 & pipeline       & P1-hist    & 0.0966 \\
+\midrule
+multi-dimensional & pipeline      & P1-tuned    & 0.1011 \\
+                  &               & P3 one head & \textbf{0.1020} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
 \subsection{Serving Coverage}
 Every evaluated test anchor gets a personalized list of 300 candidates (median 300; all anchors have at least 10). This holds by
 construction, because the anchor grid starts after a member's second purchase; members without a purchase history are outside the
@@ -668,6 +704,11 @@ Table~\ref{tab:t31}.
 over a tuned GBDT and only in its single-head form, in line with the tabular-data literature~\cite{grinsztajn2022tabular}. The effort paid
 most in retrieval (+22\,\% relative coverage) and in tuning (+4\,\% NDCG@20 on the frozen ranker).
 
+\textit{Method against data.} Most of the gain over the status quo comes from the method, not from the extra data: on purchase history
+alone the pipeline reaches 0.0966 against 0.0752 for GP-TopFreq, and the web, price, promotion, stock and store features add 0.005
+NDCG@20 on top. A retailer with only a sales log can therefore take most of the benefit; the other dimensions matter for the
+explore purchases.
+
 \textit{Explore is still the bottleneck.} Explore coverage rose 1.30 times, not 2, and at the top 10 the model is no better than the
 best-sellers on explore purchases. On average 60\,\% of a member's explore purchases are still outside the 300 candidates. Raising the cap to 500
 recovers coverage (0.535) but not NDCG@20 on valid: the extra candidates are explore models the rankers cannot yet place in the top
@@ -695,7 +736,8 @@ saw. Treating retrieval as a model, with eight explore-only sources refitted qua
 share of purchases within reach from \nCandOld{} to \nCandNew{}; with tuned rankers that see the source ranks, NDCG@20 rose from
 \nRefUncond{} to \nTuned{}--\nBest{} (+7--8\,\%), more than 25\,\% ahead of the best next-basket baseline (\nBaseline{}). A deep two-head
 ranker with a learned gate does not beat a tuned GBDT; a single-head version does by 1\,\%. The learned gate is essential; the explicit
-split is not. Naive stacking shows the inflation H2 predicted, small because the signals add little over a good feature store.
+split is not. On purchase history alone the pipeline keeps about four fifths of its gain over the frequency rules; the other data
+dimensions add the rest. Naive stacking shows the inflation H2 predicted, small because the signals add little over a good feature store.
 
 \section*{Acknowledgment}
 This work was carried out as the project of the course Advanced Machine Learning and Applications (IT2043.26.1.CH.01) of the
