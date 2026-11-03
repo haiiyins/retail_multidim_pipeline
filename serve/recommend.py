@@ -19,8 +19,12 @@ REQUIRED = ("member_id", "country_code", "model_id", "purchase_date")
 class Reference:
     def __init__(self, models, neighbours, asof):
         self.models = models.set_index("model_id")
-        self.nb = neighbours
+        self.nb = neighbours.reset_index(drop=True)
+        self.nb_rows = self.nb.groupby("model_id").indices
         self.asof = asof
+        base = self.models["popularity"] / 100 * self.models["trend"].clip(upper=3)
+        m = self.models.assign(base=base).sort_values("base", ascending=False, kind="stable")
+        self.by_dept = {d: g for d, g in m.groupby("department", sort=False)}
 
 
 def validate(df):
@@ -46,7 +50,8 @@ def repeat(h, ref):
 
 
 def co_purchase(h, ref, seen):
-    nb = ref.nb[ref.nb["model_id"].isin(set(h["model_id"]))]
+    rows = [ref.nb_rows[m] for m in seen if m in ref.nb_rows]
+    nb = ref.nb.iloc[np.concatenate(rows)] if rows else ref.nb.iloc[:0]
     nb = nb[~nb["neighbour_id"].isin(seen)]
     if nb.empty:
         return pd.DataFrame(columns=["model_id", "score", "reason"])
@@ -57,12 +62,14 @@ def co_purchase(h, ref, seen):
 
 
 def trend(h, ref, seen, n=50):
-    known = h[h["model_id"].isin(ref.models.index)]
-    depts = ref.models.loc[known["model_id"], "department"].value_counts()
+    known = [m for m in h["model_id"] if m in ref.models.index]
+    depts = ref.models.loc[known, "department"].value_counts()
     if depts.empty:
         depts = ref.models["department"].value_counts().head(3) * 0 + 1
-    m = ref.models[ref.models["department"].isin(depts.index) & ~ref.models.index.isin(seen)].copy()
-    m["score"] = m["popularity"] / 100 * m["trend"].clip(upper=3) * m["department"].map(depts / depts.sum())
+    # each department's list is sorted by base score, so its top n + |seen| rows hold every model that can reach the overall top n
+    m = pd.concat([ref.by_dept[d].head(n + len(seen)) for d in depts.index if d in ref.by_dept])
+    m = m[~m.index.isin(seen)]
+    m["score"] = m["base"] * m["department"].map(depts / depts.sum())
     m = m.sort_values("score", ascending=False).head(n).reset_index()
     m["reason"] = [f"Đang bán chạy trong {d}, ngành hàng bạn hay mua (×{t:.1f} so với quý trước)"
                    for d, t in zip(m["department"], m["trend"])]
