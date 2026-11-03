@@ -42,10 +42,15 @@ h1 { font-size: 1.9rem; margin: 26px 0 6px; line-height: 1.2; }
 
 /* KPI strip */
 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: -44px; }
-.kpi { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; animation: up .5s both; }
-.kpi b { font-size: 1.7rem; color: var(--brand); line-height: 1.1; }
-.kpi .lbl { display: block; color: var(--muted); font-size: .86rem; margin-top: 2px; }
+.kpi { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; animation: up .5s both; }
+.kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.kpi b { font-size: 1.75rem; color: var(--brand); line-height: 1.1; }
+.kpi .lbl { display: block; color: var(--muted); font-size: .84rem; font-weight: 500; margin-top: 4px; }
 .note { color: var(--muted); font-size: .8rem; margin: 8px 2px 0; }
+details.subnote { margin: 8px 2px 0; font-size: .8rem; color: var(--muted); }
+details.subnote summary { cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: var(--muted); user-select: none; }
+details.subnote summary:hover { color: var(--brand); }
+details.subnote p { margin: 6px 0 0; padding: 8px 12px; background: #fff; border: 1px solid var(--line); border-radius: 10px; line-height: 1.5; max-width: 880px; }
 
 /* data bar */
 .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 18px 0; background: var(--card); border-radius: var(--radius);
@@ -135,8 +140,10 @@ details.legend summary { cursor: pointer; font-weight: 600; color: var(--brand);
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
 .chip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 12px; cursor: pointer; font-size: .85rem; transition: .15s; }
 .chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
-.sum { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 12px; align-items: center; margin-bottom: 14px; }
+.sum { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 12px; align-items: center; margin-bottom: 12px; }
 .sum .stat b { font-size: 1.5rem; color: var(--brand); }
+.msg-bar { display: flex; align-items: center; gap: 10px; background: #eef2ff; border: 1px solid #c7d2fe; color: #1e1b4b; padding: 9px 14px; border-radius: 12px; margin-bottom: 14px; font-size: .86rem; }
+.msg-bar b { color: var(--brand); white-space: nowrap; }
 table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 th { text-align: left; color: var(--muted); font-weight: 600; font-size: .8rem; padding: 8px; border-bottom: 1px solid var(--line); }
 td { padding: 9px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
@@ -150,22 +157,60 @@ tr.in { animation: up .35s both; animation-delay: calc(var(--i) * 30ms); }
 .guide h4 { margin: 0 0 6px; } .guide ol, .guide ul { margin: 0; padding-left: 18px; } .guide li { margin: 4px 0; }
 .about { white-space: pre-wrap; font: .9rem/1.6 system-ui, sans-serif; }
 /* best model (back-test) */
-.bt-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
-.bt-kpis .stat b { font-size: 1.35rem; } .bt-kpis .stat b.best { color: var(--brand); } .bt-kpis .stat b.sq { color: var(--muted); }
+.bt-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.bt-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 10px; }
+.mcard { background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; display: flex; flex-direction: column; gap: 7px; }
+.mcard-hd { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: .8rem; font-weight: 600; color: var(--ink); }
+.lift { background: #dcfce7; color: #166534; font-weight: 700; font-size: .72rem; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+.mbar { display: grid; grid-template-columns: 32px 1fr 48px; align-items: center; gap: 7px; font-size: .78rem; }
+.mbar .lbl { font-weight: 700; color: var(--muted); } .mbar.best .lbl { color: var(--brand); }
+.mbar .track { height: 9px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+.mbar .fill { height: 100%; border-radius: 999px; background: #94a3b8; transition: width .5s ease; }
+.mbar.best .fill { background: linear-gradient(90deg, var(--brand), var(--brand2)); }
+.mbar .val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mbar.best .val { color: var(--brand); }
+.sbar { height: 12px; border-radius: 999px; overflow: hidden; display: flex; background: #e2e8f0; margin: 2px 0; }
+.sbar i { height: 100%; transition: width .4s ease; }
+.sleg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; font-size: .73rem; color: var(--muted); }
+.sleg span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.sleg b { color: var(--ink); }
+.sw-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
 .bt-grid { display: grid; grid-template-columns: 290px 1fr; gap: 16px; align-items: start; }
+.bt-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.bt-controls select { min-width: 0; width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font-size: .84rem; }
+.bt-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
 .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .lst { display: flex; flex-direction: column; gap: 6px; }
 .li { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; font-size: .84rem; animation: up .35s both; animation-delay: calc(var(--i) * 30ms); }
 .li.hit { border-color: #34d399; background: #ecfdf5; }
 .li .sw { width: 34px; height: 26px; border-radius: 7px; display: grid; place-items: center; color: #fff; font-size: .72rem; font-weight: 700; }
-.li .nm { line-height: 1.25; } .li .nm small { display: block; color: var(--muted); font-size: .74rem; }
-.ok { color: #047857; font-weight: 700; font-size: .78rem; white-space: nowrap; }
+.li .nm { line-height: 1.25; min-width: 0; } .li .nm small { display: block; color: var(--muted); font-size: .74rem; }
+.ok { color: #047857; font-weight: 700; font-size: .76rem; white-space: nowrap; background: #d1fae5; padding: 1px 7px; border-radius: 999px; }
+.bt-badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 999px; font-size: .71rem; font-weight: 700; background: #f1f5f9; color: #334155; white-space: nowrap; }
+.bt-badge.hit { background: #dcfce7; color: #166534; } .bt-badge.miss { background: #f1f5f9; color: #64748b; font-weight: 500; }
+.bt-chip { background: #e2e8f0; color: #0f172a !important; font-weight: 600; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; max-height: 150px; overflow: auto; }
-.colh { font-weight: 700; margin: 0 0 8px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-.colh .n { font-size: .82rem; color: var(--muted); font-weight: 600; }
+.history-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; margin-bottom: 12px; }
+.history-group { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; background: #f8fafc; }
+.history-group[open] { grid-column: 1 / -1; background: #fff; }
+.history-group summary { cursor: pointer; font-size: .82rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.history-group summary span { color: var(--muted); font-weight: 400; font-size: .76rem; }
+.history-group .chips { max-height: 120px; margin: 8px 0 0; }
+.bt-bought { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.bt-purchase { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; border: 1px solid var(--line); background: #f8fafc; border-radius: 10px; padding: 5px 8px; }
+.colh { font-weight: 700; margin: 0 0 8px; display: flex; justify-content: space-between; gap: 8px; align-items: center; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
+.colh.best-col { border-color: var(--brand); }
+.colh .n { font-size: .78rem; color: var(--muted); font-weight: 700; background: #f1f5f9; padding: 2px 9px; border-radius: 999px; }
+.colh.best-col .n { background: #eef2ff; color: var(--brand); }
+.hit-bar { display: inline-flex; gap: 2px; vertical-align: middle; margin-right: 4px; }
+.hit-bar i { width: 5px; height: 10px; border-radius: 2px; background: #cbd5e1; display: inline-block; }
+.hit-bar i.on { background: #10b981; }
 footer { color: var(--muted); font-size: .8rem; padding: 26px 0 40px; }
-@media (max-width: 1100px) { .grid3, .bt-grid, .cmp, .bt-kpis { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, 1fr); } .ctypes { grid-template-columns: 1fr; }
+@media (max-width: 1100px) { .grid3, .bt-grid, .cmp { grid-template-columns: 1fr; } .bt-kpis, .kpis { grid-template-columns: repeat(2, 1fr); } .ctypes { grid-template-columns: 1fr; }
   .profile { grid-template-columns: repeat(2, 1fr); } .sum { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .bt-kpis, .kpis { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .wrap { padding: 0 12px; } .top { flex-wrap: wrap; } .top > div:last-child { max-width: 100%; }
+  .bt-controls { grid-template-columns: 1fr; } .bt-kpis .stat { min-width: 0; } .bt-kpis .stat > div { flex-wrap: wrap; gap: 4px 8px !important; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -186,7 +231,7 @@ footer { color: var(--muted); font-size: .8rem; padding: 26px 0 40px; }
 
 <main class="wrap">
   <section class="kpis" id="kpis"></section>
-  <p class="note" data-i="kpinote"></p>
+  <details class="subnote"><summary>ⓘ <span data-i="kpiMethod"></span></summary><p data-i="kpinote"></p></details>
 
   <section class="bar">
     <label class="drop" id="drop"><input type="file" id="file" accept=".csv" hidden /><span aria-hidden="true">⬆</span><span id="dropText"></span></label>
@@ -199,17 +244,17 @@ footer { color: var(--muted); font-size: .8rem; padding: 26px 0 40px; }
   </section>
 
   <nav class="tabs" role="tablist">
-    <button class="tab on" data-v="customers" data-i="tab1"></button>
-    <button class="tab" data-v="campaigns" data-i="tab2"></button>
-    <button class="tab" data-v="best" data-i="tab5"></button>
-    <button class="tab" data-v="guide" data-i="tab3"></button>
-    <button class="tab" data-v="about" data-i="tab4"></button>
+    <button class="tab on" id="tab-customers" role="tab" aria-selected="true" aria-controls="customers" tabindex="0" data-v="customers" data-i="tab1"></button>
+    <button class="tab" id="tab-campaigns" role="tab" aria-selected="false" aria-controls="campaigns" tabindex="-1" data-v="campaigns" data-i="tab2"></button>
+    <button class="tab" id="tab-best" role="tab" aria-selected="false" aria-controls="best" tabindex="-1" data-v="best" data-i="tab5"></button>
+    <button class="tab" id="tab-guide" role="tab" aria-selected="false" aria-controls="guide" tabindex="-1" data-v="guide" data-i="tab3"></button>
+    <button class="tab" id="tab-about" role="tab" aria-selected="false" aria-controls="about" tabindex="-1" data-v="about" data-i="tab4"></button>
   </nav>
 
-  <section class="view on" id="customers">
+  <section class="view on" id="customers" role="tabpanel" aria-labelledby="tab-customers" tabindex="0">
     <div class="grid3">
       <div class="panel">
-        <input class="search" id="q" data-ph="search" aria-label="search" />
+        <input class="search" id="q" data-ph="search" data-ti="search" />
         <div class="members" id="members"><div class="skel"></div></div>
       </div>
       <div class="panel" id="detail"><div class="skel" style="height:420px"></div></div>
@@ -220,7 +265,7 @@ footer { color: var(--muted); font-size: .8rem; padding: 26px 0 40px; }
     </div>
   </section>
 
-  <section class="view" id="campaigns">
+  <section class="view" id="campaigns" role="tabpanel" aria-labelledby="tab-campaigns" tabindex="0">
     <div class="ctypes" id="ctypes"></div>
     <div class="filters" id="filters"></div>
     <div class="sum">
@@ -229,20 +274,45 @@ footer { color: var(--muted); font-size: .8rem; padding: 26px 0 40px; }
       <div class="stat"><b id="cItems">0</b><span data-i="cItems"></span></div>
       <button class="btn" id="export" data-i="export"></button>
     </div>
-    <div class="panel"><table><thead><tr><th data-i="thMember"></th><th data-i="thSeg"></th><th data-i="thItems"></th><th data-i="thMsg"></th></tr></thead>
+    <div class="msg-bar"><span>💬 <b data-i="thMsg"></b>:</span> <span id="campMsg"></span></div>
+    <div class="panel"><table><thead><tr><th data-i="thMember"></th><th data-i="thSeg"></th><th data-i="thItems"></th></tr></thead>
       <tbody id="audience"></tbody></table></div>
   </section>
 
-  <section class="view" id="best">
-    <div class="panel" style="margin-bottom:14px"><h3 style="margin-top:0">🏆 <span data-i="btTitle"></span></h3><p class="note" style="margin:0 0 12px" data-i="btIntro"></p>
-      <div class="bt-kpis" id="btKpis"></div></div>
+  <section class="view" id="best" role="tabpanel" aria-labelledby="tab-best" tabindex="0">
+    <div class="panel" style="margin-bottom:14px">
+      <div class="bt-head">
+        <h3 style="margin:0">🏆 <span data-i="btTitle"></span></h3>
+        <details class="subnote" style="margin:0"><summary>ⓘ <span data-i="btMethod"></span></summary><p data-i="btIntro"></p></details>
+      </div>
+      <div class="bt-kpis" id="btKpis"></div>
+    </div>
     <div class="bt-grid">
-      <div class="panel"><input class="search" id="bq" data-ph="search" aria-label="search" /><div class="members" id="btMembers"><div class="skel"></div></div></div>
+      <div class="panel">
+        <input class="search" id="bq" data-ph="search" data-ti="search" />
+        <div class="bt-controls">
+          <label><span class="sr" data-i="country"></span><select id="btCountry" data-ti="country">
+            <option value="all" data-i="all"></option><option value="TH" data-i="countryTH"></option><option value="VN" data-i="countryVN"></option>
+          </select></label>
+          <label><span class="sr" data-i="segment"></span><select id="btSegment" data-ti="segment">
+            <option value="all" data-i="all"></option><option value="new" data-i="seg_new"></option><option value="mid" data-i="seg_mid"></option><option value="loyal" data-i="seg_loyal"></option>
+          </select></label>
+          <label><span class="sr" data-i="btOutcome"></span><select id="btOutcome" data-ti="btOutcome">
+            <option value="all" data-i="all"></option><option value="p3" data-i="btP3Hit"></option><option value="gp" data-i="btGpHit"></option>
+            <option value="both" data-i="btBothHit"></option><option value="neither" data-i="btNeitherHit"></option>
+          </select></label>
+          <label><span class="sr" data-i="btSort"></span><select id="btSort" data-ti="btSort">
+            <option value="id" data-i="btSortId"></option><option value="best" data-i="btSortP3"></option><option value="diff" data-i="btSortDiff"></option>
+          </select></label>
+        </div>
+        <div class="bt-actions"><button class="btn ghost" id="btNamesBtn" type="button" data-i="names"></button></div>
+        <div class="members" id="btMembers"><div class="skel"></div></div>
+      </div>
       <div class="panel" id="btDetail"><div class="skel" style="height:420px"></div></div>
     </div>
   </section>
-  <section class="view" id="guide"><div class="guide" id="guideBody"></div></section>
-  <section class="view" id="about"><div class="panel about" id="aboutText"></div></section>
+  <section class="view" id="guide" role="tabpanel" aria-labelledby="tab-guide" tabindex="0"><div class="guide" id="guideBody"></div></section>
+  <section class="view" id="about" role="tabpanel" aria-labelledby="tab-about" tabindex="0"><div class="panel about" id="aboutText"></div></section>
   <footer data-i="footer"></footer>
 </main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -254,54 +324,63 @@ const T = {
   vi: {
     boot1: "Đang khởi động…", boot2: "Đang tải công cụ xử lý dữ liệu…", boot3: "Đang tải danh mục sản phẩm…", ready: "Sẵn sàng",
     title: "Gợi ý đúng sản phẩm, đúng thời điểm cho từng khách hàng",
-    subtitle: "Công cụ dành cho đội chăm sóc khách hàng và marketing của chuỗi bán lẻ đồ thể thao: biết khách sắp cần mua lại sản phẩm nào, nên giới thiệu sản phẩm mới nào, và lập danh sách khách cho chiến dịch chỉ với vài cú nhấp.",
-    kpi: [["×", 1.8, "hiệu quả so với gợi ý chung “sản phẩm bán chạy”", "Tỷ lệ khách mua ít nhất 1 sản phẩm trong 10 gợi ý, so với khi mọi khách nhận cùng một danh sách sản phẩm bán chạy."],
-          ["×", 1.5, "hiệu quả so với chỉ gợi ý lại sản phẩm cũ", "So với cách chỉ gợi ý lại những sản phẩm khách đã từng mua nhiều nhất."],
-          ["%", 77, "sản phẩm khách mua lại có trong gợi ý", "Khi khách mua lại một sản phẩm cũ trong 30 ngày, 77% trường hợp sản phẩm đó nằm trong 10 gợi ý."],
-          ["%", 24, "khách mua ít nhất 1 sản phẩm trong 10 gợi ý", "Tính trên các khách có mua hàng trong 30 ngày sau ngày gợi ý: cứ khoảng 4 khách thì 1 khách mua ít nhất một sản phẩm được gợi ý."]],
+    subtitle: "Nhắc mua lại đúng chu kỳ, gợi ý sản phẩm mới và tạo danh sách chiến dịch cho bán lẻ đồ thể thao.",
+    kpi: [["×", 1.8, "So với danh sách bán chạy", "Tỷ lệ khách mua ít nhất 1 sản phẩm trong 10 gợi ý, so với khi mọi khách nhận cùng một danh sách sản phẩm bán chạy."],
+          ["×", 1.5, "So với chỉ nhắc mua lại", "So với cách chỉ gợi ý lại những sản phẩm khách đã từng mua nhiều nhất."],
+          ["%", 77, "Độ phủ sản phẩm mua lại", "Khi khách mua lại một sản phẩm cũ trong 30 ngày, 77% trường hợp sản phẩm đó nằm trong 10 gợi ý."],
+          ["%", 24, "Tỷ lệ khách mua @10", "Tính trên các khách có mua hàng trong 30 ngày sau ngày gợi ý: cứ khoảng 4 khách thì 1 khách mua ít nhất một sản phẩm được gợi ý."]],
+    kpiMethod: "Phương pháp kiểm chứng (02–07/2026, TH & VN)",
     kpinote: "Số liệu kiểm tra trên lịch sử mua hàng thật từ 02/2026 đến 07/2026 (Thái Lan và Việt Nam), với 10 gợi ý cho mỗi khách. Đây là mức độ gợi ý trùng với hành vi mua thực tế, chưa phải doanh thu tăng thêm nhờ gợi ý (cần thử nghiệm A/B để đo).",
-    drop: "Kéo thả file lịch sử mua hàng (CSV) vào đây, hoặc bấm để chọn file", sample: "Dùng dữ liệu mẫu", template: "Tải file mẫu",
-    prodRef: "sản phẩm", names: "Nạp tên sản phẩm (tuỳ chọn)", namesHelp: "File CSV gồm 2 cột: model_id và product_name. Khi có tên, thẻ gợi ý sẽ hiện tên sản phẩm thay vì chỉ có mã.",
+    drop: "Kéo thả file CSV lịch sử mua hàng hoặc bấm để chọn", sample: "Dùng dữ liệu mẫu", template: "Tải file mẫu",
+    prodRef: "SP", names: "Nạp tên SP", namesHelp: "File CSV gồm 2 cột: model_id và product_name. Khi có tên, thẻ gợi ý sẽ hiện tên sản phẩm thay vì chỉ có mã.",
     namesLoaded: (n) => `Đã nạp tên cho ${n} sản phẩm`, namesBad: "File tên sản phẩm cần có cột model_id và product_name",
-    topk: "Số sản phẩm gợi ý mỗi khách", topkHelp: "Mặc định 10, giống cách đo các chỉ số phía trên. Tổng số gợi ý gồm cả nhắc mua lại và sản phẩm mới.",
+    topk: "Top K gợi ý", topkHelp: "Mặc định 10, giống cách đo các chỉ số phía trên. Tổng số gợi ý gồm cả nhắc mua lại và sản phẩm mới.",
     tab1: "Khách hàng", tab2: "Chiến dịch", tab3: "Hướng dẫn", tab4: "Về mô hình", tab5: "Mô hình tốt nhất (kiểm chứng)",
-    btTitle: "Mô hình tốt nhất so với cách làm hiện tại, trên khách thật",
+    btTitle: "So sánh P3 và GP-TopFreq trên khách hàng thật",
+    btMethod: "Chi tiết mô hình & tập kiểm tra",
     btIntro: "Mô hình sâu một đầu (P3), chọn trên tập valid, dùng đủ dữ liệu đa chiều (85 đặc trưng, 13 nguồn ứng viên), chấm theo lô trên kho dữ liệu nội bộ. Bên cạnh là cách làm hiện tại: gợi ý lại món khách mua nhiều nhất, bù bằng món bán chạy (GP-TopFreq). Mỗi khách là một khách thật lấy ngẫu nhiên trong giai đoạn kiểm tra 02–07/2026, đã ẩn danh; ✓ là món khách thực sự mua trong 30 ngày sau ngày gợi ý.",
-    btAll: "Toàn tập kiểm tra (41 734 lượt, TH + VN): khách mua ít nhất 1 món trong 10 gợi ý", btNdcg: "Độ chính xác xếp hạng NDCG@20, toàn tập kiểm tra",
-    btSample: (n) => `Trên ${num(n)} khách mẫu ở đây: khách mua ít nhất 1 món trong 10 gợi ý`,
-    btBest: "Mô hình tốt nhất (P3)", btSq: "Cách hiện tại (GP-TopFreq)", btHist: "Lịch sử mua trước ngày gợi ý", btHistSub: (n) => `${n} dòng gần nhất`,
-    btBought: "Thực tế khách mua trong 30 ngày sau", btHits: (n) => `trúng ${n}/10`, btRepeat: "mua lại", btNew: "món mới", btDaysAgo: (d) => `${d} ngày trước`,
-    btDaysAfter: (d) => `sau ${d} ngày`, btOk: "✓ đã mua", btNone: "Không có món nào trong 10 gợi ý được mua.",
-    search: "Tìm theo mã khách…", phonecap: "Khách sẽ thấy trên ứng dụng như thế này",
-    purchases: "Sản phẩm đã mua", models: "Mẫu sản phẩm khác nhau", lastBuy: "Ngày kể từ lần mua gần nhất", visits: "Lần mua trong 12 tháng qua",
-    topDepts: "Ngành hàng khách hay mua", times: "lần",
-    secRepeat: "Nhắc mua lại", secRepeatSub: "sản phẩm khách đã mua, ưu tiên sản phẩm đến lúc mua lại",
-    secExplore: "Sản phẩm mới cho khách", secExploreSub: "sản phẩm khách chưa mua: thường mua kèm hoặc đang thịnh hành",
-    seg_new: "Khách mới", seg_mid: "Khách quay lại", seg_loyal: "Khách thân thiết",
+    btAll: "Hit Rate @10 · Toàn tập (41.734 lượt)", btNdcg: "NDCG @20 · Toàn tập kiểm tra",
+    btSample: (n) => `Hit Rate @10 · Mẫu ${num(n)} khách`, btDist: (n) => `Phân bổ trúng trên ${num(n)} khách`,
+    btP3Only: "Chỉ P3", btGpOnly: "Chỉ GP",
+    btBest: "Mô hình tốt nhất (P3)", btSq: "Hiện tại (GP-TopFreq)", btHist: "Lịch sử mua trước ngày gợi ý", btHistSub: (n) => `${n} món`,
+    btBought: "Thực tế mua trong 30 ngày tiếp theo", btHits: (n) => `trúng ${n}/10`, btRepeat: "mua lại", btNew: "món mới", btDaysAgo: (d) => `${d} ngày trước`,
+    btDaysAfter: (d) => `+${d} ngày`, btOk: "✓ đã mua", btNone: "Chưa có món nào trong top 10 được mua.",
+    btOutcome: "Kết quả", btP3Hit: "P3 có trúng", btGpHit: "GP có trúng", btBothHit: "Cả hai cùng trúng", btNeitherHit: "Chưa trúng",
+    btSort: "Sắp xếp", btSortId: "Mã khách (mặc định)", btSortP3: "Số món P3 trúng", btSortDiff: "Ưu thế P3 − GP",
+    btHistorySummary: (n, d) => `${n} món · ${d} ngày trước`, btBothLists: "⇄ Chung", btP3Top: "P3 ✓", btGpTop: "GP ✓",
+    btP3Miss: "P3 –", btGpMiss: "GP –", btNoDepartment: "Ngoài danh mục", btNoPrice: "Ngoài danh mục",
+    btNoMatches: "Không có khách nào khớp với các bộ lọc này.",
+    search: "Tìm mã khách…", phonecap: "Giao diện gợi ý trên ứng dụng",
+    purchases: "Lượt mua", models: "Mã SP khác nhau", lastBuy: "Ngày từ lần mua cuối", visits: "Đơn trong 12 tháng",
+    topDepts: "Ngành hàng chính", times: "lần",
+    secRepeat: "Nhắc mua lại", secRepeatSub: "ưu tiên sản phẩm đến chu kỳ",
+    secExplore: "Gợi ý khám phá", secExploreSub: "mua kèm hoặc đang thịnh hành",
+    seg_new: "Khách mới", seg_mid: "Quay lại", seg_loyal: "Thân thiết",
     segHelp: "Theo số lần mua trong 12 tháng: khách mới 0–1 lần, khách quay lại 2 lần, khách thân thiết từ 3 lần.",
-    due: "Đến lúc mua lại", newDept: "Ngành hàng mới", dueCount: (n) => `${n} cần nhắc mua lại`, newCount: (n) => `${n} gợi ý mới`,
-    src_repeat: "Khách từng mua", src_co_purchase: "Thường được mua kèm", src_trend: "Đang thịnh hành",
-    dept: (d) => `Ngành hàng ${String(d ?? "").replace(/^Dept\s*/, "")}`,
-    priceL: "Giá", prioL: "Ưu tiên", prio: ["Rất nên gợi ý", "Nên gợi ý", "Có thể gợi ý"], codeL: "Mã SP",
-    why_repeat: (r) => `Đã mua ${r.n} lần, lần gần nhất cách đây ${r.last} ngày` + (r.cycle ? `. Thường mua lại sau khoảng ${r.cycle} ngày` : ""),
-    why_co: (r) => `Khách mua ${pname(r.because)} (khách này đã mua) cũng thường mua sản phẩm này`,
-    why_trend: (r) => `Bán chạy gấp ${num(r.trend, 1)} lần so với quý trước trong ${t("dept")(r.department)}, ngành hàng khách quan tâm`,
-    legendT: "Cách đọc thẻ gợi ý",
-    lgSrc: "Lý do gợi ý", lgPrice: "Mức giá (so với các sản phẩm cùng quốc gia)", lgPrio: "Mức ưu tiên (theo thứ tự trong danh sách, không phải xác suất mua)",
-    lgBadge: "Nhãn", lgDue: "đã đến chu kỳ mua lại quen thuộc của khách", lgNd: "thuộc ngành hàng khách chưa từng mua", lgRank: "#1 là gợi ý đứng đầu danh sách",
+    due: "Đến kỳ mua lại", newDept: "Ngành mới", dueCount: (n) => `${n} đến kỳ`, newCount: (n) => `${n} món mới`,
+    src_repeat: "Từng mua", src_co_purchase: "Hay mua kèm", src_trend: "Thịnh hành",
+    dept: (d) => `Ngành ${String(d ?? "").replace(/^Dept\s*/, "")}`,
+    priceL: "Mức giá", prioL: "Ưu tiên", prio: ["Rất cao", "Phù hợp", "Thử nghiệm"], codeL: "Mã",
+    why_repeat: (r) => `Đã mua ${r.n} lần · gần nhất ${r.last} ngày trước` + (r.cycle ? ` · chu kỳ ~${r.cycle} ngày` : ""),
+    why_co: (r) => `Hay mua cùng ${pname(r.because)}`,
+    why_trend: (r) => `Tăng ×${num(r.trend, 1)} quý này trong ${t("dept")(r.department)}`,
+    legendT: "Chú giải thẻ gợi ý",
+    lgSrc: "Nguồn gợi ý", lgPrice: "Phân khúc giá (5 mức)", lgPrio: "Độ ưu tiên xếp hạng",
+    lgBadge: "Nhãn", lgDue: "đến chu kỳ mua lại dự kiến", lgNd: "ngành hàng khách chưa từng mua", lgRank: "#1 là ưu tiên cao nhất",
     appHi: "Xin chào 👋", appHs: "Gợi ý dành riêng cho bạn", appDue: "Đến lúc thay mới đồ tập", appRepeat: "Đồ tập bạn hay chọn", appNew: "Có thể bạn sẽ thích",
     ctaBuy: "Mua lại", ctaView: "Xem",
-    c_due: "Nhắc mua lại đúng lúc", c_due_d: "Khách có sản phẩm đã đến chu kỳ mua lại, ví dụ giày chạy đã mòn, bóng, tất hay đồ tập cần thay. Nhắc đúng lúc giúp giữ chân khách và tránh mất đơn về tay đối thủ.",
-    c_cross: "Bán chéo sản phẩm mới", c_cross_d: "Giới thiệu sản phẩm khách chưa từng mua cho môn thể thao khách đang chơi, dựa trên sản phẩm thường mua kèm và sản phẩm đang thịnh hành.",
-    c_nd: "Mở rộng ngành hàng", c_nd_d: "Gợi ý sản phẩm thuộc ngành hàng khách chưa từng mua, ví dụ khách chạy bộ thử thêm đồ bơi hoặc đồ tập gym, giúp tăng số ngành hàng mỗi khách mua.",
-    country: "Quốc gia", segment: "Nhóm khách", all: "Tất cả", perMember: "Số sản phẩm mỗi khách",
+    c_due: "Nhắc mua lại đúng lúc", c_due_d: "Khách có sản phẩm chạm chu kỳ mua lại (giày, tất, bóng, phụ kiện tập).",
+    c_cross: "Bán chéo sản phẩm mới", c_cross_d: "Sản phẩm mua kèm hoặc thịnh hành trong môn thể thao khách đang chơi.",
+    c_nd: "Mở rộng ngành hàng", c_nd_d: "Giới thiệu môn thể thao hoặc ngành hàng mới phù hợp sở thích.",
+    country: "Quốc gia", countryTH: "Thái Lan", countryVN: "Việt Nam", segment: "Nhóm khách", all: "Tất cả", perMember: "SP / khách",
     cty: { TH: "Thái Lan", VN: "Việt Nam" },
-    cMembers: "khách trong danh sách", cShare: "trên tổng số khách", cItems: "sản phẩm sẽ gợi ý", export: "Tải danh sách (CSV)",
-    thMember: "Khách hàng", thSeg: "Nhóm khách", thItems: "Sản phẩm gợi ý", thMsg: "Nội dung tin nhắn gợi ý",
+    cMembers: "khách mục tiêu", cShare: "tỷ lệ tập khách", cItems: "lượt gợi ý", export: "Xuất CSV chiến dịch",
+    thMember: "Khách hàng", thSeg: "Phân khúc", thItems: "Sản phẩm đề xuất", thMsg: "Tin nhắn mẫu",
     msg_due: "Đồ tập quen thuộc của bạn có lẽ đã đến lúc thay mới. Mua lại ngay để buổi tập tiếp theo luôn sẵn sàng nhé!",
     msg_cross: "Dành riêng cho bạn: vài sản phẩm mới rất hợp với môn thể thao bạn đang chơi.",
     msg_nd: "Thử sức với một môn thể thao mới? Đây là vài gợi ý được chọn theo sở thích của bạn.",
     noAud: "Không có khách nào phù hợp với bộ lọc này.", noMember: "Chưa có dữ liệu khách hàng. Hãy tải file lên hoặc dùng dữ liệu mẫu.",
+    noMatches: "Không tìm thấy khách hàng nào khớp với nội dung tìm kiếm.",
     working: (n) => `Đang xử lý ${num(n)} dòng dữ liệu, có thể mất khoảng ${Math.max(5, Math.round(n / 250))} giây…`,
     loaded: (n, rows, bad) => `Đã xử lý ${num(n)} khách hàng, ${num(rows)} dòng dữ liệu hợp lệ${bad ? `, bỏ qua ${num(bad)} dòng lỗi` : ""}`, exported: "Đã tải danh sách khách",
     guide: [
@@ -329,54 +408,63 @@ const T = {
   en: {
     boot1: "Starting…", boot2: "Loading the data engine…", boot3: "Loading the product catalogue…", ready: "Ready",
     title: "The right product, at the right time, for every customer",
-    subtitle: "A tool for CRM and marketing teams in sporting-goods retail: see which products each customer is due to repurchase, which new products to recommend, and build a campaign audience in a few clicks.",
-    kpi: [["×", 1.8, "hit rate vs. a generic best-sellers list", "Share of customers who buy at least 1 of the 10 recommendations, compared with sending every customer the same best-sellers list."],
-          ["×", 1.5, "hit rate vs. “buy it again” only", "Compared with recommending only the products the customer bought most often."],
-          ["%", 77, "of repurchased products were recommended", "When a customer repurchased a product within 30 days, that product was among the 10 recommendations 77% of the time."],
-          ["%", 24, "of buyers bought at least 1 recommended product", "Among customers who bought within 30 days of the recommendation, about 1 in 4 bought at least one of the 10 recommendations."]],
+    subtitle: "Timely repurchase reminders, cross-sell picks, and instant campaign audiences for sporting-goods retail.",
+    kpi: [["×", 1.8, "vs. generic best-sellers", "Share of customers who buy at least 1 of the 10 recommendations, compared with sending every customer the same best-sellers list."],
+          ["×", 1.5, "vs. repurchase-only", "Compared with recommending only the products the customer bought most often."],
+          ["%", 77, "repurchase coverage @10", "When a customer repurchased a product within 30 days, that product was among the 10 recommendations 77% of the time."],
+          ["%", 24, "customer hit rate @10", "Among customers who bought within 30 days of the recommendation, about 1 in 4 bought at least one of the 10 recommendations."]],
+    kpiMethod: "Back-test methodology (Feb–Jul 2026, TH & VN)",
     kpinote: "Back-tested on real purchase history from Feb to Jul 2026 (Thailand and Vietnam), with 10 recommendations per customer. These are hit rates against actual purchases, not incremental revenue (that needs an A/B test).",
-    drop: "Drag and drop a purchase-history CSV here, or click to choose a file", sample: "Use sample data", template: "Download template",
-    prodRef: "SKU", names: "Load product names (optional)", namesHelp: "A CSV with 2 columns: model_id and product_name. Cards then show the product name instead of the SKU only.",
+    drop: "Drop a purchase-history CSV here or click to browse", sample: "Use sample data", template: "Download template",
+    prodRef: "SKU", names: "Load product names", namesHelp: "A CSV with 2 columns: model_id and product_name. Cards then show the product name instead of the SKU only.",
     namesLoaded: (n) => `Product names loaded for ${n} SKUs`, namesBad: "The product-name file needs model_id and product_name columns",
-    topk: "Recommendations per customer", topkHelp: "Default 10, the same as the metrics above. The total includes both repurchase reminders and new products.",
+    topk: "Top K picks", topkHelp: "Default 10, the same as the metrics above. The total includes both repurchase reminders and new products.",
     tab1: "Customers", tab2: "Campaigns", tab3: "How to use", tab4: "About the model", tab5: "Best model (back-test)",
-    btTitle: "The best model against today's approach, on real customers",
+    btTitle: "Best model (P3) vs. status quo (GP-TopFreq) on real customers",
+    btMethod: "Model & back-test details",
     btIntro: "The single-head deep model (P3), selected on validation, uses the full multi-dimensional data (85 features, 13 candidate sources) and is batch-scored in the internal warehouse. Next to it is today's approach: re-recommend the customer's most-bought products, filled with best-sellers (GP-TopFreq). Each customer is a real, anonymised customer drawn at random from the Feb–Jul 2026 test period; ✓ marks a product the customer actually bought within 30 days.",
-    btAll: "Whole test set (41,734 anchors, TH + VN): customers who bought at least 1 of the 10 recommendations", btNdcg: "Ranking accuracy NDCG@20, whole test set",
-    btSample: (n) => `On the ${num(n)} sample customers here: bought at least 1 of the 10 recommendations`,
-    btBest: "Best model (P3)", btSq: "Today's approach (GP-TopFreq)", btHist: "Purchases before the recommendation date", btHistSub: (n) => `latest ${n} lines`,
-    btBought: "Actually bought in the next 30 days", btHits: (n) => `${n}/10 hits`, btRepeat: "repeat", btNew: "new", btDaysAgo: (d) => `${d} days before`,
-    btDaysAfter: (d) => `after ${d} days`, btOk: "✓ bought", btNone: "None of the 10 recommendations was bought.",
-    search: "Search by customer ID…", phonecap: "What the customer sees in the app",
-    purchases: "Items purchased", models: "Distinct products", lastBuy: "Days since last purchase", visits: "Orders in the last 12 months",
+    btAll: "Hit Rate @10 · Full test (41,734 anchors)", btNdcg: "NDCG @20 · Full test set",
+    btSample: (n) => `Hit Rate @10 · ${num(n)}-member sample`, btDist: (n) => `Hit breakdown (${num(n)} members)`,
+    btP3Only: "P3 only", btGpOnly: "GP only",
+    btBest: "Best model (P3)", btSq: "Status quo (GP-TopFreq)", btHist: "Purchase history before anchor", btHistSub: (n) => `${n} items`,
+    btBought: "Actually bought in the next 30 days", btHits: (n) => `${n}/10 hits`, btRepeat: "repeat", btNew: "new", btDaysAgo: (d) => `${d}d ago`,
+    btDaysAfter: (d) => `+${d}d`, btOk: "✓ bought", btNone: "No top-10 pick bought.",
+    btOutcome: "Hit filter", btP3Hit: "P3 hit", btGpHit: "GP hit", btBothHit: "Both hit", btNeitherHit: "No hit",
+    btSort: "Sort by", btSortId: "Member ID (default)", btSortP3: "P3 hits", btSortDiff: "P3 − GP lead",
+    btHistorySummary: (n, d) => `${n} items · ${d}d ago`, btBothLists: "⇄ Both", btP3Top: "P3 ✓", btGpTop: "GP ✓",
+    btP3Miss: "P3 –", btGpMiss: "GP –", btNoDepartment: "Outside ref. catalogue", btNoPrice: "Outside ref. catalogue",
+    btNoMatches: "No customers match these filters.",
+    search: "Search member ID…", phonecap: "Customer app preview",
+    purchases: "Items bought", models: "Distinct SKUs", lastBuy: "Days since last buy", visits: "Orders (12m)",
     topDepts: "Top departments", times: "×",
-    secRepeat: "Repurchase reminders", secRepeatSub: "products the customer already bought, due ones first",
-    secExplore: "New for this customer", secExploreSub: "products not bought yet: frequently bought together or trending",
+    secRepeat: "Repurchase reminders", secRepeatSub: "due items prioritised",
+    secExplore: "Discovery picks", secExploreSub: "co-purchased or trending",
     seg_new: "New", seg_mid: "Returning", seg_loyal: "Loyal",
     segHelp: "By orders in the last 12 months: new 0–1, returning 2, loyal 3 or more.",
-    due: "Due for repurchase", newDept: "New department", dueCount: (n) => `${n} due`, newCount: (n) => `${n} new picks`,
-    src_repeat: "Bought before", src_co_purchase: "Frequently bought together", src_trend: "Trending",
-    dept: (d) => `Department ${String(d ?? "").replace(/^Dept\s*/, "")}`,
+    due: "Due now", newDept: "New dept", dueCount: (n) => `${n} due`, newCount: (n) => `${n} new`,
+    src_repeat: "Bought before", src_co_purchase: "Bought together", src_trend: "Trending",
+    dept: (d) => `Dept ${String(d ?? "").replace(/^Dept\s*/, "")}`,
     priceL: "Price", prioL: "Priority", prio: ["Top pick", "Good fit", "Worth a try"], codeL: "SKU",
-    why_repeat: (r) => `Bought ${r.n} ${r.n > 1 ? "times" : "time"}, last ${r.last} days ago` + (r.cycle ? `. Usually repurchased every ~${r.cycle} days` : ""),
-    why_co: (r) => `Customers who buy ${pname(r.because)} (already bought) often buy this too`,
-    why_trend: (r) => `Sales up ${num(r.trend, 1)}× vs. last quarter in ${t("dept")(r.department)}, a department this customer shops`,
-    legendT: "How to read a recommendation card",
-    lgSrc: "Why it is recommended", lgPrice: "Price tier (vs. other products in the same country)", lgPrio: "Priority (position in the list, not a purchase probability)",
-    lgBadge: "Labels", lgDue: "the customer's usual repurchase cycle has come round", lgNd: "a department the customer has never bought from", lgRank: "#1 is the top recommendation",
+    why_repeat: (r) => `Bought ${r.n}× · last ${r.last}d ago` + (r.cycle ? ` · ~${r.cycle}d cycle` : ""),
+    why_co: (r) => `Often bought with ${pname(r.because)}`,
+    why_trend: (r) => `Up ×${num(r.trend, 1)} vs. last quarter in ${t("dept")(r.department)}`,
+    legendT: "Card legend",
+    lgSrc: "Recommendation source", lgPrice: "Price tier (5 levels)", lgPrio: "Ranking priority",
+    lgBadge: "Badges", lgDue: "at the customer's usual repurchase cycle", lgNd: "department never bought before", lgRank: "#1 is the top pick",
     appHi: "Hi there 👋", appHs: "Picked for you", appDue: "Time to replace your gear", appRepeat: "Your go-to gear", appNew: "You might also like",
     ctaBuy: "Buy again", ctaView: "View",
-    c_due: "Repurchase reminder", c_due_d: "Customers with a product at its usual repurchase cycle, such as worn-out running shoes, balls, socks or training wear. A timely reminder protects retention and keeps the order from going elsewhere.",
-    c_cross: "Cross-sell new products", c_cross_d: "Recommend products the customer has never bought for the sports they already play, based on frequently-bought-together and trending products.",
-    c_nd: "Category expansion", c_nd_d: "Recommend products from departments the customer has never shopped, e.g. a runner trying swimwear or gym gear, to widen the basket.",
-    country: "Country", segment: "Segment", all: "All", perMember: "Products per customer",
+    c_due: "Repurchase reminder", c_due_d: "Customers with gear at its usual replacement cycle (shoes, socks, balls).",
+    c_cross: "Cross-sell new products", c_cross_d: "Co-purchased and trending items for sports they already play.",
+    c_nd: "Category expansion", c_nd_d: "Introduce a new sport or department tailored to their profile.",
+    country: "Country", countryTH: "Thailand", countryVN: "Vietnam", segment: "Segment", all: "All", perMember: "Items / member",
     cty: { TH: "Thailand", VN: "Vietnam" },
-    cMembers: "customers in the audience", cShare: "of all customers", cItems: "products to recommend", export: "Download audience (CSV)",
-    thMember: "Customer", thSeg: "Segment", thItems: "Recommended products", thMsg: "Suggested message",
+    cMembers: "target members", cShare: "of total base", cItems: "total picks", export: "Export audience (CSV)",
+    thMember: "Customer", thSeg: "Segment", thItems: "Recommended products", thMsg: "Message template",
     msg_due: "Time to replace your go-to gear? Buy again now and keep your training on track.",
     msg_cross: "Picked for you: new gear that goes with the sports you play.",
     msg_nd: "Ready to try a new sport? Here are a few picks based on what you like.",
     noAud: "No customer matches these filters.", noMember: "No customer data yet. Upload a file or use the sample data.",
+    noMatches: "No customers match your search.",
     working: (n) => `Processing ${num(n)} rows, this may take about ${Math.max(5, Math.round(n / 250))} seconds…`,
     loaded: (n, rows, bad) => `Processed ${num(n)} customers, ${num(rows)} valid rows${bad ? `, ${num(bad)} rows skipped` : ""}`, exported: "Audience downloaded",
     guide: [
@@ -426,21 +514,23 @@ function parseCsv(text) {
 function loadNames(text) {
   const [h, ...rows] = parseCsv(text.replace(/^\ufeff/, "")), cols = (h || []).map((x) => x.trim().toLowerCase());
   const i = cols.indexOf("model_id"), j = cols.indexOf("product_name");
-  if (i < 0 || j < 0) { toast(t("namesBad")); return; }
+  if (i < 0 || j < 0) { toast(() => t("namesBad")); return; }
   NAMES = Object.fromEntries(rows.map((r) => [String(r[i] ?? "").trim(), String(r[j] ?? "").trim()]).filter(([a, b]) => a && b));
-  toast(t("namesLoaded")(Object.keys(NAMES).length));
+  toast(() => t("namesLoaded")(Object.keys(NAMES).length));
   if (DATA) { renderDetail(); renderCampaign(); }
   renderBest();
 }
 function hue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
 function tile(d) { const h = hue(d); return `background:linear-gradient(135deg,hsl(${h} 65% 40%),hsl(${(h + 40) % 360} 70% 50%))`; }
 function scale(n, of, cls = "") { return `<span class="scale ${cls}" aria-hidden="true">${Array.from({ length: of }, (_, i) => `<i class="${i < n ? "f" : ""}"></i>`).join("")}</span>`; }
-function price(b) { b = Math.min(5, Math.max(1, +b || 1)); return `${scale(b, 5)}<span>${PRICE[L][b - 1]} (${b}/5)</span>`; }
+function price(b) { b = Math.min(5, Math.max(1, +b || 1)); return `${scale(b, 5)}<span>${PRICE[L][b - 1]}</span>`; }
 function tier(rank, k) { return rank <= Math.ceil(k / 3) ? 0 : rank <= Math.ceil((2 * k) / 3) ? 1 : 2; }
 function prio(rank, k) { const x = tier(rank, k); return `<span class="prio">${scale(3 - x, 3)}${t("prio")[x]}</span>`; }
-let TOAST;
-function toast(m, sticky = false) {
-  const e = $("#toast"); e.textContent = m; e.classList.add("on"); clearTimeout(TOAST);
+let TOAST, TOAST_MESSAGE = null;
+function toast(message, sticky = false) {
+  const e = $("#toast");
+  TOAST_MESSAGE = typeof message === "function" ? message : () => message;
+  e.textContent = TOAST_MESSAGE(); e.classList.add("on"); clearTimeout(TOAST);
   if (!sticky) TOAST = setTimeout(() => e.classList.remove("on"), 2400);
 }
 function count(el, to, fmt, ms = 900) {
@@ -458,9 +548,10 @@ function i18n() {
   document.querySelectorAll("[data-ti]").forEach((e) => { e.dataset.tip = t(e.dataset.ti); e.setAttribute("aria-label", t(e.dataset.ti)); });
   document.querySelectorAll(".lang button").forEach((b) => b.classList.toggle("on", b.dataset.l === L));
   if (!LAST_NAME) $("#dropText").textContent = t("drop");
+  if (TOAST_MESSAGE && $("#toast").classList.contains("on")) $("#toast").textContent = TOAST_MESSAGE();
   $("#engine").textContent = py ? t("ready") : t("boot1");
   $("#kpis").innerHTML = t("kpi").map(([f, v, lbl, tip], i) =>
-    `<div class="kpi" style="animation-delay:${0.05 * (i + 1)}s"><b data-v="${v}" data-f="${f}">${f === "×" ? "×" + num(v, 1) : num(v) + "%"}</b>${help(tip)}<span class="lbl">${lbl}</span></div>`).join("");
+    `<div class="kpi" style="animation-delay:${0.05 * (i + 1)}s"><div class="kpi-top"><b data-v="${v}" data-f="${f}">${f === "×" ? "×" + num(v, 1) : num(v) + "%"}</b>${help(tip)}</div><span class="lbl">${lbl}</span></div>`).join("");
   $("#guideBody").innerHTML = t("guide").map(([h, items]) => `<div class="panel"><h4>${h}</h4><ul>${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`).join("");
   if (DATA) { renderMembers(); renderDetail(); renderCampaign(); }
   renderBest();
@@ -491,14 +582,33 @@ function legend() {
 function renderMembers() {
   const q = $("#q").value.trim().toLowerCase(), el = $("#members");
   const list = DATA.profiles.filter((p) => p.member_id.toLowerCase().includes(q));
-  if (!list.length) { el.innerHTML = `<div class="empty">${t("noMember")}</div>`; return; }
+  if (!list.length) { el.innerHTML = `<div class="empty">${DATA.profiles.length ? t("noMatches") : t("noMember")}</div>`; return; }
   el.innerHTML = list.map((p) => {
     const recs = DATA.byMember[p.member_id] || [], due = recs.filter((r) => r.due).length, x = recs.filter((r) => r.source !== "repeat").length;
-    return `<button class="mem ${p.member_id === SEL ? "on" : ""}" data-m="${esc(p.member_id)}"><div class="id">${esc(p.member_id)}</div>
+    return `<button class="mem ${p.member_id === SEL ? "on" : ""}" aria-pressed="${p.member_id === SEL}" data-m="${esc(p.member_id)}"><div class="id">${esc(p.member_id)}</div>
       <div class="tags"><span class="tag ${p.segment}">${t("seg_" + p.segment)}</span><span class="tag">${t("cty")[p.country_code] ?? p.country_code}</span>
       ${due ? `<span class="tag due">⏰ ${t("dueCount")(due)}</span>` : ""}<span class="tag x">✨ ${t("newCount")(x)}</span></div></button>`;
   }).join("");
+  bindMemberNavigation(el, (id) => { SEL = id; renderMembers(); renderDetail(); });
   el.querySelectorAll(".mem").forEach((b) => b.addEventListener("click", () => { SEL = b.dataset.m; renderMembers(); renderDetail(); }));
+}
+function bindMemberNavigation(el, select) {
+  if (el.dataset.keyboardBound) return;
+  el.dataset.keyboardBound = "true";
+  el.addEventListener("keydown", (event) => {
+    const buttons = [...el.querySelectorAll(".mem")], current = buttons.indexOf(event.target);
+    if (current < 0) return;
+    let next = current;
+    if (event.key === "ArrowDown" || event.key === "ArrowRight") next = Math.min(buttons.length - 1, current + 1);
+    else if (event.key === "ArrowUp" || event.key === "ArrowLeft") next = Math.max(0, current - 1);
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = buttons.length - 1;
+    else return;
+    event.preventDefault();
+    const id = buttons[next].dataset.m;
+    select(id);
+    [...el.querySelectorAll(".mem")].find((button) => button.dataset.m === id)?.focus();
+  });
 }
 
 function renderDetail() {
@@ -543,10 +653,10 @@ function renderCampaign() {
     `&nbsp;&nbsp;<label class="k">${t("perMember")} <input type="range" id="per" min="1" max="6" value="${CAMP.per}" /> <b>${CAMP.per}</b></label>`;
   const aud = audience(), n = aud.length, items = aud.reduce((s, a) => s + a.items.length, 0);
   count($("#cMembers"), n, ""); count($("#cShare"), DATA.profiles.length ? Math.round((100 * n) / DATA.profiles.length) : 0, "%"); count($("#cItems"), items, "");
+  $("#campMsg").textContent = t("msg_" + CAMP.type);
   $("#audience").innerHTML = n ? aud.map((a, i) => `<tr class="in" style="--i:${i}"><td><b>${esc(a.p.member_id)}</b><br><span class="code">${t("cty")[a.p.country_code] ?? a.p.country_code}</span></td>
     <td><span class="tag ${a.p.segment}">${t("seg_" + a.p.segment)}</span></td>
-    <td><div class="tags">${a.items.map((r) => `<span class="tag" style="${tile(r.department)};color:#fff" title="${esc(reason(r))} · ${esc(r.model_id)}">${esc(head(r))} · ${PRICE[L][Math.min(5, Math.max(1, +r.price_band || 1)) - 1]}</span>`).join("")}</div></td>
-    <td class="msg">${t("msg_" + CAMP.type)}</td></tr>`).join("") : `<tr><td colspan="4" class="empty">${t("noAud")}</td></tr>`;
+    <td><div class="tags">${a.items.map((r) => `<span class="tag" style="${tile(r.department)};color:#fff" title="${esc(reason(r))} · ${esc(r.model_id)}">${esc(head(r))} · ${PRICE[L][Math.min(5, Math.max(1, +r.price_band || 1)) - 1]}</span>`).join("")}</div></td></tr>`).join("") : `<tr><td colspan="3" class="empty">${t("noAud")}</td></tr>`;
   document.querySelectorAll(".ctype").forEach((b) => b.addEventListener("click", () => { CAMP.type = b.dataset.c; renderCampaign(); }));
   document.querySelectorAll(".chip").forEach((b) => b.addEventListener("click", () => { CAMP[b.dataset.f] = b.dataset.v; renderCampaign(); }));
   $("#per").addEventListener("input", (e) => { CAMP.per = +e.target.value; renderCampaign(); });
@@ -558,42 +668,105 @@ function exportCsv() {
     t("dept")(r.department), PRICE[L][Math.min(5, Math.max(1, +r.price_band || 1)) - 1], t("src_" + r.source), reason(r), t("msg_" + CAMP.type)].map(q).join(",")));
   const url = URL.createObjectURL(new Blob(["\ufeff" + [head.join(","), ...lines].join("\n")], { type: "text/csv" }));
   Object.assign(document.createElement("a"), { href: url, download: `audience_${CAMP.type}.csv` }).click();
-  toast(t("exported"));
+  toast(() => t("exported"));
 }
 
 let BT = null, BSEL = null;
 const TEST = { hr10: { best: 0.240, status_quo: 0.184 }, ndcg: { best: 0.1020, status_quo: 0.0752 } };
 const hits = (m, k) => m[k].filter((x) => x.bought).length;
-function btItem(x, i) {
-  const nm = NAMES[x.model_id] ? `${esc(NAMES[x.model_id])}<small>${esc(t("dept")(x.department))} · <code>${esc(x.model_id)}</code></small>`
-    : `${esc(t("dept")(x.department))}<small><code>${esc(x.model_id)}</code>${x.price_band ? " · " + PRICE[L][x.price_band - 1] : ""}</small>`;
-  return `<div class="li ${x.bought ? "hit" : ""}" style="--i:${i}"><span class="sw" style="${tile(x.department)}">#${i + 1}</span><span class="nm">${nm}</span>
-    <span>${x.bought ? `<span class="ok">${t("btOk")}</span> ` : ""}<span class="tag ${x.repeat ? "" : "x"}">${x.repeat ? t("btRepeat") : t("btNew")}</span></span></div>`;
+function btDepartment(d) {
+  const department = String(d ?? "").trim();
+  return !department || /^dept\s*--$/i.test(department) || department === "--" ? t("btNoDepartment") : t("dept")(department);
+}
+function btTile(d) {
+  return btDepartment(d) === t("btNoDepartment") ? "background:#64748b" : tile(d);
+}
+function btItem(x, i, inBoth) {
+  const department = btDepartment(x.department), outRef = department === t("btNoDepartment");
+  const hasPrice = Number.isInteger(x.price_band) && x.price_band >= 1 && x.price_band <= 5;
+  const priceText = hasPrice ? PRICE[L][x.price_band - 1] : t("btNoPrice");
+  const meta = NAMES[x.model_id]
+    ? `${esc(department)}${!outRef || hasPrice ? " · " + esc(priceText) : ""} · <code>${esc(x.model_id)}</code>`
+    : `<code>${esc(x.model_id)}</code>${!outRef || hasPrice ? " · " + esc(priceText) : ""}`;
+  const nm = `${esc(NAMES[x.model_id] ?? department)}<small>${meta}</small>`;
+  return `<div class="li ${x.bought ? "hit" : ""}" style="--i:${i}"><span class="sw" style="${btTile(x.department)}">#${i + 1}</span><span class="nm">${nm}</span>
+    <span style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${inBoth ? `<span class="bt-badge">${t("btBothLists")}</span>` : ""}${x.bought ? `<span class="ok">${t("btOk")}</span>` : ""}<span class="tag ${x.repeat ? "" : "x"}">${x.repeat ? t("btRepeat") : t("btNew")}</span></span></div>`;
 }
 function renderBest() {
   if (!BT) return;
-  const pct = (v) => `${num(100 * v, 1)}%`, n = BT.members.length;
-  $("#btKpis").innerHTML = [[t("btAll"), pct(TEST.hr10.best), pct(TEST.hr10.status_quo)], [t("btNdcg"), num(TEST.ndcg.best, 3), num(TEST.ndcg.status_quo, 3)],
-    [t("btSample")(n), pct(BT.sample_hr10.best), pct(BT.sample_hr10.status_quo)]].map(([lbl, b, q]) =>
-    `<div class="stat"><span>${lbl}</span><div style="display:flex;gap:14px;align-items:baseline;margin-top:4px"><b class="best">${b}</b><span class="code">${t("btBest")}</span>
-      <b class="sq">${q}</b><span class="code">${t("btSq")}</span></div></div>`).join("");
+  const pct = (v) => `${num(100 * v, 1)}%`, n = BT.members.length || 1;
+  const lift = (b, q) => `+${Math.round(((b - q) / q) * 100)}%`;
+  const mcard = (lbl, b, q, fb, fq, max) => `<div class="mcard"><div class="mcard-hd"><span>${lbl}</span><span class="lift">${lift(b, q)}</span></div>
+    <div class="mbar best"><span class="lbl">P3</span><div class="track"><div class="fill" style="width:${Math.min(100, (b / max) * 100)}%"></div></div><span class="val">${fb}</span></div>
+    <div class="mbar"><span class="lbl">GP</span><div class="track"><div class="fill" style="width:${Math.min(100, (q / max) * 100)}%"></div></div><span class="val">${fq}</span></div></div>`;
+  let cBoth = 0, cP3 = 0, cGp = 0, cNone = 0;
+  BT.members.forEach((m) => { const p = hits(m, "best") > 0, g = hits(m, "status_quo") > 0; if (p && g) cBoth++; else if (p) cP3++; else if (g) cGp++; else cNone++; });
+  const distCard = `<div class="mcard"><div class="mcard-hd"><span>${t("btDist")(BT.members.length)}</span></div>
+    <div class="sbar"><i style="width:${(100 * cP3) / n}%;background:var(--brand)"></i><i style="width:${(100 * cBoth) / n}%;background:var(--brand2)"></i><i style="width:${(100 * cGp) / n}%;background:#f59e0b"></i><i style="width:${(100 * cNone) / n}%;background:#cbd5e1"></i></div>
+    <div class="sleg">
+      <span><i class="sw-dot" style="background:var(--brand)"></i>${t("btP3Only")}: <b>${cP3}</b></span>
+      <span><i class="sw-dot" style="background:var(--brand2)"></i>${t("btBothHit")}: <b>${cBoth}</b></span>
+      <span><i class="sw-dot" style="background:#f59e0b"></i>${t("btGpOnly")}: <b>${cGp}</b></span>
+      <span><i class="sw-dot" style="background:#cbd5e1"></i>${t("btNeitherHit")}: <b>${cNone}</b></span>
+    </div></div>`;
+  $("#btKpis").innerHTML = [
+    mcard(t("btAll"), TEST.hr10.best, TEST.hr10.status_quo, pct(TEST.hr10.best), pct(TEST.hr10.status_quo), 0.3),
+    mcard(t("btNdcg"), TEST.ndcg.best, TEST.ndcg.status_quo, num(TEST.ndcg.best, 3), num(TEST.ndcg.status_quo, 3), 0.13),
+    mcard(t("btSample")(BT.members.length), BT.sample_hr10.best, BT.sample_hr10.status_quo, pct(BT.sample_hr10.best), pct(BT.sample_hr10.status_quo), Math.max(0.3, BT.sample_hr10.best * 1.15)),
+    distCard,
+  ].join("");
   const q = $("#bq").value.trim().toLowerCase();
-  $("#btMembers").innerHTML = BT.members.filter((m) => m.member_id.toLowerCase().includes(q)).map((m) =>
-    `<button class="mem ${m.member_id === BSEL ? "on" : ""}" data-m="${esc(m.member_id)}"><div class="id">${esc(m.member_id)}</div>
+  const country = $("#btCountry").value, segment = $("#btSegment").value, outcome = $("#btOutcome").value, sort = $("#btSort").value;
+  const members = BT.members.filter((m) => {
+    const p3 = hits(m, "best") > 0, gp = hits(m, "status_quo") > 0;
+    return m.member_id.toLowerCase().includes(q) && (country === "all" || m.country_code === country) &&
+      (segment === "all" || m.segment === segment) &&
+      (outcome === "all" || (outcome === "p3" && p3) || (outcome === "gp" && gp) ||
+       (outcome === "both" && p3 && gp) || (outcome === "neither" && !p3 && !gp));
+  });
+  members.sort((a, b) => sort === "best" ? hits(b, "best") - hits(a, "best") || a.member_id.localeCompare(b.member_id)
+    : sort === "diff" ? (hits(b, "best") - hits(b, "status_quo")) - (hits(a, "best") - hits(a, "status_quo")) || a.member_id.localeCompare(b.member_id)
+      : a.member_id.localeCompare(b.member_id));
+  if (!members.some((member) => member.member_id === BSEL)) BSEL = members[0]?.member_id ?? null;
+  const memberList = $("#btMembers");
+  memberList.innerHTML = members.length ? members.map((m) =>
+    `<button class="mem ${m.member_id === BSEL ? "on" : ""}" aria-pressed="${m.member_id === BSEL}" data-m="${esc(m.member_id)}"><div class="id">${esc(m.member_id)}</div>
       <div class="tags"><span class="tag ${m.segment}">${t("seg_" + m.segment)}</span><span class="tag">${t("cty")[m.country_code] ?? m.country_code}</span>
-      <span class="tag x">P3 ${hits(m, "best")}</span><span class="tag">GP ${hits(m, "status_quo")}</span></div></button>`).join("");
-  $("#btMembers").querySelectorAll(".mem").forEach((b) => b.addEventListener("click", () => { BSEL = b.dataset.m; renderBest(); }));
+      <span class="tag x">P3 ${hits(m, "best")}</span><span class="tag">GP ${hits(m, "status_quo")}</span></div></button>`).join("")
+    : `<div class="empty">${t("btNoMatches")}</div>`;
+  bindMemberNavigation(memberList, (id) => { BSEL = id; renderBest(); });
+  memberList.querySelectorAll(".mem").forEach((b) => b.addEventListener("click", () => { BSEL = b.dataset.m; renderBest(); }));
   const m = BT.members.find((x) => x.member_id === BSEL);
-  if (!m) { $("#btDetail").innerHTML = ""; return; }
-  const chip = (x, sub) => `<span class="tag" style="${tile(x.department)};color:#fff" title="${esc(x.model_id)}">${esc(NAMES[x.model_id] ?? t("dept")(x.department))} · ${sub}</span>`;
-  const col = (k, title) => `<div><div class="colh">${title}<span class="n">${t("btHits")(hits(m, k))}</span></div>
-    <div class="lst">${m[k].map(btItem).join("")}</div>${hits(m, k) ? "" : `<p class="note">${t("btNone")}</p>`}</div>`;
+  if (!m) { $("#btDetail").innerHTML = `<div class="empty">${t("btNoMatches")}</div>`; return; }
+  const chip = (x, sub) => `<span class="tag bt-chip" title="${esc(x.model_id)}">${esc(NAMES[x.model_id] ?? btDepartment(x.department))} · ${sub}</span>`;
+  const historyByDepartment = new Map();
+  m.history.forEach((item) => {
+    const department = btDepartment(item.department);
+    if (!historyByDepartment.has(department)) historyByDepartment.set(department, []);
+    historyByDepartment.get(department).push(item);
+  });
+  const history = [...historyByDepartment].sort((a, b) =>
+    Math.min(...a[1].map((item) => item.days_before)) - Math.min(...b[1].map((item) => item.days_before)) || a[0].localeCompare(b[0]));
+  const bestIds = new Set(m.best.map((item) => item.model_id)), gpIds = new Set(m.status_quo.map((item) => item.model_id));
+  const boughtItem = (item) => {
+    const inBest = bestIds.has(item.model_id), inGp = gpIds.has(item.model_id);
+    return `<div class="bt-purchase">${chip(item, `${item.repeat ? t("btRepeat") : t("btNew")}, ${t("btDaysAfter")(item.days_after)}`)}
+      <span class="bt-badge ${inBest ? "hit" : "miss"}">${inBest ? t("btP3Top") : t("btP3Miss")}</span>
+      <span class="bt-badge ${inGp ? "hit" : "miss"}">${inGp ? t("btGpTop") : t("btGpMiss")}</span></div>`;
+  };
+  const hitDots = (arr) => `<span class="hit-bar" aria-hidden="true">${arr.map((x) => `<i class="${x.bought ? "on" : ""}"></i>`).join("")}</span>`;
+  const col = (k, title) => `<div><div class="colh ${k === "best" ? "best-col" : ""}"><span>${title}</span><span class="n">${hitDots(m[k])}${t("btHits")(hits(m, k))}</span></div>
+    <div class="lst">${m[k].map((item, i) => btItem(item, i, (k === "best" ? gpIds : bestIds).has(item.model_id))).join("")}</div>${hits(m, k) ? "" : `<p class="note">${t("btNone")}</p>`}</div>`;
   $("#btDetail").innerHTML = `<h3 style="margin-top:0">${esc(m.member_id)} <span class="tag ${m.segment}">${t("seg_" + m.segment)}</span>${help(t("segHelp"))}
       <span class="tag">${t("cty")[m.country_code] ?? m.country_code}</span></h3>
     <div class="code" style="margin-bottom:4px">${t("btHist")} · ${t("btHistSub")(m.history.length)}</div>
-    <div class="chips">${m.history.map((x) => chip(x, t("btDaysAgo")(x.days_before))).join("")}</div>
+    <div class="history-groups">${history.map(([department, items]) => {
+      const recent = Math.min(...items.map((item) => item.days_before));
+      return `<details class="history-group"><summary>${esc(department)} <span>· ${t("btHistorySummary")(items.length, recent)}</span></summary>
+        <div class="chips">${items.map((item) => chip(item, t("btDaysAgo")(item.days_before))).join("")}</div></details>`;
+    }).join("")}</div>
     <div class="code" style="margin-bottom:4px">${t("btBought")}</div>
-    <div class="chips">${m.bought.map((x) => chip(x, `${x.repeat ? t("btRepeat") : t("btNew")}, ${t("btDaysAfter")(x.days_after)}`)).join("")}</div>
+    <div class="bt-bought">${m.bought.map(boughtItem).join("") || `<div class="empty">—</div>`}</div>
     <div class="cmp">${col("best", "🏆 " + t("btBest"))}${col("status_quo", t("btSq"))}</div>`;
 }
 async function loadBest() {
@@ -604,6 +777,8 @@ async function loadBest() {
   } catch (e) { $("#btDetail").innerHTML = `<div class="empty">${t("error")}${esc(e.message)}</div>`; }
 }
 $("#bq").addEventListener("input", renderBest);
+["#btCountry", "#btSegment", "#btOutcome", "#btSort"].forEach((selector) => $(selector).addEventListener("change", renderBest));
+$("#btNamesBtn").addEventListener("click", () => $("#names").click());
 
 async function boot() {
   $("#engine").textContent = t("boot1");
@@ -635,7 +810,7 @@ const sampleText = async () => (await fetch("reference/sample_purchases.csv")).t
 async function runText(text) {
   try {
     const lines = (text.trim().match(/\n/g) || []).length;
-    if (lines > 500) { toast(t("working")(lines), true); await new Promise((r) => setTimeout(r, 50)); }
+    if (lines > 500) { toast(() => t("working")(lines), true); await new Promise((r) => setTimeout(r, 50)); }
     const res = JSON.parse(py.globals.get("run")(text, $("#k").value));
     DATA = { profiles: res.profiles, byMember: {} };
     for (const r of res.recs) (DATA.byMember[r.member_id] ||= []).push(r);
@@ -643,8 +818,8 @@ async function runText(text) {
     DATA.profiles.sort((a, b) => dues(b.member_id) - dues(a.member_id) || a.member_id.localeCompare(b.member_id));
     if (!DATA.profiles.some((p) => p.member_id === SEL)) SEL = DATA.profiles[0]?.member_id ?? null;
     renderMembers(); renderDetail(); renderCampaign();
-    toast(t("loaded")(res.members, res.rows, res.rejected));
-  } catch (e) { toast(t("error") + String(e.message).split("\n").filter(Boolean).pop()); }
+    toast(() => t("loaded")(res.members, res.rows, res.rejected));
+  } catch (e) { toast(() => t("error") + String(e.message).split("\n").filter(Boolean).pop()); }
 }
 
 let LAST = null, LAST_NAME = null;
@@ -660,11 +835,26 @@ $("#k").addEventListener("input", (e) => ($("#kv").textContent = e.target.value)
 $("#k").addEventListener("change", async () => py && runText(LAST ?? (await sampleText())));
 $("#q").addEventListener("input", () => DATA && renderMembers());
 $("#export").addEventListener("click", () => DATA && exportCsv());
-document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => {
-  document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("on", x === b));
+function activateTab(b) {
+  document.querySelectorAll(".tab").forEach((x) => {
+    const active = x === b;
+    x.classList.toggle("on", active); x.setAttribute("aria-selected", String(active)); x.tabIndex = active ? 0 : -1;
+  });
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("on", v.id === b.dataset.v));
   $(".bar").style.display = b.dataset.v === "best" ? "none" : "";
-}));
+}
+document.querySelectorAll(".tab").forEach((b, i, tabs) => {
+  b.addEventListener("click", () => activateTab(b));
+  b.addEventListener("keydown", (event) => {
+    let next = i;
+    if (event.key === "ArrowRight") next = (i + 1) % tabs.length;
+    else if (event.key === "ArrowLeft") next = (i + tabs.length - 1) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    else return;
+    event.preventDefault(); tabs[next].focus(); tabs[next].click();
+  });
+});
 document.querySelectorAll(".lang button").forEach((b) => b.addEventListener("click", () => { L = b.dataset.l; i18n(); }));
 i18n();
 document.querySelectorAll(".kpi b").forEach((e, i) => setTimeout(() => count(e, +e.dataset.v, e.dataset.f, 1200), 300 + i * 120));
