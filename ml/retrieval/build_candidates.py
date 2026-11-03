@@ -3,7 +3,7 @@ Gold pair SQL runs on it unchanged (ml/common/pairs.py): r1 … r5 flags and sco
 priority_source (6 = proposed by learned sources only), candidate_rank = mix_rank; plus rank_<source> of every mixed source (NULL when
 the source does not propose the model) and fit_cutoff / source_ts_max of the learned sources. The policy defaults to the one with the
 higher MAIN (TH + VN) valid coverage at mixer.k (t30). Checks: QC-6 point-in-time (pit.assert_pit) and the cap (≤ k rows per anchor).
-Usage: python ml/retrieval/build_candidates.py [--policy fixed|per_member]"""
+Usage: python ml/retrieval/build_candidates.py [--policy fixed|per_member] [--k 500 --version v3]   (default k = mixer.k → candidates_v2)"""
 import argparse, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -25,14 +25,17 @@ def pick_policy(con, k):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--policy", default=None)
+    ap.add_argument("--k", type=int, default=int(M["k"]))
+    ap.add_argument("--version", default="v2", help="output ml.candidates_<version>")
     a = ap.parse_args()
-    k = int(M["k"])
+    k, out_name = a.k, f"candidates_{a.version}"
     con = connect(threads=16)
     con.execute("SET memory_limit='100GB'")
     policy = a.policy or pick_policy(con, k)
     ranks = ", ".join(f"m.rank_{s}" for s in list(BASE_SOURCES) + learned_sources())
     mix = ml_path("candidates", f"mix_{policy}", "*.parquet")
-    out_dir = os.path.dirname(ml_path("candidates_v2", "_"))
+    out_dir = os.path.dirname(ml_path(out_name, "_"))
+    os.makedirs(out_dir, exist_ok=True)
     for f in os.listdir(out_dir):
         os.remove(os.path.join(out_dir, f))
     for split, country in con.execute(f"SELECT DISTINCT split, country_code FROM read_parquet('{mix}') ORDER BY ALL").fetchall():
@@ -45,15 +48,15 @@ def main():
             FROM read_parquet('{mix}') m
             LEFT JOIN lh.gold.gld_candidates g ON g.member_id = m.member_id AND g.anchor_date = m.anchor_date AND g.model_code = m.model_code
             WHERE m.split = '{split}' AND m.country_code = '{country}' AND m.mix_rank <= {k}
-        ) TO '{ml_path("candidates_v2", f"{split}_{country}.parquet")}' (FORMAT parquet)""")
-    rel = f"read_parquet('{ml_path('candidates_v2', '*.parquet')}')"
+        ) TO '{ml_path(out_name, f"{split}_{country}.parquet")}' (FORMAT parquet)""")
+    rel = f"read_parquet('{ml_path(out_name, '*.parquet')}')"
     pit = assert_pit(con, rel, require=())
     cap = con.execute(f"SELECT MAX(n) FROM (SELECT COUNT(*) AS n FROM {rel} GROUP BY member_id, anchor_date)").fetchone()[0]
     assert cap <= k, f"cap violated: {cap} > {k}"
     n = con.execute(f"SELECT split, COUNT(*), COUNT(DISTINCT (member_id, anchor_date)) FROM {rel} GROUP BY 1 ORDER BY 1").fetchall()
-    print(f"candidates_v2 ({policy}, k = {k}): {n}; pit {pit}; max per anchor {cap}")
+    print(f"{out_name} ({policy}, k = {k}): {n}; pit {pit}; max per anchor {cap}")
     con.close()
-    publish_view("candidates_v2", ml_path("candidates_v2", "*.parquet"))
+    publish_view(out_name, ml_path(out_name, "*.parquet"))
 
 
 if __name__ == "__main__":

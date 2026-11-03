@@ -8,7 +8,7 @@ y30, y90 (A, K) labels; mask (A, K) real candidates
 seq, gap (A, L) the last L purchases before the anchor (model index, log2 bucket of days before the anchor), oldest → newest
 rho    (A,) the member's repeat share before the anchor (fixed-gate ablation); gate_y (A,) repeat share of her unconditional positives
        in (t, t + Δ] (NaN without positives), the target of the learned gate
-Usage: python ml/umtr/data.py --source v1|v2 [--splits train,valid,test]"""
+Usage: python ml/umtr/data.py --source v1|v2|v3 [--splits train,valid,test]"""
 import argparse, os, sys, time
 import numpy as np, pandas as pd, torch
 
@@ -27,7 +27,7 @@ EXTRA_NONFEAT = {"fit_cutoff", "source_ts_max", "country_code"}
 def relation(source):
     if source == "v1":
         return "lh.gold.gld_ranking_dataset"
-    return f"read_parquet('{ml_path('pairs_v2', '*.parquet')}')"
+    return f"read_parquet('{ml_path('pairs_' + source, '*.parquet')}')"
 
 
 def vocab(con):
@@ -57,10 +57,11 @@ def load(con, source, split, codes, dept_of, stats=None):
                          FROM {rel} WHERE anchor_date BETWEEN DATE '{sw[split + '_lo']}' AND DATE '{sw[split + '_hi']}'
                          {"AND in_train_sample" if split == "train" else ""}
                          ORDER BY member_id, anchor_date, pos""").df()
-    df = df[df["pos"] < C["k"]]
+    k = int(C.get(f"k_{source}", C["k"]))
+    df = df[df["pos"] < k]
     key = df["member_id"].astype(str) + "|" + df["anchor_date"].astype(str)
     a_idx, anchors = pd.factorize(key, sort=False)
-    A, K = len(anchors), C["k"]
+    A, K = len(anchors), k
     pos = df["pos"].to_numpy()
     v = df[feats].to_numpy(np.float64)
     v = np.sign(v) * np.log1p(np.abs(v))

@@ -197,3 +197,15 @@ hyper-parameters (`gbdt.py --seed`, `umtr/train.py --seed`). Test, TH + VN, NDCG
 0.1013 ± 0.0002, P3 two heads 0.1008 ± 0.0003, P3 one head 0.1022 ± 0.0001. Seed-matched paired P3 one head − P1-tuned: +0.0009,
 +0.0010, +0.0006; one head − two heads: +0.0011, +0.0018, +0.0011. The conclusions of t31 / t32 hold; the two-head model's repeat
 recall varies most (0.79–0.85). Tuning itself (10 TPE trials, seed 0) was not repeated.
+
+## 2026-11-03 · Candidate cap K = 500 (candidates_v3, t31_v3)
+
+Question: does the K = 300 cap limit accuracy? The mixer list cut at K = 500 (`build_candidates.py --k 500 --version v3`, then
+`pairs.py --version v3`, `umtr/data.py --source v3`) raises test TH + VN coverage 0.450 → 0.535 for 1.6× the pairs. P1-frozen was
+refitted as is; P1-tuned (study `p1_v3`) and P3 (study `p3_v3`) were re-tuned with 10 trials, P3 final fits for two heads and one head.
+Decision on valid, TH + VN NDCG@20: P1-tuned 0.1088 → 0.1079, P3 two heads 0.1087 → 0.1092, P3 one head 0.1096 → 0.1097 — no gain,
+**K = 300 kept**. Test, reported once afterwards (t31_v3_paired, v3 − v2): P1-frozen −0.0009 [−0.0016, −0.0003], P1-tuned −0.0003
+[−0.0008, 0.0001], P3 two heads +0.0006 [−0.0000, 0.0011], P3 one head +0.0012 [0.0007, 0.0017]. The one-head test gain is not
+supported on valid and is not used for selection (it would be selection on test). The GBDT loses 0.025 repeat recall to the extra
+negatives. Conclusion: the cap is not binding; ranking the hard explore candidates is.
+Also tried on valid only: rank-averaging the final fits (P1-tuned, P2, P3, seeds) — 0.1096 → 0.1103 at best; not adopted.

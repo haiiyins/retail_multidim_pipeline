@@ -66,3 +66,22 @@ NDCG@20 only partly. Paired member bootstrap, test, TH + VN:
 The gain is significant but small (0.0947 → 0.0973): the frozen ranker has no feature that tells it which learned source proposed a
 candidate, it trades repeat recall for explore recall, and most new explore candidates land below rank 20. Section VI asks whether
 rankers that see the source ranks convert more of it.
+
+## E. Is the cap binding? K = 500 (t31_v3)
+
+The same mixer cut at K = 500 (candidates_v3, 1.6× the pairs; QC-6, leakage and no-row-loss checks pass) lifts coverage from 0.450
+to 0.535 on test. Every ranker was refitted on it with the protocol of section VI (P1-frozen as is; P1-tuned and P3 re-tuned with 10
+trials on valid). The decision was taken on valid, where nothing gains: TH + VN NDCG@20 P1-tuned 0.1088 → 0.1079, P3 two heads
+0.1087 → 0.1092, P3 one head 0.1096 → 0.1097. K = 300 is kept. Test, reported once afterwards, paired v3 − v2:
+
+| test, TH + VN, NDCG@20 | v2 (K = 300) | v3 (K = 500) | paired Δ | 95 % CI |
+|---|---:|---:|---:|---|
+| P1-frozen | 0.0973 | 0.0963 | −0.0009 | [−0.0016, −0.0003] |
+| P1-tuned | 0.1011 | 0.1008 | −0.0003 | [−0.0008, +0.0001] |
+| P3 two heads | 0.1009 | 0.1015 | +0.0006 | [−0.0000, +0.0011] |
+| P3 one head | 0.1020 | 0.1032 | +0.0012 | [+0.0007, +0.0017] |
+
+Eight more points of coverage buy at most one thousandth of NDCG@20. The extra candidates are positives the sources rank low, and
+the GBDT loses repeat recall (−0.025) to the extra negatives; P3, which scores the whole list jointly, holds repeat recall and gains a
+little explore recall. The one-head gain on test is significant but absent on valid, so it is reported as a sensitivity result, not
+used to change the selection. The cap is not what limits accuracy: ranking the hard explore candidates is.
