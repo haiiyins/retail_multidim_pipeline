@@ -967,7 +967,7 @@ def build_architecture_overview():
     ax.axis("off")
 
     _title_block(ax, 0.40, 10.85, "Architecture Overview — Multi-Signal Retail Recommendation Pipeline",
-                 "Raw files → Bronze → Silver → Gold → fixed LambdaRank evaluation, with quality gates throughout")
+                 "Raw files → Bronze → Silver → Gold → retrieval, ranking and unconditional evaluation, with quality gates throughout")
 
     top, bot = 9.55, 2.95
     cols = [
@@ -995,11 +995,11 @@ def build_architecture_overview():
             ("Candidates R1–R5", "top 200 per anchor"),
             ("Ranking dataset", "labels at 30 d and 90 d"),
         ]),
-        ("5", "Evaluation", "frozen model, two axes", "eval", 16.05, 3.55, [
-            ("LambdaRank", "hyper-parameters fixed"),
-            ("Ablation", "features × candidates"),
-            ("Bootstrap CI", "500× member-level"),
-            ("Cost × gain", "wall time · memory"),
+        ("5", "Models & evaluation", "two-stage, unconditional", "eval", 16.05, 3.55, [
+            ("Retrieval", "R1–R13 · mixer K = 300"),
+            ("Rankers", "GBDT · stacked · deep"),
+            ("Unconditional eval", "every purchase · NDCG@20"),
+            ("Bootstrap CI", "member · paired"),
         ]),
     ]
     # dashed lakehouse boundary around Bronze, Silver, Gold
