@@ -8,7 +8,8 @@ Usage (tuning smoke, ML-07 DoD): python ml/rankers/gbdt.py --tune p1 --trials 3
        python ml/rankers/gbdt.py --tune p1 --source v2 [--final --name p1_tuned_v2]      (P1-tuned on ml.candidates_v2)
        python ml/rankers/gbdt.py --tune p2 --source v2 --signals [--final --name p2_v2]  (P2)
        python ml/rankers/gbdt.py --tune p1 --source v2 --final --skip-tune --seed 1 --name p1_tuned_v2_seed1  (seed variance)
-       python ml/rankers/gbdt.py --tune p1 --source v2 --budget 30 --final --name p1_tuned_v2_b30  (30 trials, space p1_b30)"""
+       python ml/rankers/gbdt.py --tune p1 --source v2 --budget 30 --final --name p1_tuned_v2_b30  (30 trials, space p1_b30)
+       python ml/rankers/gbdt.py --tune p1 --source v2 --history-only --final --name p1_hist_v2  (purchase-history features only)"""
 import argparse, json, os, sys
 import lightgbm as lgb, numpy as np, pandas as pd
 
@@ -50,6 +51,13 @@ def load(con, split, delta, relation="lh.gold.gld_ranking_dataset", positive_gro
 
 
 POINT_IN_TIME = ("fit_cutoff", "source_ts_max", "model_version")
+# Features computable from (member, model, date, quantity) sales lines plus the model's department: the input of a purchase-history-
+# only recommender. Out: web (R3 and its rank, candidate_rank which mixes it), prices / promotions, stock, stores, calendar, sports.
+HISTORY = {"r1", "r2", "r5", "score_r1", "score_r2", "score_r5", "rank_r1", "rank_r2", "rank_r5", "rank_ease", "rank_item2vec",
+           "rank_tifuknn", "rank_two_tower", "rank_sasrec", "rank_explin", "rank_rp3beta", "rank_trend", "hist_qty", "hist_buy_cnt",
+           "days_since_bought", "days_since_dept_buy", "dept_buy_cnt", "dept_cycle_days", "dept_overdue_ratio", "copurchase_lift_max",
+           "copurchase_lift_mean", "copurchase_links", "buyers_28d", "qty_28d", "popularity_rank", "model_age_days", "seasonal_idx",
+           "tx_30d", "tx_90d", "tx_365d", "items_365d", "models_365d", "days_since_last_tx", "country_code"}
 
 
 def features(df, drop=()):
@@ -98,6 +106,7 @@ def main():
     ap.add_argument("--name", default=None)
     ap.add_argument("--skip-tune", action="store_true")
     ap.add_argument("--seed", type=int, default=0, help="final refit with LightGBM seed 42 + SEED (seed variance)")
+    ap.add_argument("--history-only", action="store_true", help="keep the HISTORY features only; study <model>_hist")
     ap.add_argument("--budget", type=int, default=None, help="tuning budget: study <model>_b<N>, space <model>_b<N> of tuning.yml")
     a = ap.parse_args()
     from ml.rankers.frozen import relation
@@ -108,9 +117,13 @@ def main():
         from ml.signals.run_leakage_study import add_signals, with_dept
         tr, va = (add_signals(con, with_dept(con, d), "rolling").drop(columns=["dept"]) for d in (tr, va))
     feat = features(tr)
+    if a.history_only:
+        missing = HISTORY - set(feat)
+        assert not missing, f"history features not in the pairs: {sorted(missing)}"
+        feat = [c for c in feat if c in HISTORY]
     print(f"train {len(tr):,} rows · valid {len(va):,} rows · {len(feat)} features · {threads()} threads", flush=True)
     tag = "" if a.source == "v1" else f"_{a.source}"
-    study_name = f"{a.tune}{tag}" + (f"_b{a.budget}" if a.budget else "")
+    study_name = f"{a.tune}{tag}" + ("_hist" if a.history_only else "") + (f"_b{a.budget}" if a.budget else "")
     budget = a.budget or N_TRIALS
 
     def objective(params, trial):
@@ -132,7 +145,7 @@ def main():
         from ml.common.registry import Run
         params = best_params(study_name, budget) | ({"seed": BASE["seed"] + a.seed} if a.seed else {})
         name = a.name or f"{study_name}"
-        with Run(name, config={"source": a.source, "signals": a.signals, "seed": a.seed, "budget": a.budget}, params=params) as run:
+        with Run(name, config={"source": a.source, "signals": a.signals, "seed": a.seed, "budget": a.budget, "history_only": a.history_only}, params=params) as run:
             m = fit(params, tr, va, feat, a.delta)
             run.metrics["best_iteration"] = m.best_iteration
             te = load(con, "test", a.delta, rel)

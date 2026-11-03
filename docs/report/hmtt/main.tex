@@ -61,7 +61,9 @@ on the explore coverage they add, and merged by a rank-quota mixer under a cap o
 to \nCandNew{}. Under one tuning budget, a tuned gradient-boosted ranker, a stacked variant and a deep multi-task ranker with
 repeat and explore heads and a learned gate are compared with five next-basket baselines. All two-stage rankers beat the strongest
 baseline by more than a quarter; the deep model gains about one percent over the tuned trees only in its single-head form, and the
-learned gate, not the explicit split, carries the benefit. A controlled study confirms that naive stacking inflates in-sample metrics.
+learned gate, not the explicit split, carries the benefit. Restricted to features a purchase log yields, the pipeline keeps about four
+fifths of its gain over the frequency rules a retailer uses today; the other data dimensions add the rest, mostly on new items. A
+controlled study confirms that naive stacking inflates in-sample metrics.
 \end{abstract}
 
 \begin{keywords}
@@ -98,7 +100,7 @@ repeat, compared with a single head?
 \item \textbf{H2 (hypothesis).} Naive stacking inflates metrics on training and pseudo-test anchors relative to a rolling protocol;
 on the real test the gap narrows but does not vanish.
 \item \textbf{RQ4 (feasibility).} How many times better than ``best-sellers'' and ``buy the same again'' is the best system, and what
-purchase value does it capture (offline proxy)?
+purchase value does it capture (offline proxy), and how much of its gain needs data beyond the purchase history?
 \end{itemize}
 
 The contributions are: (1) an unconditional evaluation protocol with a repeat / explore split and a positive-level error
@@ -159,7 +161,8 @@ Fig.~\ref{fig:arch} shows the system.
 
 The hardware is one shared GH200 node (72 Arm cores and one Hopper-class GPU); deep models use bfloat16 mixed precision. Every model
 with hyper-parameters receives the same budget of 10 Optuna~\cite{akiba2019optuna} TPE~\cite{bergstra2011tpe} trials on valid. The
-course plan asked for 30 trials and three seeds; the reduced budget is discussed in Section~\ref{sec:discussion}.
+course plan asked for 30 trials and three seeds; the rankers were re-tuned with 30 trials as a check (Section~\ref{sec:results})
+and the final fits repeated with three seeds.
 
 % ---------------------------------------------------------------------------------------------------------------------------------
 \section{Unconditional Evaluation and Error Analysis}
@@ -461,6 +464,15 @@ P1-tuned $-0.0003$ $[-0.0008, +0.0001]$, P3 two heads $+0.0006$ $[-0.0000, +0.00
 (0.1032). The one-head test gain is not supported on valid and is not used for selection, which would select on test. The GBDT
 loses 0.025 repeat recall to the extra negatives. The cap is not what limits accuracy; ranking the hard explore candidates is.
 
+\textit{Is the tuning budget binding?} With 10 trials the best GBDT trial was the last one and sat near the learning-rate floor, and the
+best P3 trial sat at its floor. P1-tuned, P2 and P3 were therefore re-tuned on the same v2 pairs with 30 trials each and lower floors
+(GBDT learning rate $\ge 0.005$ with up to 6\,000 rounds, P3 learning rate $\ge 2 \cdot 10^{-5}$), the same budget for every ranker.
+On valid (TH + VN, the decision data), NDCG@20 does not improve from 10 to 30 trials: P1-tuned 0.1088 to 0.1089, P2 0.1089 to
+0.1088, P3 two heads 0.1087 to 0.1086, P3 one head 0.1096 to 0.1092, so the 10-trial fits are kept. Reported once afterwards on test
+(paired, 30 $-$ 10 trials): P1-tuned $+0.0001$ $[-0.0003, +0.0006]$, P2 $+0.0007$ $[+0.0003, +0.0011]$ (0.1020), P3 two heads
+$-0.0002$ $[-0.0005, +0.0001]$, P3 one head $-0.0000$ $[-0.0003, +0.0003]$ (0.1020). The search had converged at 10 trials, and the
+order of Table~\ref{tab:t31} stands: with 30 trials P2 ties with P3 one head on test, but it does not on valid.
+
 \subsection{By Country and Segment}
 Table~\ref{tab:segments} splits NDCG@20 by country and by member segment (transactions in the 365 days before the anchor: new
 $\le 1$, mid 2, loyal $\ge 3$; all countries). The ordering holds in every country and segment, and the differences between P1-tuned
@@ -617,6 +629,40 @@ As an offline proxy, not a causal estimate, the GMV-weighted Recall@10 is 0.077 
 i.e., 268\,EUR of observed next-30-day purchase value per 1\,000 recommendations against 184 and 79. These purchases happened anyway;
 an online test is needed to know how many a recommendation would cause.
 
+\textit{Purchase history only.} The status quo recommends from purchase history alone. To separate what the extra data dimensions
+bring from what the two-stage pipeline brings, P1 was re-tuned (10 trials) and refitted on the same pairs with only the 39 of 85
+features a purchase log yields: R1, R2, R5 and the learned source ranks, own and department history, co-purchase, sales popularity,
+season and model age, activity counts and country. Web behaviour (R3 and the mixed candidate rank), prices and promotions, stock,
+stores, calendar, sport affinity and the member price profile are removed. Table~\ref{tab:hist} crosses data and method. The
+pipeline on history alone gains $+0.0214$ $[+0.0204, +0.0225]$ NDCG@20 over GP-TopFreq; the other dimensions add $+0.0045$
+$[+0.0039, +0.0052]$ for P1-tuned and $+0.0054$ $[+0.0046, +0.0062]$ for P3 one head over P1-hist (paired, test; valid gives the
+same order: 0.0819, 0.1044, 0.1088, 0.1096). Of the $+0.0268$ of P3 one head over GP-TopFreq, about four fifths are therefore reached
+by retrieval and a learned ranker on the purchase log, and one fifth needs the other data, mostly as explore recall (P1-tuned $-$
+P1-hist $+0.0077$, repeat $-0.0086$). The history-only row is slightly optimistic: its candidate pool is the multi-dimensional one
+(it still holds the web-intent candidates, without the features that explain them), and the two-tower and trend sources use the
+unit price paid on the sales lines.
+
+\begin{table}[t]
+\caption{Data $\times$ method on test (TH + VN, NDCG@20). P1-hist: P1 re-tuned on the 39 purchase-history features.}
+\label{tab:hist}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lllr}
+\toprule
+Data & Method & Model & NDCG@20 \\
+\midrule
+purchase history & frequency rule & GP-TopFreq & 0.0752 \\
+                 & NBR            & TIFU-KNN   & 0.0788 \\
+                 & pipeline       & P1-hist    & 0.0966 \\
+\midrule
+multi-dimensional & pipeline      & P1-tuned    & 0.1011 \\
+                  &               & P3 one head & \textbf{0.1020} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
 \subsection{Serving Coverage}
 Every evaluated test anchor gets a personalized list of 300 candidates (median 300; all anchors have at least 10). This holds by
 construction, because the anchor grid starts after a member's second purchase; members without a purchase history are outside the
@@ -668,14 +714,22 @@ Table~\ref{tab:t31}.
 over a tuned GBDT and only in its single-head form, in line with the tabular-data literature~\cite{grinsztajn2022tabular}. The effort paid
 most in retrieval (+22\,\% relative coverage) and in tuning (+4\,\% NDCG@20 on the frozen ranker).
 
+\textit{Method against data.} Most of the gain over the status quo comes from the method, not from the extra data: on purchase history
+alone the pipeline reaches 0.0966 against 0.0752 for GP-TopFreq, and the web, price, promotion, stock and store features add 0.005
+NDCG@20 on top. A retailer with only a sales log can therefore take most of the benefit; the other dimensions matter for the
+explore purchases.
+
 \textit{Explore is still the bottleneck.} Explore coverage rose 1.30 times, not 2, and at the top 10 the model is no better than the
 best-sellers on explore purchases. On average 60\,\% of a member's explore purchases are still outside the 300 candidates. Raising the cap to 500
 recovers coverage (0.535) but not NDCG@20 on valid: the extra candidates are explore models the rankers cannot yet place in the top
 20.
 
-\textit{Reduced budget.} The run used 10 trials instead of 30 and one seed for tuning. The final fits were repeated with three seeds:
-the seed spread ($\le 0.0003$ NDCG@20) is smaller than the P3 one-head gain, but the search itself was not repeated, so its noise is
-not measured. SASRec NBR has no NDCG@20 budget of its own.
+\textit{Tuning budget.} The selected fits use 10 trials; a 30-trial re-tuning of every ranker changed valid NDCG@20 by at most
+0.0004 and was not adopted. The final fits were repeated with three seeds: the seed spread ($\le 0.0003$ NDCG@20) is smaller than the
+P3 one-head gain over P1-tuned. The searches themselves ran with one sampler seed, and the candidate sources and NBR baselines kept
+the 10-trial budget; SASRec NBR has no NDCG@20 budget of its own. The margins between P1-tuned, P2 and P3 are below 0.001; P2's
+place depends on the budget (30 trials bring it level with P3 one head on test, not on valid), and only the gain of P3 one head over
+P1-tuned holds at every seed and at both budgets.
 
 \textit{Offline only.} GMV figures are a proxy; recommendations change behaviour, which an offline replay cannot measure.
 
@@ -695,7 +749,8 @@ saw. Treating retrieval as a model, with eight explore-only sources refitted qua
 share of purchases within reach from \nCandOld{} to \nCandNew{}; with tuned rankers that see the source ranks, NDCG@20 rose from
 \nRefUncond{} to \nTuned{}--\nBest{} (+7--8\,\%), more than 25\,\% ahead of the best next-basket baseline (\nBaseline{}). A deep two-head
 ranker with a learned gate does not beat a tuned GBDT; a single-head version does by 1\,\%. The learned gate is essential; the explicit
-split is not. Naive stacking shows the inflation H2 predicted, small because the signals add little over a good feature store.
+split is not. On purchase history alone the pipeline keeps about four fifths of its gain over the frequency rules; the other data
+dimensions add the rest. Naive stacking shows the inflation H2 predicted, small because the signals add little over a good feature store.
 
 \section*{Acknowledgment}
 This work was carried out as the project of the course Advanced Machine Learning and Applications (IT2043.26.1.CH.01) of the
