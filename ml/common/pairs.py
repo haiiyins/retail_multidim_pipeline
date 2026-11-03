@@ -5,7 +5,7 @@ lakehouse (lh.silver / lh.gold), so the feature logic stays defined once and the
 Per split × country: data/ml/pairs_v2/<split>_<country>.parquet = gld_ranking_dataset columns (pair features, label_30 / label_90)
 plus the source columns of candidates_v2. Checks (the dbt tests of Gold, on the new table): leakage_fs_pair (last_source_ts after the
 anchor: 0 rows), no row loss (one pair row per candidate), point-in-time of the learned sources (pit.assert_pit).
-Usage: python ml/common/pairs.py [--splits train,valid,test] [--countries SG,TH,VN]"""
+Usage: python ml/common/pairs.py [--splits train,valid,test] [--countries SG,TH,VN] [--version v3: candidates_v3 → pairs_v3]"""
 import argparse, os, sys, time
 import jinja2, yaml
 
@@ -39,10 +39,11 @@ def ranking_sql(candidates):
     return render("gld_ranking_dataset", {"gld_fs_pair": f"(\n{pair}\n)"})
 
 
-def build(con, split, country, cand_glob):
+def build(con, split, country, cand_glob, version="v2"):
     cand = (f"(SELECT * REPLACE (CAST(anchor_date AS DATE) AS anchor_date) FROM read_parquet('{cand_glob}') "
             f"WHERE country_code = '{country}')")
-    out = ml_path("pairs_v2", f"{split}_{country}.parquet")
+    out = ml_path(f"pairs_{version}", f"{split}_{country}.parquet")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
     t0 = time.time()
     con.execute(f"COPY ({ranking_sql(cand)}) TO '{out}' (FORMAT parquet)")
     rel = f"read_parquet('{out}')"
@@ -59,12 +60,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--splits", default="train,valid,test")
     ap.add_argument("--countries", default="SG,TH,VN")
+    ap.add_argument("--version", default="v2")
     a = ap.parse_args()
     con = connect(threads=int(os.environ.get("PAIRS_THREADS", 32)))
     con.execute(f"SET memory_limit='{os.environ.get('PAIRS_MEMORY', '150GB')}'")
     for split in a.splits.split(","):
         for country in a.countries.split(","):
-            build(con, split, country, ml_path("candidates_v2", f"{split}_*.parquet"))
+            build(con, split, country, ml_path(f"candidates_{a.version}", f"{split}_*.parquet"), a.version)
     con.close()
 
 

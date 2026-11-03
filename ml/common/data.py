@@ -61,16 +61,18 @@ def publish_view(name, parquet_path, strict=False):
 
 def publish_all():
     """Views for every ml output on disk: features/<name>.parquet → ml.<name>, signals/<name>.parquet → ml.sig_<name>,
-    candidates/<source>/ → ml.cand_<source>, candidates_v2/ → ml.candidates_v2."""
+    candidates/<source>/ → ml.cand_<source>, candidates_v<n>/ → ml.candidates_v<n>."""
     import glob
     for sub, prefix in (("features", ""), ("signals", "sig_")):
         for p in sorted(glob.glob(os.path.join(ML_DIR, sub, "[!_]*.parquet"))):
             name = prefix + os.path.basename(p)[:-len(".parquet")].removesuffix("_rolling")
             publish_view(name, p, strict=True)
             print(f"ml.{name}")
-    if glob.glob(os.path.join(ML_DIR, "candidates_v2", "*.parquet")):
-        publish_view("candidates_v2", os.path.join(ML_DIR, "candidates_v2", "*.parquet"), strict=True)
-        print("ml.candidates_v2")
+    for d in sorted(glob.glob(os.path.join(ML_DIR, "candidates_v*", ""))):
+        name = os.path.basename(d.rstrip("/"))
+        if glob.glob(os.path.join(d, "*.parquet")):
+            publish_view(name, os.path.join(d, "*.parquet"), strict=True)
+            print(f"ml.{name}")
     for d in sorted(glob.glob(os.path.join(ML_DIR, "candidates", "*", ""))):
         name = os.path.basename(d.rstrip("/"))
         publish_view(f"cand_{name}", os.path.join(d, "*.parquet"), strict=True)

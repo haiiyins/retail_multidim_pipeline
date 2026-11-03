@@ -91,7 +91,7 @@ def main():
     ap.add_argument("--tune", default="p1")
     ap.add_argument("--trials", type=int, default=None)
     ap.add_argument("--delta", type=int, default=30)
-    ap.add_argument("--source", default="v1", help="v1 = gold.gld_ranking_dataset, v2 = pairs of ml.candidates_v2")
+    ap.add_argument("--source", default="v1", help="v1 = gold.gld_ranking_dataset, v2 / v3 = pairs of ml.candidates_v2 / _v3")
     ap.add_argument("--signals", action="store_true", help="add the rolling P2 signal features (P2)")
     ap.add_argument("--final", action="store_true", help="refit the best trial and write valid / test scores")
     ap.add_argument("--name", default=None)

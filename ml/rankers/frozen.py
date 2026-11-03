@@ -15,7 +15,7 @@ V1 = "lh.gold.gld_ranking_dataset"
 
 
 def relation(source):
-    return V1 if source == "v1" else f"read_parquet('{ml_path('pairs_v2', '*.parquet')}')"
+    return V1 if source == "v1" else f"read_parquet('{ml_path('pairs_' + source, '*.parquet')}')"
 
 
 def v1_features(con):

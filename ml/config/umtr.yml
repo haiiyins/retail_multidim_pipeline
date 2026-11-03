@@ -1,5 +1,6 @@
 # P3 UMTR (ml/umtr/, plan §8, D9) — reduced run of 2026-11-02: 10 trials, one seed (ml/DECISIONS.md).
 k: 300              # candidates per anchor (ml.candidates_v2 cap)
+k_v3: 500           # ml.candidates_v3 cap
 max_len: 50         # purchases in the sequence
 heads: 2
 blocks: 2
