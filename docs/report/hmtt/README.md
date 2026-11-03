@@ -1,5 +1,12 @@
 # HMTT report — chapter drafts
 
+**LaTeX paper:** [`main.tex`](main.tex) (IEEE Access class `ieeeaccess.cls` on `IEEEtran.cls`, references in
+[`custom.bib`](custom.bib), figures from `docs/figures/ml/`), built to [`main.pdf`](main.pdf) by `make report-pdf`. The class needs
+pdfLaTeX (it uses `spotcolor` and T1 Times / Helvetica), not XeLaTeX; on the GH200 host TinyTeX provides it
+(`~/.TinyTeX/bin/aarch64-linux`). When a rerun replaces a report table, update the headline-number block at the top of `main.tex`
+and the tables that quote it, then rerun `make ml-figures` and `make report-pdf`. Author names, affiliation and biographies are
+placeholders to complete.
+
 Drafts of the IEEE Access paper of the course plan (§13): I Introduction · II Related work · III Data and infrastructure · IV
 Unconditional evaluation protocol and error analysis · V Learned retrieval · VI Ranking · VII Results (RQ1–RQ3, H2) · VIII Feasibility
 and demo · IX Discussion and limitations · X Conclusion. The slide outline is [`slides.md`](slides.md).

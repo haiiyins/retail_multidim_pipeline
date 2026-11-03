@@ -1,0 +1,710 @@
+\documentclass{ieeeaccess}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{adjustbox}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{../../figures/ml/}}
+
+% Headline numbers (test, TH + VN, Delta = 30, unconditional protocol). Every value comes from docs/report/tables/ml/;
+% update this block and the tables below when a rerun replaces a table.
+\newcommand{\nRefCond}{0.206}        % t28, P1-frozen, conditional NDCG@20
+\newcommand{\nRefUncond}{0.095}      % t28, P1-frozen, unconditional NDCG@20, TH + VN
+\newcommand{\nNoPosShare}{40.7}      % t28, % of anchors with no positive among the 200 candidates
+\newcommand{\nNoSource}{58}          % t28b, % of positives proposed by no source
+\newcommand{\nCandOld}{0.370}        % t30, R1-R5@200 coverage
+\newcommand{\nCandNew}{0.450}        % t30, candidates_v2 coverage
+\newcommand{\nExpOld}{0.307}         % t30, R1-R5@200 explore coverage
+\newcommand{\nExpNew}{0.400}         % t30, candidates_v2 explore coverage
+\newcommand{\nK}{300}                % candidate cap of candidates_v2
+\newcommand{\nBest}{0.1020}          % t31, best model on valid (P3 one head)
+\newcommand{\nTuned}{0.1011}         % t31, P1-tuned
+\newcommand{\nBaseline}{0.0788}      % t31, best next-basket baseline (TIFU-KNN)
+
+\def\footerline{IT2043 Advanced Machine Learning and Applications, final report, 2026}
+
+\begin{document}
+\history{Final report of the course Advanced Machine Learning and Applications (IT2043.26.1.CH.01), Master of Information Technology,
+November 2026. Source code: github.com/haiiyins/retail\_multidim\_pipeline}
+\doi{}
+
+\title{Evaluating and Improving Personalized Product Recommendation with Multi-Signal Machine Learning on Large-Scale Retail
+Data}
+
+\author{\uppercase{Yen Phan}\authorrefmark{1,*}, \uppercase{Manh Le}\authorrefmark{1,*}, and
+\uppercase{Kha Nguyen}\authorrefmark{1,*}}
+\address[1]{University of Information Technology, Vietnam National University, Ho Chi Minh City, Vietnam}
+\address[*]{Corresponding authors}
+\tfootnote{This work builds on the data pipeline of the course Data Processing Engineering (IT2047.26.1.CH.01) of the same
+programme.}
+
+\markboth
+{Y. Phan \headeretal: Evaluating and Improving Personalized Product Recommendation}
+{Y. Phan \headeretal: Evaluating and Improving Personalized Product Recommendation}
+
+\corresp{Corresponding authors: Yen Phan (e-mail: 26848274@grad.uit.edu.vn), Manh Le (e-mail: 26848126@grad.uit.edu.vn), and
+Kha Nguyen (e-mail: 26848091@grad.uit.edu.vn).}
+
+\begin{abstract}
+Recommender evaluations of retail next-basket prediction often score a ranker only on the users whose candidate list already holds
+a purchase. On a loyalty data set of a multi-country sporting-goods retailer, this conditional protocol reported a normalized
+discounted cumulative gain at 20 of \nRefCond{} for a gradient-boosted ranker over 200 rule-based candidates. Counting every purchase,
+including those the candidate generator never proposed, the same model scores \nRefUncond{}, and a positive-level error decomposition
+shows that \nNoSource{}\,\% of the missed purchases were never retrieved, almost all of them items the member had not bought before.
+We therefore treat retrieval as a model: eight learned candidate sources, including linear auto-encoders, random-walk, nearest-neighbour,
+two-tower and self-attentive sequential models, are restricted to items new to the member, refitted every quarter in every split, tuned
+on the explore coverage they add, and merged by a rank-quota mixer under a cap of \nK{} candidates. Coverage rises from \nCandOld{}
+to \nCandNew{}. Under one tuning budget, a tuned gradient-boosted ranker, a stacked variant and a deep multi-task ranker with
+repeat and explore heads and a learned gate are compared with five next-basket baselines. All two-stage rankers beat the strongest
+baseline by more than a quarter; the deep model gains about one percent over the tuned trees only in its single-head form, and the
+learned gate, not the explicit split, carries the benefit. A controlled study confirms that naive stacking inflates in-sample metrics.
+\end{abstract}
+
+\begin{keywords}
+Evaluation methodology, gradient boosting, learning to rank, multi-task learning, next-basket recommendation, recommender systems,
+retail analytics, two-stage retrieval.
+\end{keywords}
+
+\titlepgskip=-15pt
+
+\maketitle
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Introduction}
+\label{sec:introduction}
+
+\PARstart{A}{} loyalty member of a multi-country sporting-goods retailer opens the app on a Monday: which product models will
+they buy in the next 30 days? A previous project built a point-in-time feature store over eleven exported tables and a LightGBM
+LambdaRank ranker~\cite{ke2017lightgbm,burges2010lambdamart} (P1) over 200 candidates per (member, Monday) anchor. It reported a
+normalized discounted cumulative gain NDCG@20 of \nRefCond{}, but only on anchors whose candidate list contained at least one purchase.
+Measured over every anchor with a purchase, counting purchases outside the list as misses, the same model scores 0.090 (TH + VN:
+\nRefUncond{}), and \nNoPosShare{}\,\% of the anchors have no purchase in the list at all.
+
+This paper asks where those errors are and what it takes to fix them. It reformulates next-basket recommendation (NBR) as a
+two-stage problem in which retrieval is a model with its own objective, and compares a deep multi-task ranker against tuned
+gradient-boosted trees (GBDT) and strong NBR baselines under one tuning budget. The research questions are phrased as questions,
+not as expected orderings, because a GBDT win is a valid outcome~\cite{grinsztajn2022tabular}:
+\begin{itemize}
+\item \textbf{RQ1 (retrieval).} How much do learned candidate sources raise unconditional recall over the rule-based sources R1--R5,
+separately for repeat and explore purchases, at what cost, and how much of that gain reaches NDCG@20 when the ranker is unchanged?
+\item \textbf{RQ2 (ranking).} With the same tuning budget and candidates, how does an end-to-end deep multi-task ranker (P3) compare
+with a tuned GBDT (P1-tuned), stacking (P2) and NBR baselines, overall and by segment?
+\item \textbf{RQ3 (repeat / explore).} Do explicit repeat and explore heads with a learned gate improve explore without hurting
+repeat, compared with a single head?
+\item \textbf{H2 (hypothesis).} Naive stacking inflates metrics on training and pseudo-test anchors relative to a rolling protocol;
+on the real test the gap narrows but does not vanish.
+\item \textbf{RQ4 (feasibility).} How many times better than ``best-sellers'' and ``buy the same again'' is the best system, and what
+purchase value does it capture (offline proxy)?
+\end{itemize}
+
+The contributions are: (1) an unconditional evaluation protocol with a repeat / explore split and a positive-level error
+decomposition that locates \nNoSource{}\,\% of the missed purchases in retrieval rather than ranking; (2) an explore-only retrieval
+layer of eight learned sources refitted quarterly in every split, with a rank-quota mixer; (3) a fair-budget comparison of P1-tuned,
+P2, P3 and five baselines on the same candidates; (4) a controlled measurement of stacking leakage (naive, rolling, leaky); and (5) a
+static, privacy-preserving demonstrator.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Related Work}
+\label{sec:related}
+
+\textit{Next-basket recommendation.} The reality check of Li et al.~\cite{li2023nbr} showed that repeat purchases dominate common NBR
+metrics and that simple frequency baselines (P-TopFreq, GP-TopFreq) are hard to beat; it introduced the repeat / explore recall split
+used here. TIFU-KNN~\cite{hu2020tifu} models personal item frequency with time decay and neighbour smoothing. More generally,
+carefully tuned simple baselines often match recent neural recommenders~\cite{dacrema2019progress}.
+
+\textit{Item-based and graph retrieval.} EASE~\cite{steck2019ease} is a closed-form linear auto-encoder; RP3beta~\cite{paudel2017rp3beta}
+re-weights random walks by item popularity; item2vec~\cite{barkan2016item2vec} learns co-occurrence embeddings.
+
+\textit{Neural retrieval and sequential models.} Two-tower models~\cite{yi2019twotower} score users and items in a shared space with a
+softmax over items; SASRec~\cite{kang2018sasrec} applies causal self-attention~\cite{vaswani2017attention} to the behaviour sequence,
+gSASRec~\cite{petrov2023gsasrec} corrects its overconfidence under negative sampling, and PinnerFormer~\cite{pancha2022pinnerformer}
+trains on a dense all-action objective over a future window. DIN~\cite{zhou2018din} adds target attention of the candidate over the
+behaviour sequence.
+
+\textit{Multi-task and repeat-aware ranking.} MMoE~\cite{ma2018mmoe} gates shared experts per task. Repeat-aware recommenders separate
+repeat and explore modes (RepeatNet~\cite{ren2019repeatnet}, ReCANet~\cite{ariannezhad2022recanet}). Our P3 gates two listwise heads
+with a learned member-level probability.
+
+\textit{Leakage in stacking.} Out-of-fold or temporally rolling fits are standard for stacked models~\cite{wolpert1992stacking}; we
+measure the inflation of an in-sample fit directly.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Data and Infrastructure}
+\label{sec:data}
+
+The data set is an export of eleven tables from the retailer's data platform: point-of-sale and e-commerce lines (89.3\,M lines),
+catalogue, price timeline, stock, loyalty members, favourite sports, stores, calendar, and 999.7\,M web and app events, for
+Singapore (SG), Thailand (TH) and Vietnam (VN) from 2023-01 to 2026-10. A DuckDB / dbt lakehouse turns them into Bronze, Silver and Gold
+layers with seven quality gates (QC-1 to QC-7). After cleaning, the fact table holds 66.1\,M sale lines in 26.3\,M transactions by
+4.7\,M buying members. The unit of prediction is a (member, anchor Monday) pair; a positive is any non-returned model bought in
+$(t, t+\Delta]$ with $\Delta = 30$ days ($\Delta = 90$ as an auxiliary label).
+
+Splits are by anchor date with a 42-day purge gap: train up to 2025-09-15, valid anchors 2025-10-27 to 2025-12-22, test anchors
+2026-02-02 to 2026-07-27. Anchors are capped per country by hash rank (50\,000 train, 15\,000 valid, 50\,000 test). The main scope
+is TH + VN; SG labels are reported but flagged REVIEW because of label quality. Unless stated otherwise, every number below is on
+the test split, TH + VN, $\Delta = 30$.
+
+Every model-generated table carries its fit cutoff, the latest source timestamp it read and a model version, and is checked by QC-6:
+no row may read an event at or after its anchor, and no fit may use a cutoff later than the anchor. Learned candidate sources and
+signal models are refitted at 13 quarterly cutoffs (2023-07-01 to 2026-07-01) in every split; an anchor uses the latest cutoff
+$\le t$. A single fit at the end of train would leave 27--34\,\% of the test positives outside a 5\,000-model universe that is
+5--10 months old; quarterly refits halve that share. Rankers are trained once on train and selected on valid.
+Fig.~\ref{fig:arch} shows the system.
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_arch.png}{Two-stage system. Every learned component is fitted at quarterly cutoffs before the anchors it scores.\label{fig:arch}}
+
+The hardware is one shared GH200 node (72 Arm cores and one Hopper-class GPU); deep models use bfloat16 mixed precision. Every model
+with hyper-parameters receives the same budget of 10 Optuna~\cite{akiba2019optuna} TPE~\cite{bergstra2011tpe} trials on valid. The
+course plan asked for 30 trials and three seeds; the reduced budget is discussed in Section~\ref{sec:discussion}.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Unconditional Evaluation and Error Analysis}
+\label{sec:protocol}
+
+\subsection{Protocol}
+The evaluated unit is every used anchor $a$ with at least one non-returned purchase in $(t, t+\Delta]$; its positives $P_a$ are all of
+those purchases, including those outside the candidate list $C_a$, which are placed below every candidate. With $L_a^K$ the top $K$ of
+the ranked list,
+\begin{equation}
+\mathrm{Recall}@K = \frac{|P_a \cap L_a^K|}{|P_a|},
+\end{equation}
+\begin{equation}
+\mathrm{NDCG}@K = \frac{\sum_{k=1}^{K} \mathbf{1}[\ell_k \in P_a] / \log_2(k+1)}{\sum_{k=1}^{\min(K, |P_a|)} 1/\log_2(k+1)},
+\end{equation}
+where $\ell_k$ is the item at rank $k$, so the ideal gain counts every positive, retrieved or not~\cite{jarvelin2002ndcg}. A positive is \emph{repeat} if the member bought
+the model before $t$ and \emph{explore} otherwise~\cite{li2023nbr}; recall\_repeat@20 and recall\_explore@20 average over the anchors
+that have positives of that kind. We also report HR@10 (at least one hit in the top 10) and the candidate recall (share of positives
+anywhere in $C_a$). Metrics are member means; confidence intervals come from a bootstrap over members~\cite{efron1993bootstrap}
+(1\,000 resamples) and model differences from a paired bootstrap over the same members.
+
+\subsection{The Reference Model Under the New Protocol}
+Table~\ref{tab:t28} puts both protocols side by side. The conditional protocol drops the \nNoPosShare{}\,\% of the anchors whose list
+holds no purchase, which doubles the headline number.
+
+\begin{table}[t]
+\caption{P1-frozen under the conditional and unconditional protocols (test, $\Delta = 30$).}
+\label{tab:t28}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrrrr}
+\toprule
+Protocol, scope & anchors & NDCG@20 & HR@10 & rec.\ rep. & rec.\ exp. & cand. \\
+\midrule
+conditional, TH + VN   & 25\,538 & 0.206 & 0.368 & 0.826 & 0.218 & 1.000 \\
+unconditional, TH + VN & 41\,734 & \textbf{0.095} & 0.225 & 0.824 & 0.073 & 0.370 \\
+unconditional, all     & 63\,574 & 0.090 & 0.217 & 0.797 & 0.065 & 0.351 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Where the Errors Are}
+Each of the 213\,289 test positives is put in one cell: ranked in the top 10, ranked below 10, proposed by a source but cut by the
+200 cap, or proposed by no source (Table~\ref{tab:t28b}, Fig.~\ref{fig:t28b}).
+
+\begin{table}[t]
+\caption{Fate of the test positives of P1-frozen over R1--R5 candidates (shares of positives).}
+\label{tab:t28b}
+\setlength{\tabcolsep}{4pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrrr}
+\toprule
+ & positives & top 10 & rank 11+ & capped & no source \\
+\midrule
+repeat  & 18\,251  & 0.654 & 0.332 & 0.013 & 0.002 \\
+explore & 195\,038 & 0.028 & 0.227 & 0.111 & 0.634 \\
+all     & 213\,289 & 0.082 & 0.236 & 0.103 & 0.580 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_t28b_errors.png}{Where the test positives of the reference model end up.\label{fig:t28b}}
+
+Repeat is largely solved; explore is 91\,\% of the positives and 74.5\,\% of it never reaches the ranker. Of the capped positives,
+95\,\% come from R5 (the national top 300), whose lower ranks do not fit the cap. The positives without a source are mid-tail, not
+long-tail: 95\,\% have a popularity rank between 301 and 5\,000 at the anchor, so a learned source over a per-country universe of the
+top 5\,000 models can reach them while losing only about 3\,\% of the positives. R4 (sport $\times$ offer, recall 0.0002) is dropped:
+only 1.07\,\% of the anchors have a favourite sport. These facts set the agenda of Section~\ref{sec:retrieval}.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Learned Retrieval}
+\label{sec:retrieval}
+
+\subsection{Sources}
+R1 (repurchase) already holds 99.7\,\% of the repeat positives, so every learned source is \emph{explore-only}: it masks the models the
+member bought before the anchor and is tuned on the explore coverage it \emph{adds} to R1--R5@200 on valid ($\Delta$ cand\_explore of
+the union), not on its own recall. Each source is fitted per country at each quarterly cutoff over the top 5\,000 models by buyers in
+the previous 365 days, and proposes 100 candidates per anchor (Table~\ref{tab:sources}). With 5\,000 models per country, an exact
+matrix product on the GPU replaces an approximate nearest-neighbour index.
+
+The two neural sources are adapted to the target. The two-tower model (R9) draws several reference days per member and epoch, adds
+the month of $t$ to the member tower, and uses a softmax over the universe that masks the models already bought. SASRec (R10) takes
+one step per basket (the mean of its model embeddings) with a gap embedding, and is trained with a dense all-action explore loss in
+the spirit of PinnerFormer~\cite{pancha2022pinnerformer}: each step predicts every explore model of the following $\Delta$ days.
+R11 (explin) is a supervised windowed linear model $\hat{Y} = XB$ with closed-form ridge solution, where $X$ is the time-decayed
+purchase history before $t$ and $Y$ the explore purchases in $(t, t+\Delta]$. R13 reweights the recent country popularity by the
+member's departments and price band.
+
+\begin{table}[t]
+\caption{Learned candidate sources and their best valid gain in explore coverage over R1--R5@200 (10 trials).}
+\label{tab:sources}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{llr}
+\toprule
+Source & Model (tuned parameters) & $\Delta$ cand.\ exp. \\
+\midrule
+R6  & EASE, closed-form item--item ($\lambda$)                   & +0.085 \\
+R7  & item2vec over baskets (defaults)                            & --- \\
+R8  & TIFU-KNN ($k$, $r_b$, $r_g$, $\alpha$)                      & +0.057 \\
+R9  & two-tower, softmax over explore targets ($d$, $\tau$, lr, dropout) & +0.074 \\
+R10 & SASRec, dense all-action loss ($d$, blocks, dropout, lr)    & +0.085 \\
+R11 & explin, windowed linear ($\lambda$, half-life)              & +0.074 \\
+R12 & RP3beta, random walk ($\alpha$, $\beta$)                    & +0.088 \\
+R13 & context-aware trend (window, weights)                       & +0.069 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Mixer and the Cap}
+The ranker receives at most $K$ candidates. The mixer interleaves the sources by weighted rank quotas: candidate $i$ gets the key
+\begin{equation}
+\kappa(i) = \min_{s \,:\, i \in C_s} \frac{r_s(i) - 0.5}{w_s},
+\end{equation}
+where $r_s(i)$ is its rank in source $s$ and $w_s$ the source's stand-alone valid Recall@100, and the $K$ smallest keys are kept. A
+per-member variant scales $w_{R1}$ by the member's repeat share; it ties with the fixed policy on valid (TH + VN coverage at 300:
+0.4841 against 0.4847), so the fixed policy is used. $K = \nK{}$ is chosen from the recall--cost curve (Fig.~\ref{fig:curve}).
+
+\subsection{Coverage}
+
+\begin{table}[t]
+\caption{Candidate coverage on test (TH + VN, $\Delta = 30$).}
+\label{tab:t30}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrr}
+\toprule
+Candidate set & list & cand. & repeat & explore \\
+\midrule
+R1--R5 (reference)                       & 200     & 0.370 & 0.997 & 0.307 \\
+R1--R5 $\cup$ R12 RP3beta (best single)  & 277     & 0.439 & 0.997 & 0.386 \\
+R1--R5 $\cup$ R6 / R10 / R7              & 260--282 & 0.430--0.435 & 0.997 & 0.375--0.381 \\
+R1--R5 $\cup$ all learned (uncapped)     & 483     & 0.541 & 0.997 & 0.499 \\
+\textbf{candidates\_v2, mixer, $K = 300$} & 300    & \textbf{0.450} & 0.972 & \textbf{0.400} \\
+mixer, $K = 500$                          & 470    & 0.535 & 0.994 & 0.492 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.8\textwidth]{fig_t30_curve.png}{Candidate coverage against the cap $K$; the fixed and per-member mixers overlap at every $K$.\label{fig:curve}}
+
+Coverage rises from \nCandOld{} to \nCandNew{} at $K = \nK{}$ (Table~\ref{tab:t30}), meeting the plan's target of 0.45; explore coverage
+rises 1.30 times (\nExpOld{} to \nExpNew{}), short of the target of 2. The cap costs 2.5 points of repeat coverage: R1 lists beyond
+rank 60 lose their slots to explore candidates. The sources are complementary: the union of all eight adds 0.17 over R1--R5 while the
+best single source adds 0.07. The neural sources do not beat the cheap ones: SASRec ties with EASE, the two-tower model is below,
+and RP3beta, the best single source, trains in minutes against about six GPU-hours of tuning and building for each neural source
+(Section~\ref{sec:feasibility}). QC-6 on candidates\_v2 finds no row that reads an event at or after its anchor and no fit cutoff
+after the anchor. The pairs of candidates\_v2 are rendered from the same dbt SQL as Gold and match it on a parity day up to
+floating-point noise.
+
+\subsection{From Recall to NDCG}
+With the ranker frozen (P1-frozen's hyper-parameters and original feature set, refitted on the v2 pairs), the retrieval gain reaches
+NDCG@20 only partly. The paired difference v2 $-$ v1 is $+0.0025$ $[+0.0018, +0.0032]$ in NDCG@20 and $+0.0052$ in HR@10, with
+$+0.0101$ recall\_explore@20 and $-0.0315$ recall\_repeat@20. The gain is significant but small (0.0947 to 0.0973): the frozen ranker
+has no feature that tells it which learned source proposed a candidate, it trades repeat recall for explore recall, and most new
+explore candidates land below rank 20.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Ranking Models}
+\label{sec:ranking}
+
+All rankers score the same candidates\_v2 lists ($K = \nK{}$) and are selected on unconditional valid NDCG@20 with 10 TPE trials.
+\begin{itemize}
+\item \textbf{P1-frozen}: the previous LambdaRank with its frozen hyper-parameters and original features, refitted on the v2 pairs; a
+reference row, not a tuned competitor.
+\item \textbf{P1-tuned}: LightGBM LambdaRank over every pair column (85 features, the source ranks of R6--R13 included).
+\item \textbf{P2}: P1-tuned plus five stacked signals fitted with the rolling protocol: a LightGBM department hazard over member
+$\times$ department rows, $P(\text{buy in } (t, t+\Delta])$, and LightGBM quantile models of willingness to pay (log unit price,
+quantiles 0.5 and 0.9).
+\item \textbf{P3 (UMTR)}: a Transformer over the last 50 purchases (model and log-gap embeddings), an MLP over the member context, an
+item tower over the candidate's pair features, and DIN-style target attention~\cite{zhou2018din} of each candidate over the sequence
+states; 3.7\,M parameters.
+\item \textbf{Baselines}: P-TopFreq, GP-TopFreq~\cite{li2023nbr}, EASE and TIFU-KNN as full-catalogue NBR rankers with their own
+10-trial budget on valid NDCG@20, and SASRec (the R10 model without the explore mask, no separate budget).
+\end{itemize}
+
+P3 has two heads, repeat and explore, each with a softmax over its group of candidates ($R_a$: models bought before $t$; $E_a$: the
+others). A gate $g(u) \in (0, 1)$ computed from the member representation splits the probability mass:
+\begin{equation}
+p(i) = \begin{cases}
+g(u)\, \dfrac{e^{s^{r}_i}}{\sum_{j \in R_a} e^{s^{r}_j}}, & i \in R_a,\\[2ex]
+\bigl(1 - g(u)\bigr)\, \dfrac{e^{s^{e}_i}}{\sum_{j \in E_a} e^{s^{e}_j}}, & i \in E_a.
+\end{cases}
+\end{equation}
+The loss is listwise, $\mathcal{L} = -\frac{1}{|P_a \cap C_a|}\sum_{i \in P_a \cap C_a} \log p(i) + \lambda_g\,\mathrm{BCE}(g, y^{rep})
++ \lambda_{90}\,\mathcal{L}_{90}$, where $y^{rep}$ is the repeat share of the member's positives and $\mathcal{L}_{90}$ an auxiliary
+binary cross-entropy on the $\Delta = 90$ label. Early stopping uses unconditional valid NDCG@20. The one-head ablation replaces the
+two group softmaxes by one softmax over $C_a$.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Results}
+\label{sec:results}
+
+\subsection{RQ2: Model Comparison}
+
+\begin{table*}[t]
+\caption{Ranking on test (TH + VN, 41\,734 anchors, $\Delta = 30$, unconditional), with 95\,\% member-bootstrap intervals of NDCG@20.
+Selection on valid with 10 trials and one seed.}
+\label{tab:t31}
+\centering
+\begin{tabular}{lrcrrrr}
+\toprule
+Model & NDCG@20 & 95\,\% CI & HR@10 & recall\_repeat@20 & recall\_explore@20 & cand.\ recall \\
+\midrule
+P-TopFreq                 & 0.0615 & [0.0597, 0.0632] & 0.156 & 0.877 & 0.000 & 0.093 \\
+GP-TopFreq                & 0.0752 & [0.0734, 0.0769] & 0.184 & 0.878 & 0.041 & 0.262 \\
+EASE NBR                  & 0.0548 & [0.0535, 0.0561] & 0.146 & 0.368 & 0.072 & 0.231 \\
+TIFU-KNN NBR              & 0.0788 & [0.0770, 0.0806] & 0.187 & 0.885 & 0.043 & 0.234 \\
+SASRec NBR                & 0.0606 & [0.0589, 0.0622] & 0.156 & 0.435 & 0.067 & 0.235 \\
+\midrule
+P1-frozen (R1--R5 candidates) & 0.0947 & [0.0925, 0.0968] & 0.225 & 0.824 & 0.073 & 0.370 \\
+P1-frozen (v2)            & 0.0973 & [0.0949, 0.0994] & 0.230 & 0.793 & 0.083 & 0.450 \\
+P1-tuned (v2)             & 0.1011 & [0.0990, 0.1033] & 0.239 & 0.817 & 0.092 & 0.450 \\
+P2 (v2)                   & 0.1013 & [0.0994, 0.1034] & 0.240 & 0.806 & 0.093 & 0.450 \\
+P3 two heads              & 0.1009 & [0.0988, 0.1029] & 0.237 & 0.845 & 0.089 & 0.450 \\
+\textbf{P3 one head}      & \textbf{0.1020} & [0.0999, 0.1040] & 0.240 & 0.838 & 0.090 & 0.450 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table}[t]
+\caption{Paired member-bootstrap differences on test (TH + VN), $a - b$ [95\,\% CI].}
+\label{tab:paired}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lll}
+\toprule
+$a - b$ & NDCG@20 & rec.\ explore@20 \\
+\midrule
+P1-tuned $-$ P1-frozen (v2) & +0.0039 [+0.0032, +0.0045] & +0.0085 \\
+P2 $-$ P1-tuned             & +0.0002 [$-$0.0002, +0.0006] & +0.0007 \\
+P3 two heads $-$ P1-tuned   & $-$0.0002 [$-$0.0009, +0.0005] & $-$0.0031 \\
+P3 one head $-$ P1-tuned    & +0.0009 [+0.0002, +0.0016] & $-$0.0016 \\
+P3 one head $-$ P2          & +0.0007 [+0.0000, +0.0014] & $-$0.0023 \\
+P1-tuned $-$ TIFU-KNN NBR   & +0.0224 [+0.0214, +0.0234] & +0.0488 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_t31_ndcg.png}{NDCG@20 of every model on test with 95\,\% member-bootstrap intervals.\label{fig:t31}}
+
+Tables~\ref{tab:t31} and~\ref{tab:paired} and Fig.~\ref{fig:t31} are read as answers rather than as a leaderboard.
+\begin{itemize}
+\item Every two-stage ranker beats every NBR baseline by a wide margin (P1-tuned $-$ TIFU-KNN: $+0.022$, 28\,\%). The strongest baseline
+is TIFU-KNN, then GP-TopFreq; EASE and SASRec as full-catalogue rankers fall below popularity because, without the repeat-preserving
+candidates of a two-stage system, they give up the repeats (recall\_repeat 0.37--0.43 against 0.88).
+\item Tuning matters more than the model family: P1-tuned gains $+0.0039$ over the frozen parameters on the same pairs, more than the
+whole retrieval gain under the frozen ranker ($+0.0025$).
+\item The deep model and the GBDT are within a thousandth. P3 with one head is the only model significantly above P1-tuned ($+0.0009$,
+about 1\,\%), and only just above P2. The two-head P3 ties with P1-tuned: it keeps more repeats ($+0.029$ recall\_repeat@20) and finds
+fewer explore purchases ($-0.003$).
+\item Stacking adds nothing measurable (P2 $-$ P1-tuned $+0.0002$, interval across zero), consistent with Section~\ref{sec:h2}: the Gold
+pair features already hold department recency, cycles and price gaps.
+\end{itemize}
+On valid, over the three countries of the tuning objective, the order is the same (P3 one head 0.1049, P3 two heads 0.1037, P2
+0.1034, P1-tuned 0.1033).
+
+\textit{Seed variance.} The final fits of P1-tuned and both P3 variants were repeated with seeds 1 and 2 at the same hyper-parameters
+(Table~\ref{tab:seeds}, Fig.~\ref{fig:seeds}). The seed spread ($\le 0.0003$) is below the gap between P3 one head and P1-tuned; the
+seed-matched paired differences are $+0.0009$, $+0.0010$ and $+0.0006$, and one head beats two heads at every seed ($+0.0011$,
+$+0.0018$, $+0.0011$). The two-head model is the least stable: its repeat recall moves from 0.79 to 0.85 across seeds, i.e., the
+learned gate lands in different places from one run to the next.
+
+\begin{table}[t]
+\caption{Seed variance of the final fits (test, TH + VN, NDCG@20).}
+\label{tab:seeds}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lccc}
+\toprule
+Model & seeds 0 / 1 / 2 & mean $\pm$ sd & rec.\ repeat mean $\pm$ sd \\
+\midrule
+P1-tuned     & 0.1011 / 0.1013 / 0.1016 & 0.1013 $\pm$ 0.0002 & 0.809 $\pm$ 0.007 \\
+P3 two heads & 0.1009 / 0.1005 / 0.1011 & 0.1008 $\pm$ 0.0003 & 0.824 $\pm$ 0.030 \\
+P3 one head  & 0.1020 / 0.1022 / 0.1022 & 0.1022 $\pm$ 0.0001 & 0.831 $\pm$ 0.008 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_t31_seeds.png}{NDCG@20 of the final fits across three seeds.\label{fig:seeds}}
+
+\textit{Is the cap binding?} Cutting the mixer list at $K = 500$ instead of 300 raises test coverage from 0.450 to 0.535 for
+1.6 times the pairs. P1-frozen was refitted as is, P1-tuned and P3 were re-tuned with 10 trials. On valid (TH + VN), the decision
+data, NDCG@20 does not improve: P1-tuned 0.1088 to 0.1079, P3 two heads 0.1087 to 0.1092, P3 one head 0.1096 to 0.1097, so
+$K = 300$ is kept. Reported once afterwards on test (paired, $K = 500$ $-$ $K = 300$): P1-frozen $-0.0009$ $[-0.0016, -0.0003]$,
+P1-tuned $-0.0003$ $[-0.0008, +0.0001]$, P3 two heads $+0.0006$ $[-0.0000, +0.0011]$, P3 one head $+0.0012$ $[+0.0007, +0.0017]$
+(0.1032). The one-head test gain is not supported on valid and is not used for selection, which would select on test. The GBDT
+loses 0.025 repeat recall to the extra negatives. The cap is not what limits accuracy; ranking the hard explore candidates is.
+
+\subsection{By Country and Segment}
+Table~\ref{tab:segments} splits NDCG@20 by country and by member segment (transactions in the 365 days before the anchor: new
+$\le 1$, mid 2, loyal $\ge 3$; all countries). The ordering holds in every country and segment, and the differences between P1-tuned
+and P3 stay below 0.002 everywhere. The largest gain of the whole pipeline over the reference is on new members (0.079 to 0.090,
++14\,\%), whose purchases are almost all explore and who benefit most from the learned sources. SG (REVIEW scope) gains as much as TH
+and VN. A web / no-web split is not reported: 2--19\,\% of the anchors have web events and the web features carry about 1\,\% of the
+SHAP mass (Section~\ref{sec:shap}).
+
+\begin{table}[t]
+\caption{NDCG@20 on test by country and segment.}
+\label{tab:segments}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrrrr}
+\toprule
+Model & SG & TH & VN & new & mid & loyal \\
+\midrule
+TIFU-KNN NBR    & 0.069 & 0.085 & 0.072 & 0.065 & 0.080 & 0.078 \\
+P1-frozen (v1)  & 0.082 & 0.101 & 0.088 & 0.079 & 0.094 & 0.095 \\
+P1-tuned (v2)   & 0.089 & 0.108 & 0.093 & 0.089 & 0.101 & 0.099 \\
+P3 two heads    & 0.089 & 0.107 & 0.093 & 0.088 & 0.101 & 0.100 \\
+P3 one head     & 0.090 & 0.109 & 0.094 & 0.090 & 0.101 & 0.100 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{RQ3: Repeat and Explore Heads}
+
+\begin{table}[t]
+\caption{P3 ablation, paired differences against P3 with two heads and a learned gate (test, TH + VN).}
+\label{tab:t32}
+\setlength{\tabcolsep}{2.5pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrr}
+\toprule
+Variant $-$ two heads & NDCG@20 & HR@10 & rec.\ rep. & rec.\ exp. \\
+\midrule
+one head              & +0.0011 & +0.0025 & $-$0.0073 & +0.0016 \\
+fixed gate            & $-$0.0066 & $-$0.0105 & $-$0.2753 & +0.0159 \\
+no sequence           & $-$0.0003 & +0.0001 & $-$0.0240 & +0.0020 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\\[1ex]
+{\footnotesize NDCG@20 intervals: one head [+0.0007, +0.0016]; fixed gate [$-$0.0074, $-$0.0058]; no sequence [$-$0.0007, +0.0000].
+Fixed gate: $g$ = the member's historical repeat share.}
+\end{table}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.8\textwidth]{fig_t32_ablation.png}{P3 ablation on test.\label{fig:t32}}
+
+The explicit split does \emph{not} improve explore (Table~\ref{tab:t32}, Fig.~\ref{fig:t32}): the single head is better on NDCG@20
+and on explore recall, at a small cost in repeat recall. The gate is the part that matters: replacing the learned $g$ by the member's
+historical repeat share loses 0.0066 NDCG@20 and a third of the repeat recall. A plausible reading is that the historical share
+(about 10\,\% of positives) under-weights the repeat group for the anchors where a repeat is due, which the learned gate can see from
+the context. The learned gate ranks segments correctly (mean $g$: loyal 0.23, mid 0.17, new 0.14) but is not calibrated: it is about
+twice the observed repeat share (0.12, 0.08, 0.06) and correlates only weakly with the per-anchor target (0.11--0.19). The sequence
+encoder adds repeat recall ($+0.024$) but no NDCG: the pair features already summarize the history.
+
+\subsection{H2: Stacking Leakage}
+\label{sec:h2}
+The department hazard is fitted three ways: rolling (quarterly cutoffs, the only point-in-time-correct variant), naive (fitted once on
+train and applied in-sample) and leaky (fitted on every split). Its AUC on train / pseudo-test (last train quarter) / test is 0.681 /
+0.703 / 0.708 for rolling, 0.725 / 0.744 / 0.705 for naive, and 0.710 / 0.717 / 0.723 for leaky. The in-sample fit looks 0.04 AUC
+better on the anchors it has seen and loses that lead on test; the leaky fit stays better on test because it has seen those labels.
+
+Fused into a ranker (P1-frozen parameters, fitted on train anchors up to 2025-05-31), the signals give the NDCG@20 of
+Table~\ref{tab:t29b}. H2 holds in direction on both candidate sets, more clearly on v2: the naive fusion is ahead of rolling on its own
+training anchors ($+0.0026$) and on the pseudo-test ($+0.0029$), and behind it on test ($-0.0004$). The leaky fusion is the only one
+ahead on test ($+0.0011$ on v2), because its signals were fitted on the test labels. The inflation is small because the signals are
+weak given the Gold features, and the gaps are of the order of the member-bootstrap intervals ($\pm 0.002$ on test, $\pm 0.005$ on the
+5\,337 pseudo-test anchors). An in-sample stacked signal would nevertheless have been reported as a gain that does not exist on test.
+
+\begin{table}[t]
+\caption{Stacking leakage: unconditional NDCG@20 of a fused ranker by signal protocol (TH + VN).}
+\label{tab:t29b}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{v1 candidates} & \multicolumn{3}{c}{v2 candidates} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Signals & train & pseudo & test & train & pseudo & test \\
+\midrule
+none    & 0.1219 & 0.1072 & 0.0941 & 0.1246 & 0.1097 & 0.0961 \\
+rolling & 0.1227 & 0.1090 & 0.0945 & 0.1255 & 0.1097 & 0.0964 \\
+naive   & 0.1246 & 0.1095 & 0.0934 & 0.1281 & 0.1126 & 0.0959 \\
+leaky   & 0.1232 & 0.1087 & 0.0944 & 0.1256 & 0.1091 & 0.0975 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{What the GBDT Uses}
+\label{sec:shap}
+Grouped TreeSHAP~\cite{lundberg2020treeshap} over 3\,000 test anchors (Table~\ref{tab:shap}) shows that the learned source ranks are
+the second feature group of P1-tuned (17\,\% of the mean absolute SHAP value), which is why the tuned rankers convert more of the
+retrieval gain than the frozen one, which does not see them. In P2 the five stacked signals take 2.4\,\% of the mass.
+
+\begin{table}[t]
+\caption{P1-tuned: share of mean $|\mathrm{SHAP}|$ by feature group (test).}
+\label{tab:shap}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrr}
+\toprule
+Feature group & all & repeat cand. & explore cand. \\
+\midrule
+model: popularity / season / stock      & 0.475 & 0.298 & 0.492 \\
+retrieval: learned source ranks         & 0.165 & 0.202 & 0.162 \\
+retrieval: R1--R5 flags / scores / rank & 0.085 & 0.140 & 0.079 \\
+member: price profile                   & 0.080 & 0.031 & 0.085 \\
+pair: own history                       & 0.027 & 0.155 & 0.014 \\
+web behaviour                           & 0.013 & 0.013 & 0.013 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Feasibility and Demonstrator}
+\label{sec:feasibility}
+
+\subsection{Value Over Simple Rules}
+The best model on valid, P3 with one head, is compared with three references on test HR@10 (Table~\ref{tab:t38}). ``Random'' draws
+10 slots uniformly from the 5\,000-model universe (analytic); ``popular'' is the country top 10 by buyers in the 28 days before the
+anchor, the same list for every member; ``buy-again'' is P-TopFreq. The model is 1.8 times the best-sellers and 1.5 times ``buy the
+same again'' overall. On repeats it matches buy-again (both about 0.78); on explore purchases it is slightly below the best-sellers
+(0.110 against 0.115). Its value is that it does both at once in one list of ten, which no single rule does.
+
+\begin{table}[t]
+\caption{HR@10 of P3 one head against business references (test, TH + VN).}
+\label{tab:t38}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrrrr}
+\toprule
+Positives & P3 & random & popular & buy-again & $\times$ pop. & $\times$ again \\
+\midrule
+all     & 0.240 & 0.007 & 0.137 & 0.156 & 1.76 & 1.54 \\
+repeat  & 0.775 & 0.003 & 0.178 & 0.777 & 4.36 & 1.00 \\
+explore & 0.110 & 0.006 & 0.115 & 0.000 & 0.96 & --- \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+As an offline proxy, not a causal estimate, the GMV-weighted Recall@10 is 0.077 against 0.053 for buy-again and 0.023 for popular,
+i.e., 268\,EUR of observed next-30-day purchase value per 1\,000 recommendations against 184 and 79. These purchases happened anyway;
+an online test is needed to know how many a recommendation would cause.
+
+\subsection{Serving Coverage}
+Every evaluated test anchor gets a personalized list of 300 candidates (median 300; all anchors have at least 10). This holds by
+construction, because the anchor grid starts after a member's second purchase; members without a purchase history are outside the
+evaluated population and get the country best-sellers at serving time.
+
+\subsection{Cost}
+Table~\ref{tab:cost} lists the cost of the candidate sources on the shared GH200 (wall times are upper bounds). The neural sources cost
+50--100 times more compute than EASE or RP3beta for the same or a lower coverage gain. Among the rankers the costs are all small at this
+scale (150\,000 training anchors $\times$ 300 candidates): tuning takes 0.22--0.38\,h, a final fit 1.3--5.1\,min, and P3 (3.7\,M
+parameters) scores 1\,000 test anchors in 0.09\,s on the GPU.
+
+\begin{table}[t]
+\caption{Cost of the candidate sources (13 cutoffs $\times$ 3 countries).}
+\label{tab:cost}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{llrrrr}
+\toprule
+Source & device & tune h & build h & $\Delta$ exp. & per build h \\
+\midrule
+R6 EASE       & GPU & 0.04 & 0.07 & +0.085 & 1.27 \\
+R12 RP3beta   & GPU & 0.05 & 0.08 & +0.088 & 1.16 \\
+R8 TIFU-KNN   & GPU & 0.04 & 0.08 & +0.057 & 0.75 \\
+R13 trend     & CPU & 0.03 & 0.13 & +0.069 & 0.54 \\
+R11 explin    & GPU & 0.07 & 0.47 & +0.074 & 0.16 \\
+R7 item2vec   & CPU & ---  & 0.56 & ---    & --- \\
+R9 two-tower  & GPU & 2.48 & 3.05 & +0.074 & 0.02 \\
+R10 SASRec    & GPU & 4.19 & 3.18 & +0.085 & 0.03 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Demonstrator}
+A static page on a public Hugging Face Space runs the recommender in the browser (Pyodide). The user uploads a purchase file
+(member, country, model, purchase date, quantity); the page validates it and returns the top $K$ of each member with the source of
+each item (repeat with time decay, co-purchase from EASE neighbours, recent country trend), merged with the same rank-quota rule as
+the mixer, and a reason in words. Model identifiers are salted hashes, departments carry generic labels, popularity is shown as a
+percentile, the sample members are synthetic, and the salt never leaves the server. The demonstrator uses reference tables frozen at
+2026-07-28 and does not run the trained rankers: it shows the retrieval layer and its explanations, not the accuracy of
+Table~\ref{tab:t31}.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+\textit{GBDT against deep models.} Under the same budget and the same candidates, the deep multi-task ranker gains about 1\,\% NDCG@20
+over a tuned GBDT and only in its single-head form, in line with the tabular-data literature~\cite{grinsztajn2022tabular}. The effort paid
+most in retrieval (+22\,\% relative coverage) and in tuning (+4\,\% NDCG@20 on the frozen ranker).
+
+\textit{Explore is still the bottleneck.} Explore coverage rose 1.30 times, not 2, and at the top 10 the model is no better than the
+best-sellers on explore purchases. On average 60\,\% of a member's explore purchases are still outside the 300 candidates. Raising the cap to 500
+recovers coverage (0.535) but not NDCG@20 on valid: the extra candidates are explore models the rankers cannot yet place in the top
+20.
+
+\textit{Reduced budget.} The run used 10 trials instead of 30 and one seed for tuning. The final fits were repeated with three seeds:
+the seed spread ($\le 0.0003$ NDCG@20) is smaller than the P3 one-head gain, but the search itself was not repeated, so its noise is
+not measured. SASRec NBR has no NDCG@20 budget of its own.
+
+\textit{Offline only.} GMV figures are a proxy; recommendations change behaviour, which an offline replay cannot measure.
+
+\textit{Scope.} SG labels are REVIEW; SG results are reported but not used for conclusions. gSASRec, distillation of P3 into a GBDT,
+conformal intervals, drift monitoring, and the what-if and parity check of the demonstrator were dropped from the plan.
+
+\textit{Future work.} A full-catalogue universe with monthly refits addresses the coverage ceiling of the 5\,000-model universe;
+content embeddings of the catalogue text and the web click-stream as a second behaviour sequence, possibly with a generative sequential
+model such as HSTU~\cite{zhai2024hstu}, target the explore purchases that no co-purchase signal reaches.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Conclusion}
+\label{sec:conclusion}
+
+Measured over every purchase, the reference recommender was half as good as reported, and most of its misses were purchases it never
+saw. Treating retrieval as a model, with eight explore-only sources refitted quarterly and mixed under a 300-candidate cap, raised the
+share of purchases within reach from \nCandOld{} to \nCandNew{}; with tuned rankers that see the source ranks, NDCG@20 rose from
+\nRefUncond{} to \nTuned{}--\nBest{} (+7--8\,\%), more than 25\,\% ahead of the best next-basket baseline (\nBaseline{}). A deep two-head
+ranker with a learned gate does not beat a tuned GBDT; a single-head version does by 1\,\%. The learned gate is essential; the explicit
+split is not. Naive stacking shows the inflation H2 predicted, small because the signals add little over a good feature store.
+
+\section*{Acknowledgment}
+This work was carried out as the project of the course Advanced Machine Learning and Applications (IT2043.26.1.CH.01) of the
+Master of Information Technology programme at the University of Information Technology, Vietnam National University Ho Chi Minh City,
+under the supervision of Dr. Ha Minh Tan, whom the authors thank for the guidance. The data set was made available for academic use by its owner; no organisation-specific
+identifier appears in this report or in the repository.
+
+\bibliographystyle{IEEEtran}
+\bibliography{custom}
+\EOD
+
+\end{document}
