@@ -1,0 +1,34 @@
+name: Deploy demo Space
+# Rebuilds the public Hugging Face Space from serve/ on every merge to main. The anonymised reference (data/demo/ is not versioned)
+# is pulled back from the live Space; a new reference is still published from the server with `make demo-reference && make demo-push`.
+on:
+  push:
+    branches: [main]
+    paths: ["serve/**", ".github/workflows/deploy-space.yml"]
+  workflow_dispatch:
+concurrency: { group: deploy-space, cancel-in-progress: false }
+permissions: { contents: read }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      SPACE: yphan3103/nbr-demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -q "huggingface_hub>=0.34" pandas numpy pytest
+      - name: Check the token
+        run: test -n "$HF_TOKEN" || { echo "::error::repository secret HF_TOKEN is not set"; exit 1; }
+      - name: Pull the current reference from the live Space
+        run: hf download "$SPACE" --repo-type space --local-dir live --include "reference/*"
+      - name: Stage the Space
+        run: python serve/build_space.py --ref-csv live/reference
+      - name: Smoke test
+        run: |
+          python -m pytest serve/tests -q
+          test -f data/demo/space/index.html && test -f data/demo/space/reference/showcase.json
+          ! grep -q "__FILES__" data/demo/space/index.html
+      - name: Upload
+        run: hf upload "$SPACE" data/demo/space . --repo-type space --delete "*" --commit-message "deploy ${{ github.sha }}"

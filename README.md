@@ -273,6 +273,7 @@ This is a course project maintained by the team below; contributions from team m
 2. Every new dbt model ships with `schema.yml` tests; Gold models must pass the leakage assertions in `dbt_multidim/tests/`.
 3. Keep code, comments, commit messages and documentation in English. Never commit anything under `data/`, `.env` or `*.duckdb`.
 4. Open a pull request against `main` using the template; one reviewer approves before merging. `main` is not protected technically (branch protection is unavailable on GitHub Free for private repositories), so this is a team rule: never push or force-push to `main` directly.
+5. Demo Space: a merge to `main` that touches `serve/` redeploys the public Hugging Face Space (`.github/workflows/deploy-space.yml`, about two minutes; no Hugging Face account needed). The workflow keeps the anonymised reference already on the Space and replaces the page and code (`index.html`, `recommend.py`, `ABOUT.md`). Preview locally with `python serve/build_space.py --ref-csv <reference folder downloaded from the Space>` and `python -m http.server` in `data/demo/space`. A new reference (new as-of date, new back-test sample) is published from the server only: `make demo-reference && make demo-push`.
 
 Suggestions and bug reports from outside the team are welcome through the issue tracker.
 
