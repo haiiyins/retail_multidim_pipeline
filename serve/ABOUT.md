@@ -1,5 +1,5 @@
 Demo này làm gì
-- Bảng điều khiển cho đội CRM/marketing. Tab Khách hàng: hồ sơ khách, nhắc mua lại (kèm chu kỳ mua và cờ "đến hạn" khi đã qua
+- Bảng điều khiển cho đội CRM/marketing của chuỗi bán lẻ đồ thể thao. Tab Khách hàng: hồ sơ khách, nhắc mua lại (kèm chu kỳ mua và cờ "đến hạn" khi đã qua
   80–200 % chu kỳ của chính khách), gợi ý món mới kèm lý do, và màn hình app mà khách sẽ thấy.
 - Tab Chiến dịch: chọn loại chiến dịch (nhắc mua lại đến hạn, bán chéo món mới, mở rộng ngành hàng), lọc theo quốc gia và phân
   khúc, xuất danh sách khách kèm món gợi ý và thông điệp ra CSV.
