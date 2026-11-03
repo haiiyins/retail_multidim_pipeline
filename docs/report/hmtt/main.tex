@@ -250,8 +250,9 @@ valid. Fig.~\ref{fig:arch} shows the two-stage system that the following section
 The lakehouse (DuckDB 2.0, dbt 1.12) runs on a single machine: one country on a laptop, the three countries on a 16-thread server
 with the same commands. The models run on one shared GH200 node (72 Arm cores and one Hopper-class GPU); deep models use bfloat16
 mixed precision. Every model with hyper-parameters receives
-the same budget of 10 Optuna~\cite{akiba2019optuna} TPE~\cite{bergstra2011tpe} trials on valid; as a check, the rankers were
-re-tuned with 30 trials (Section~\ref{sec:results}) and the final fits repeated with three seeds.
+the same budget of 10 Optuna~\cite{akiba2019optuna} TPE~\cite{bergstra2011tpe} trials on valid, which is TPE's random start-up phase,
+i.e., a seeded random search; the rankers were re-tuned with 30 trials as a check (Section~\ref{sec:results}) and the final fits
+repeated with three seeds.
 
 % ---------------------------------------------------------------------------------------------------------------------------------
 \section{Unconditional Evaluation and Error Analysis}
