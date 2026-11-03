@@ -25,26 +25,29 @@
 \newcommand{\nTuned}{0.1011}         % t31, P1-tuned
 \newcommand{\nBaseline}{0.0788}      % t31, best next-basket baseline (TIFU-KNN)
 
-\def\theyear{2026}
+\def\footerline{Advanced Machine Learning and Applications, final report, 2026}
 
 \begin{document}
-\history{Date of publication xxxx 00, 0000, date of current version November 3, 2026.}
-\doi{10.1109/ACCESS.2026.DOI}
+\history{Final report of the course Advanced Machine Learning and Applications, Master of Information Technology,
+November 2026. Source code: github.com/haiiyins/retail\_multidim\_pipeline}
+\doi{}
 
 \title{Retrieval Is the Bottleneck: Unconditional Evaluation, Explore-Only Learned Candidate Sources and Multi-Task Ranking for
 Next-Basket Recommendation in Multi-Country Retail}
 
-\author{\uppercase{Phan Nguyen Hai Yen}\authorrefmark{1},
-\uppercase{Manh [Full Name]}\authorrefmark{1}, and \uppercase{Kha [Full Name]}\authorrefmark{1}}
-\address[1]{[Faculty, University, City, Vietnam] (Group 6, course ``Advanced Machine Learning and Applications'')}
-\tfootnote{This work was carried out as the course project of ``Advanced Machine Learning and Applications'' (HMTT), on top of the
-data pipeline of the course ``Data Processing Engineering'' (KTXLDL).}
+\author{\uppercase{Yen Phan}\authorrefmark{1,*}, \uppercase{Manh Le}\authorrefmark{1,*}, and
+\uppercase{Kha Nguyen}\authorrefmark{1,*}}
+\address[1]{University of Information Technology, Vietnam National University, Ho Chi Minh City, Vietnam}
+\address[*]{Corresponding authors}
+\tfootnote{This work builds on the data pipeline of the course Data Processing Engineering (IT2047.26.1.CH.01) of the same
+programme.}
 
 \markboth
-{Phan \headeretal: Retrieval Is the Bottleneck in Next-Basket Recommendation}
-{Phan \headeretal: Retrieval Is the Bottleneck in Next-Basket Recommendation}
+{Y. Phan \headeretal: Retrieval Is the Bottleneck in Next-Basket Recommendation}
+{Y. Phan \headeretal: Retrieval Is the Bottleneck in Next-Basket Recommendation}
 
-\corresp{Corresponding author: Phan Nguyen Hai Yen (e-mail: pnhaiyen520@gmail.com).}
+\corresp{Corresponding authors: Yen Phan (e-mail: 26848274@grad.uit.edu.vn), Manh Le (e-mail: 26848126@grad.uit.edu.vn), and
+Kha Nguyen (e-mail: 26848091@grad.uit.edu.vn).}
 
 \begin{abstract}
 Recommender evaluations of retail next-basket prediction often score a ranker only on the users whose candidate list already holds
@@ -421,7 +424,8 @@ fewer explore purchases ($-0.003$).
 \item Stacking adds nothing measurable (P2 $-$ P1-tuned $+0.0002$, interval across zero), consistent with Section~\ref{sec:h2}: the Gold
 pair features already hold department recency, cycles and price gaps.
 \end{itemize}
-On valid the order is the same (P3 one head 0.1049, P3 two heads 0.1037, P2 0.1034, P1-tuned 0.1033).
+On valid, over the three countries of the tuning objective, the order is the same (P3 one head 0.1049, P3 two heads 0.1037, P2
+0.1034, P1-tuned 0.1033).
 
 \textit{Seed variance.} The final fits of P1-tuned and both P3 variants were repeated with seeds 1 and 2 at the same hyper-parameters
 (Table~\ref{tab:seeds}, Fig.~\ref{fig:seeds}). The seed spread ($\le 0.0003$) is below the gap between P3 one head and P1-tuned; the
@@ -448,6 +452,14 @@ P3 one head  & 0.1020 / 0.1022 / 0.1022 & 0.1022 $\pm$ 0.0001 & 0.831 $\pm$ 0.00
 \end{table}
 
 \Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_t31_seeds.png}{NDCG@20 of the final fits across three seeds.\label{fig:seeds}}
+
+\textit{Is the cap binding?} Cutting the mixer list at $K = 500$ instead of 300 raises test coverage from 0.450 to 0.535 for
+1.6 times the pairs. P1-frozen was refitted as is, P1-tuned and P3 were re-tuned with 10 trials. On valid (TH + VN), the decision
+data, NDCG@20 does not improve: P1-tuned 0.1088 to 0.1079, P3 two heads 0.1087 to 0.1092, P3 one head 0.1096 to 0.1097, so
+$K = 300$ is kept. Reported once afterwards on test (paired, $K = 500$ $-$ $K = 300$): P1-frozen $-0.0009$ $[-0.0016, -0.0003]$,
+P1-tuned $-0.0003$ $[-0.0008, +0.0001]$, P3 two heads $+0.0006$ $[-0.0000, +0.0011]$, P3 one head $+0.0012$ $[+0.0007, +0.0017]$
+(0.1032). The one-head test gain is not supported on valid and is not used for selection, which would select on test. The GBDT
+loses 0.025 repeat recall to the extra negatives. The cap is not what limits accuracy; ranking the hard explore candidates is.
 
 \subsection{By Country and Segment}
 Table~\ref{tab:segments} splits NDCG@20 by country and by member segment (transactions in the 365 days before the anchor: new
@@ -657,8 +669,9 @@ over a tuned GBDT and only in its single-head form, in line with the tabular-dat
 most in retrieval (+22\,\% relative coverage) and in tuning (+4\,\% NDCG@20 on the frozen ranker).
 
 \textit{Explore is still the bottleneck.} Explore coverage rose 1.30 times, not 2, and at the top 10 the model is no better than the
-best-sellers on explore purchases. On average 60\,\% of a member's explore purchases are still outside the 300 candidates; the
-uncapped union of the sources reaches 0.541 coverage, so the cap and the universe of 5\,000 models, not only the sources, bound recall.
+best-sellers on explore purchases. On average 60\,\% of a member's explore purchases are still outside the 300 candidates. Raising the cap to 500
+recovers coverage (0.535) but not NDCG@20 on valid: the extra candidates are explore models the rankers cannot yet place in the top
+20.
 
 \textit{Reduced budget.} The run used 10 trials instead of 30 and one seed for tuning. The final fits were repeated with three seeds:
 the seed spread ($\le 0.0003$ NDCG@20) is smaller than the P3 one-head gain, but the search itself was not repeated, so its noise is
@@ -669,7 +682,7 @@ not measured. SASRec NBR has no NDCG@20 budget of its own.
 \textit{Scope.} SG labels are REVIEW; SG results are reported but not used for conclusions. gSASRec, distillation of P3 into a GBDT,
 conformal intervals, drift monitoring, and the what-if and parity check of the demonstrator were dropped from the plan.
 
-\textit{Future work.} Larger candidate caps and a full-catalogue universe with monthly refits address the coverage ceiling directly;
+\textit{Future work.} A full-catalogue universe with monthly refits addresses the coverage ceiling of the 5\,000-model universe;
 content embeddings of the catalogue text and the web click-stream as a second behaviour sequence, possibly with a generative sequential
 model such as HSTU~\cite{zhai2024hstu}, target the explore purchases that no co-purchase signal reaches.
 
@@ -685,27 +698,13 @@ ranker with a learned gate does not beat a tuned GBDT; a single-head version doe
 split is not. Naive stacking shows the inflation H2 predicted, small because the signals add little over a good feature store.
 
 \section*{Acknowledgment}
-The authors thank the course instructors for their guidance and the data owner for answering questions about the export. Company and
-brand names are withheld at the data owner's request.
+This work was carried out as the project of the course Advanced Machine Learning and Applications of the Master of Information
+Technology programme at the University of Information Technology, Vietnam National University Ho Chi Minh City. The authors thank the
+course instructors for their guidance. The data set was made available for academic use by its owner; no organisation-specific
+identifier appears in this report or in the repository.
 
 \bibliographystyle{IEEEtran}
 \bibliography{custom}
-
-\begin{IEEEbiography}{Phan Nguyen Hai Yen}
-is a member of Group 6, responsible for the tuning harness and the multi-task ranker P3 with its ablation, and is the main editor of
-this report. [Biography to complete.]
-\end{IEEEbiography}
-
-\begin{IEEEbiography}{Manh [Full Name]}
-is a member of Group 6, responsible for the unconditional evaluation protocol and the error analysis, the stacked signals and the
-leakage study, the next-basket baselines, and the feasibility analysis. [Biography to complete.]
-\end{IEEEbiography}
-
-\begin{IEEEbiography}{Kha [Full Name]}
-is a member of Group 6, responsible for the sequence data and the GPU environment, the neural candidate sources, the mixer and the recall
-curves, the SASRec baseline, the demonstrator, and the cost analysis. [Biography to complete.]
-\end{IEEEbiography}
-
 \EOD
 
 \end{document}
