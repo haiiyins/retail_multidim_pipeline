@@ -159,7 +159,8 @@ Fig.~\ref{fig:arch} shows the system.
 
 The hardware is one shared GH200 node (72 Arm cores and one Hopper-class GPU); deep models use bfloat16 mixed precision. Every model
 with hyper-parameters receives the same budget of 10 Optuna~\cite{akiba2019optuna} TPE~\cite{bergstra2011tpe} trials on valid. The
-course plan asked for 30 trials and three seeds; the reduced budget is discussed in Section~\ref{sec:discussion}.
+course plan asked for 30 trials and three seeds; the rankers were re-tuned with 30 trials as a check (Section~\ref{sec:results})
+and the final fits repeated with three seeds.
 
 % ---------------------------------------------------------------------------------------------------------------------------------
 \section{Unconditional Evaluation and Error Analysis}
@@ -461,6 +462,15 @@ P1-tuned $-0.0003$ $[-0.0008, +0.0001]$, P3 two heads $+0.0006$ $[-0.0000, +0.00
 (0.1032). The one-head test gain is not supported on valid and is not used for selection, which would select on test. The GBDT
 loses 0.025 repeat recall to the extra negatives. The cap is not what limits accuracy; ranking the hard explore candidates is.
 
+\textit{Is the tuning budget binding?} With 10 trials the best GBDT trial was the last one and sat near the learning-rate floor, and the
+best P3 trial sat at its floor. P1-tuned, P2 and P3 were therefore re-tuned on the same v2 pairs with 30 trials each and lower floors
+(GBDT learning rate $\ge 0.005$ with up to 6\,000 rounds, P3 learning rate $\ge 2 \cdot 10^{-5}$), the same budget for every ranker.
+On valid (TH + VN, the decision data), NDCG@20 does not improve from 10 to 30 trials: P1-tuned 0.1088 to 0.1089, P2 0.1089 to
+0.1088, P3 two heads 0.1087 to 0.1086, P3 one head 0.1096 to 0.1092, so the 10-trial fits are kept. Reported once afterwards on test
+(paired, 30 $-$ 10 trials): P1-tuned $+0.0001$ $[-0.0003, +0.0006]$, P2 $+0.0007$ $[+0.0003, +0.0011]$ (0.1020), P3 two heads
+$-0.0002$ $[-0.0005, +0.0001]$, P3 one head $-0.0000$ $[-0.0003, +0.0003]$ (0.1020). The search had converged at 10 trials, and the
+order of Table~\ref{tab:t31} stands: with 30 trials P2 ties with P3 one head on test, but it does not on valid.
+
 \subsection{By Country and Segment}
 Table~\ref{tab:segments} splits NDCG@20 by country and by member segment (transactions in the 365 days before the anchor: new
 $\le 1$, mid 2, loyal $\ge 3$; all countries). The ordering holds in every country and segment, and the differences between P1-tuned
@@ -673,9 +683,12 @@ best-sellers on explore purchases. On average 60\,\% of a member's explore purch
 recovers coverage (0.535) but not NDCG@20 on valid: the extra candidates are explore models the rankers cannot yet place in the top
 20.
 
-\textit{Reduced budget.} The run used 10 trials instead of 30 and one seed for tuning. The final fits were repeated with three seeds:
-the seed spread ($\le 0.0003$ NDCG@20) is smaller than the P3 one-head gain, but the search itself was not repeated, so its noise is
-not measured. SASRec NBR has no NDCG@20 budget of its own.
+\textit{Tuning budget.} The selected fits use 10 trials; a 30-trial re-tuning of every ranker changed valid NDCG@20 by at most
+0.0004 and was not adopted. The final fits were repeated with three seeds: the seed spread ($\le 0.0003$ NDCG@20) is smaller than the
+P3 one-head gain over P1-tuned. The searches themselves ran with one sampler seed, and the candidate sources and NBR baselines kept
+the 10-trial budget; SASRec NBR has no NDCG@20 budget of its own. The margins between P1-tuned, P2 and P3 are below 0.001; P2's
+place depends on the budget (30 trials bring it level with P3 one head on test, not on valid), and only the gain of P3 one head over
+P1-tuned holds at every seed and at both budgets.
 
 \textit{Offline only.} GMV figures are a proxy; recommendations change behaviour, which an offline replay cannot measure.
 
