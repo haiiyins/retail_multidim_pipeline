@@ -6,7 +6,9 @@ last 365 days), each model's department, price band (quintile within its departm
 cutoff), top NEIGHBOURS per model. Model codes become salted hashes (salt in data/demo/salt, never published) and departments
 generic labels; no brand, store or member data leaves.
 The sample CSV is synthetic: random walks over the EASE neighbours from popular models, not real members.
-Usage: python serve/export_reference.py [--sample-only: rewrite only the synthetic sample from the exported reference]  →  data/demo/reference/{models,neighbours}_<country>.parquet, sample_purchases.csv"""
+Usage: python serve/export_reference.py [--sample-only: rewrite only the synthetic sample from the exported reference]
+       [--members N: with --sample-only, write N synthetic members split over the countries to data/demo/sample_purchases_<N>.csv]
+  →  data/demo/reference/{models,neighbours}_<country>.parquet, sample_purchases.csv"""
 import datetime as dt, hashlib, os, secrets, sys
 import numpy as np, pandas as pd, torch
 
@@ -72,13 +74,18 @@ PERSONAS = [  # (name, visits, share of visits that re-buy a model already bough
     ("explorer", 7, 0.1, None), ("explorer", 5, 0.0, None), ("loyal", 9, 0.3, 90), ("mid", 2, 0.5, None)]
 
 
-def synthetic(country, m, nb, cutoff, rng):
-    """Synthetic members, one per persona: random walks over the EASE neighbours from popular models, with re-buys on a cycle
-    for the replenishers (their last re-buy is made due at the as-of date). Not real members."""
+def synthetic(country, m, nb, cutoff, rng, n=len(PERSONAS)):
+    """n synthetic members cycling over the personas: random walks over the EASE neighbours from popular models, with re-buys on a
+    cycle for the replenishers (their last re-buy is made due at the as-of date). Members past the first round get jittered visits
+    and cycles. Not real members."""
     pop = m.sort_values("popularity", ascending=False)["model_id"].to_numpy()[:300]
     nbs = {k: (g["neighbour_id"].to_numpy(), g["weight"].to_numpy()) for k, g in nb.groupby("model_id")}
     rows = []
-    for k, (persona, visits, rebuy, cycle) in enumerate(PERSONAS):
+    for k in range(n):
+        persona, visits, rebuy, cycle = PERSONAS[k % len(PERSONAS)]
+        if k >= len(PERSONAS):
+            visits = visits if visits <= 2 else max(3, visits + int(rng.integers(-2, 3)))
+            cycle = cycle and int(cycle * rng.uniform(0.7, 1.4))
         member = f"{country}-{persona}-{k + 1}"
         if cycle:
             last = int(cycle * rng.uniform(0.9, 1.2))
@@ -105,10 +112,13 @@ def synthetic(country, m, nb, cutoff, rng):
 def main():
     if "--sample-only" in sys.argv:
         cutoff, rng = dt.date.fromisoformat((OUT / "asof.txt").read_text().strip()), np.random.default_rng(0)
+        n = int(sys.argv[sys.argv.index("--members") + 1]) if "--members" in sys.argv else None
+        per = [n // len(COUNTRIES) + (i < n % len(COUNTRIES)) for i in range(len(COUNTRIES))] if n else [len(PERSONAS)] * len(COUNTRIES)
         sample = pd.concat([synthetic(c, pd.read_parquet(OUT / f"models_{c}.parquet"), pd.read_parquet(OUT / f"neighbours_{c}.parquet"),
-                                      cutoff, rng) for c in COUNTRIES], ignore_index=True)
-        sample.to_csv(OUT / "sample_purchases.csv", index=False)
-        print(f"  sample: {sample['member_id'].nunique()} synthetic members, {len(sample)} lines → {OUT}")
+                                      cutoff, rng, k) for c, k in zip(COUNTRIES, per)], ignore_index=True)
+        path = OUT.parent / f"sample_purchases_{n}.csv" if n else OUT / "sample_purchases.csv"
+        sample.to_csv(path, index=False)
+        print(f"  sample: {sample['member_id'].nunique()} synthetic members, {len(sample)} lines → {path}")
         return
     con = connect()
     cutoff = split_windows()["test_hi"] + dt.timedelta(days=1)

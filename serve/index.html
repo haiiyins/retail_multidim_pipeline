@@ -272,7 +272,8 @@ const T = {
     msg_cross: "Dành riêng cho bạn: vài sản phẩm mới rất hợp với môn thể thao bạn đang chơi.",
     msg_nd: "Thử sức với một môn thể thao mới? Đây là vài gợi ý được chọn theo sở thích của bạn.",
     noAud: "Không có khách nào phù hợp với bộ lọc này.", noMember: "Chưa có dữ liệu khách hàng. Hãy tải file lên hoặc dùng dữ liệu mẫu.",
-    loaded: (n, rows, bad) => `Đã xử lý ${n} khách hàng, ${rows} dòng dữ liệu hợp lệ${bad ? `, bỏ qua ${bad} dòng lỗi` : ""}`, exported: "Đã tải danh sách khách",
+    working: (n) => `Đang xử lý ${num(n)} dòng dữ liệu, có thể mất khoảng ${Math.max(5, Math.round(n / 250))} giây…`,
+    loaded: (n, rows, bad) => `Đã xử lý ${num(n)} khách hàng, ${num(rows)} dòng dữ liệu hợp lệ${bad ? `, bỏ qua ${num(bad)} dòng lỗi` : ""}`, exported: "Đã tải danh sách khách",
     guide: [
       ["1. Đưa dữ liệu vào", ["Kéo thả file CSV lịch sử mua hàng vào khung nét đứt, hoặc bấm “Dùng dữ liệu mẫu”.",
         "File cần các cột: member_id (mã khách), country_code (TH hoặc VN), model_id (mã sản phẩm), purchase_date (ngày mua, dạng 2026-07-01), quantity (số lượng, có thể bỏ trống).",
@@ -339,7 +340,8 @@ const T = {
     msg_cross: "Picked for you: new gear that goes with the sports you play.",
     msg_nd: "Ready to try a new sport? Here are a few picks based on what you like.",
     noAud: "No customer matches these filters.", noMember: "No customer data yet. Upload a file or use the sample data.",
-    loaded: (n, rows, bad) => `Processed ${n} customers, ${rows} valid rows${bad ? `, ${bad} rows skipped` : ""}`, exported: "Audience downloaded",
+    working: (n) => `Processing ${num(n)} rows, this may take about ${Math.max(5, Math.round(n / 250))} seconds…`,
+    loaded: (n, rows, bad) => `Processed ${num(n)} customers, ${num(rows)} valid rows${bad ? `, ${num(bad)} rows skipped` : ""}`, exported: "Audience downloaded",
     guide: [
       ["1. Load data", ["Drag and drop a purchase-history CSV onto the dashed box, or click “Use sample data”.",
         "Required columns: member_id (customer ID), country_code (TH or VN), model_id (product ID), purchase_date (e.g. 2026-07-01), quantity (optional).",
@@ -398,7 +400,11 @@ function scale(n, of, cls = "") { return `<span class="scale ${cls}" aria-hidden
 function price(b) { b = Math.min(5, Math.max(1, +b || 1)); return `${scale(b, 5)}<span>${PRICE[L][b - 1]} (${b}/5)</span>`; }
 function tier(rank, k) { return rank <= Math.ceil(k / 3) ? 0 : rank <= Math.ceil((2 * k) / 3) ? 1 : 2; }
 function prio(rank, k) { const x = tier(rank, k); return `<span class="prio">${scale(3 - x, 3)}${t("prio")[x]}</span>`; }
-function toast(m) { const e = $("#toast"); e.textContent = m; e.classList.add("on"); setTimeout(() => e.classList.remove("on"), 2400); }
+let TOAST;
+function toast(m, sticky = false) {
+  const e = $("#toast"); e.textContent = m; e.classList.add("on"); clearTimeout(TOAST);
+  if (!sticky) TOAST = setTimeout(() => e.classList.remove("on"), 2400);
+}
 function count(el, to, fmt, ms = 900) {
   const t0 = performance.now(), d = fmt === "×" ? 1 : 0;
   const f = (now) => { const p = Math.min(1, (now - t0) / ms), v = num(to * (1 - Math.pow(1 - p, 3)), d);
@@ -545,6 +551,8 @@ def run(text, k):
 const sampleText = async () => (await fetch("reference/sample_purchases.csv")).text();
 async function runText(text) {
   try {
+    const lines = (text.trim().match(/\n/g) || []).length;
+    if (lines > 500) { toast(t("working")(lines), true); await new Promise((r) => setTimeout(r, 50)); }
     const res = JSON.parse(py.globals.get("run")(text, $("#k").value));
     DATA = { profiles: res.profiles, byMember: {} };
     for (const r of res.recs) (DATA.byMember[r.member_id] ||= []).push(r);
