@@ -61,10 +61,12 @@ ml-retrieval:
 	$(NOFILE); python ml/retrieval/report.py && python ml/common/data.py
 all: bronze gates silver gold train ablation
 
-# Demo v0 on a public Hugging Face Space (anonymised reference, synthetic sample; the salt never leaves data/demo/)
+# Demo v0 on a public Hugging Face Space (anonymised reference, synthetic sample, anonymised real back-test sample published with
+# the data owner's consent; the salt never leaves data/demo/)
 DEMO_SPACE ?= yphan3103/nbr-demo
 demo-reference:
 	python serve/export_reference.py
+	python serve/export_showcase.py
 demo-push:
 	python serve/build_space.py
 	hf repos create $(DEMO_SPACE) --type space --sdk static --public --exist-ok

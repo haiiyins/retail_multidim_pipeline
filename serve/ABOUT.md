@@ -6,8 +6,10 @@ Demo này làm gì
 - Nhận lịch sử mua (CSV) của một hoặc nhiều khách, trả về top-K mẫu sản phẩm cho mỗi khách, kèm nguồn và lý do của từng gợi ý.
 - Ba nguồn: mua lại (lịch sử của chính khách, giảm dần theo thời gian), mua kèm (láng giềng EASE), xu hướng (độ phổ biến gần đây
   trong ngành hàng khách hay mua). Ba nguồn được trộn bằng hạn ngạch theo thứ hạng, giống bộ trộn ứng viên của pipeline.
-- Demo chỉ chạy tầng retrieval với bảng tham chiếu đóng băng tại ngày as-of; nó không chạy các mô hình xếp hạng đã huấn luyện,
-  nên không tái hiện độ chính xác bên dưới.
+- Tab Khách hàng / Chiến dịch chạy tầng retrieval với bảng tham chiếu đóng băng tại ngày as-of, trên file bạn tải lên.
+- Tab Mô hình tốt nhất: kết quả chấm theo lô của mô hình sâu một đầu (P3, đủ dữ liệu đa chiều) so với cách hiện tại (GP-TopFreq)
+  cho 500 khách thật lấy ngẫu nhiên trong tập kiểm tra, kèm món khách thực sự mua trong 30 ngày sau. Mô hình tốt nhất cần dữ liệu
+  nội bộ (web, giá, khuyến mãi, tồn kho, cửa hàng) và các mạng PyTorch, nên chạy theo lô trong kho dữ liệu như khi triển khai thật.
 
 Kết quả offline của pipeline (tập test 2026-02 … 07, TH + VN, Δ = 30 ngày, giao thức không điều kiện)
 - Hệ tham chiếu ban đầu: NDCG@20 0,095; 40,7 % anchor không có món nào khách mua trong danh sách ứng viên.
@@ -20,4 +22,7 @@ Kết quả offline của pipeline (tập test 2026-02 … 07, TH + VN, Δ = 30 
 
 Quyền riêng tư
 - Mã mẫu sản phẩm là hash có muối; ngành hàng dùng nhãn chung; độ phổ biến hiển thị dạng phần trăm; khách mẫu là dữ liệu tổng hợp.
+- Mẫu khách thật ở tab Mô hình tốt nhất được công bố với sự đồng ý của bên sở hữu dữ liệu và đã tối giản: mã khách đánh số lại
+  theo thứ tự xáo trộn, mã sản phẩm băm có muối, ngày chuyển thành số ngày so với ngày gợi ý, tối đa 40 dòng lịch sử; không có giá,
+  cửa hàng, hành vi web hay thông tin cá nhân.
 - File CSV bạn tải lên được xử lý ngay trong trình duyệt, không gửi lên máy chủ.

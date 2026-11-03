@@ -234,3 +234,14 @@ Test, reported once (t31_hist, t31_hist_paired): GP-TopFreq 0.0752, P1-hist 0.09
 P1-hist − GP-TopFreq +0.0214 [0.0204, 0.0225], P1-tuned − P1-hist +0.0045 [0.0039, 0.0052], P3 one head − P1-hist +0.0054
 [0.0046, 0.0062]. Of the +0.0268 of P3 one head over GP-TopFreq, about 80 % is reached on history alone and 20 % needs the other
 dimensions; the multi-dimensional gain is in explore recall (+0.0077) and costs some repeat recall in the GBDT (−0.0086).
+
+## 2026-11-03 · Demo: best model as batch output on real members (showcase)
+
+The demo ran only the retrieval layer, so it showed none of the measured accuracy. The best model (P3 one head) cannot score an
+uploaded CSV: it needs the Gold web / price / promotion / stock / store features and the ranks of eight learned sources, two of them
+PyTorch networks, which do not run in Pyodide. It is served as a retailer would serve it, by batch scoring in the warehouse; the
+Space gets a tab with that output (`serve/export_showcase.py` → `showcase.json`): 500 test anchors, 250 per country, one per member,
+drawn uniformly (seed 0), with P3 one head and GP-TopFreq top 10, the history before the anchor and the purchases of the next 30
+days. Sample HR@10 0.240 vs 0.190 (whole test 0.240 vs 0.184). The sample of real members is published with the data owner's
+consent and minimised: sequential member ids in shuffled order (no hash of the real id), the reference's salted model hashes and
+generic departments, days relative to the anchor, the last 40 history lines, no price, store, web or member attribute.
