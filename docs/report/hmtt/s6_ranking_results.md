@@ -2,17 +2,17 @@
 
 All rankers score the same candidates_v2 lists (K = 300) and are selected on unconditional valid NDCG@20 with 10 TPE trials (D5).
 
-- **P1-frozen** — the KTXLDL LambdaRank with its frozen hyper-parameters and original features, refitted on the v2 pairs. A
+- **P1-frozen** — the baseline LambdaRank with its frozen hyper-parameters and 73 Gold pair features, refitted on the v2 pairs. A
   reference row, not a tuned competitor.
-- **P1-tuned** — LightGBM LambdaRank over every pair column (85 features, source ranks of R6 – R13 included).
+- **P1-tuned** — LightGBM LambdaRank over every pair column (85 features: 73 baseline + 12 v2 columns including source ranks of R6 – R13).
 - **P2** — P1-tuned plus five stacked signals fitted with the rolling protocol (D7): a LightGBM department hazard (member ×
-  department rows, P(buy in (t, t + Δ])) and LightGBM quantile models of willingness to pay (log unit price, α 0.5 and 0.9).
-- **P3 (UMTR)** — a Transformer over the last 50 purchases (model and log-gap embeddings), an MLP over the member context, an item
-  tower over the candidate's pair features, DIN target attention of each candidate over the sequence. Two heads, repeat and explore,
+  department rows, P(buy in (t, t + Δ])) and LightGBM quantile models of willingness to pay (log unit price, α = 0.5 on median log-price and α = 0.9 on max log-price, plus candidate price gaps).
+- **P3 (UMTR)** — a bidirectional Transformer over the last 50 purchase lines (model, log-gap and reverse-position embeddings), a context MLP (`self.ctx(x[:, 0])`), an item
+  tower over the candidate's embeddings and 100 dense pair features (84 signed-log standardised columns + 16 NaN flags), and scaled dot-product DIN-style target attention of each candidate over the sequence. Two heads, repeat and explore,
   each with a softmax inside its group; a learned gate g(u) gives the repeat group mass g and the explore group 1 − g, trained with
-  BCE on the member's repeat share. Auxiliary Δ = 90 head; listwise loss; early stopping on valid NDCG@20. 3.7 M parameters.
-- **Baselines (D10)** — P-TopFreq, GP-TopFreq, EASE and TIFU-KNN as full-catalogue next-basket rankers with their own 10-trial budget,
-  SASRec (the R10 model without the explore mask, no separate budget).
+  BCE on the repeat share of the member's unconditional positives. Auxiliary Δ = 90 head; listwise loss; 6 epochs restoring the best checkpoint on unconditional valid NDCG@20. 3.73 M parameters.
+- **Baselines (D10)** — five full-catalogue NBR families (six rows): P-TopFreq, GP-TopFreq, EASE and TIFU-KNN with their own 10-trial budget,
+  and SASRec reusing the R10 network and parameters in two forms (explore-trained unmasked, and SASRecAll retrained on all targets).
 
 # VII. Results
 

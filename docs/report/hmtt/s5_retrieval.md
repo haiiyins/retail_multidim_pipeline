@@ -10,11 +10,11 @@ previous 365 days, and proposes 100 candidates per anchor.
 | Source | Model | Tuned (10 trials) | Best valid Δ cand_explore |
 |---|---|---|---:|
 | R6 | EASE, closed-form item–item | λ | +0.085 |
-| R7 | item2vec (skip-gram over baskets) | defaults | — |
+| R7 | item2vec (skip-gram over purchase sequences) | defaults | +0.074 |
 | R8 | TIFU-KNN, time-decayed personal frequency + neighbours | k, r_b, r_g, α | +0.057 |
-| R9 | two-tower, in-batch softmax over explore targets | d, τ, lr, dropout | +0.074 |
+| R9 | two-tower, full-universe masked softmax over explore targets | d, τ, lr, dropout | +0.074 |
 | R10 | SASRec, one step per basket, dense all-action explore loss | d, blocks, dropout, lr | +0.085 |
-| R11 | explin: windowed linear model X = history ≤ t → Y = explore in (t, t + Δ] | λ, half-life | +0.074 |
+| R11 | explin: windowed linear model X = history < t → Y = explore in (t, t + Δ] | λ, half-life | +0.074 |
 | R12 | RP3beta, popularity-reweighted random walk | α, β | +0.088 |
 | R13 | context-aware trend (recent popularity × member's departments and price band) | window, department and price weights | +0.069 |
 

@@ -1,20 +1,19 @@
 # III. Data and infrastructure
 
-The data and the feature store are those of the KTXLDL report (chapters 2 – 4 of `docs/report/`); this section only summarises what
-the models see. Eleven exported tables (point-of-sale and e-commerce lines, catalogue, prices, stock, loyalty members, favourite
-sports, stores, calendar, web and app events) go through Bronze → Silver → Gold in DuckDB / dbt with seven quality gates (QC-1 … 7).
+The eleven operational tables (point-of-sale and e-commerce lines, catalogue, prices, stock, loyalty members, favourite
+sports, stores, calendar, web and app events) go through Bronze → Silver → Gold in DuckDB / dbt with seven quality gates (QC-1 … 7), answering RQ1.
 The unit of prediction is a (member, anchor Monday) pair; a purchase is any non-returned model bought in (t, t + Δ]. Splits are by
-anchor date: train ≤ 2025-09, valid 2025-10 … 2026-01, test 2026-02 … 2026-07. Main scope is TH + VN (D1): SG labels are reported but
+anchor date with a 42-day purge gap: train ≤ 2025-09-15, valid 2025-10-27 … 2025-12-22, test 2026-02-02 … 2026-07-27. Main scope is TH + VN (D1): SG labels are reported but
 flagged REVIEW. Anchors are capped per country by hash rank (50 000 train, 15 000 valid, 50 000 test).
 
 Every model-generated table carries `fit_cutoff`, `source_ts_max` and `model_version` (D8) and is checked by QC-6: no row may read an
 event at or after its anchor, and no fit may use a cutoff later than the anchor. Learned candidate sources and signal models are
-refitted at 13 quarterly cutoffs (2023-07-01 … 2026-07-01) in every split; an anchor uses the latest cutoff ≤ t. Refitting only once
+refitted at 13 quarterly cutoffs (2023-07-01 … 2026-07-01) in every split; an anchor uses the latest cutoff ≤ t (`fig_pit_timeline`). Refitting only once
 at the end of train would leave 27 – 34 % of the test positives outside a 5 000-model universe that was 5 – 10 months old; quarterly
-refits halve that (DECISIONS, D8 revised). Rankers are trained once on train and selected on valid.
+refits halve that to 15.5 % (DECISIONS, D8 revised). Rankers are trained once on train and selected on valid.
 
-Hardware: one GH200 node (72 Arm cores, one H100-class GPU, shared). Deep models use mixed precision. Budget: 10 Optuna TPE trials per
-model with hyper-parameters, one seed (reduced run; the plan asked for 30 trials and three seeds).
+Hardware: one GH200 node (72 Arm cores, one H100-class GPU, shared). Deep models use bfloat16 mixed precision. Budget: 10 Optuna TPE trials per
+model with hyper-parameters (checked with 30 trials on the rankers), and three seeds for the final ranker fits.
 
 # IV. Unconditional evaluation protocol and error analysis
 
@@ -22,8 +21,8 @@ model with hyper-parameters, one seed (reduced run; the plan asked for 30 trials
 
 The evaluated unit is every used anchor with at least one non-returned purchase in (t, t + Δ]. Every purchase is a positive,
 including those outside the candidate list, which count as misses. Metrics are HR@10, NDCG@K, MRR@20 and Recall@K over all positives,
-plus recall_repeat@20 and recall_explore@20 (a repeat is a model the member bought before t; NBR reality check). Confidence intervals
-come from a bootstrap over members (1 000 resamples); model differences use a paired bootstrap over the same members.
+plus recall_repeat@20 and recall_explore@20 (a repeat is a model the member bought on or before t; NBR reality check). Confidence intervals
+come from a bootstrap over members (500 resamples); model differences use a paired bootstrap over the same members (1 000 resamples).
 
 ## B. The reference model under the new protocol (t28)
 

@@ -1,0 +1,733 @@
+\documentclass[jtehm]{ieeeaccess}
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setdefaultlanguage{vietnamese}
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{adjustbox}
+\hypersetup{hidelinks}
+\definecolor{accessblue}{cmyk}{1,0.3,0,0.2}
+\definecolor{greycolor}{cmyk}{0,0,0,0.8}
+\makeatletter
+\jtehmfalse
+\def\correspfont{\rmfamily\fontencoding{T1}\fontseries{n}\fontsize{7.7}{9.24}\selectfont}
+\def\tfootnotefont{\rmfamily\fontencoding{T1}\fontseries{n}\fontsize{7.7}{9.24}\selectfont}
+\def\abstractheadfont{\sffamily\fontencoding{T1}\fontseries{b}\fontsize{10}{12}\selectfont}
+\def\indexheadfont{\sffamily\fontencoding{T1}\fontseries{b}\fontsize{10}{12}\selectfont}
+\def\thetable{\@arabic\c@table}
+\setlength\titlewidth{152.83mm}
+\let\abstractwidth\titlewidth
+\advance\abstractwidth by -2.39mm
+\def\headerlogo{\raisebox{-2pt}{\includegraphics[width=7.61pc]{logo.png}}}
+\def\headerlogoall{\raisebox{-2pt}{\includegraphics[width=7.61pc]{notaglinelogo.png}}}
+\def\ps@titlepage{%
+  \def\@oddhead{\parbox[t]{\textwidth}{\mbox{}\\[-6.3mm]\mbox{}\nheaderfont\color{accessblue}\headName\hfill\headerlogo{\raisebox{-2pt}{\,}}\color{black}\vspace*{-1.5mm}\par\hrulefill}}
+  \def\@evenhead{\parbox[t]{\textwidth}{\mbox{}\\[-6.3mm]\mbox{}\headerlogo\hfill\nheaderfont\color{accessblue}\headName{\raisebox{-2pt}{\,}}\color{black}\vspace*{-1.5mm}\par\hrulefill}}
+   \def\@oddfoot{\raisebox{3pt}{%
+     \hbox to 0pc{\hbox to \textwidth{{\footervolfont \footerline}\hfill\mbox{}}}%
+     \hbox to 0pc{\hbox to \textwidth{\mbox{}\hfill{\footervolfont\@pubid}\hfill\mbox{}}}%
+     \hbox to 0pc{\hbox to \textwidth{\mbox{}\hfill{\footerpagefont\thepage}}}%
+     }}
+   \def\@evenfoot{\raisebox{3pt}{%
+     \hbox to 0pc{\hbox to \textwidth{{\footerpagefont\thepage}\hfill}\mbox{}}\hspace*{1.8pc}%
+     \hspace*{-1.8pc}\hbox to 0pc{\hbox to \textwidth{\mbox{}\hfill{\footervolfont\@pubid}\hfill\mbox{}}}%
+     \hbox to 0pc{\hbox to \textwidth{\mbox{}\hfill{\footervolfont \footerline}}}\hspace*{1.8pc}%
+   }}
+}
+\def\ps@headings{%
+   \def\@oddhead{\parbox[t]{\textwidth}{\mbox{}\\[-6.3mm]{\raisebox{-2pt}{\headerfont\rightmark}}\hfill\headerlogoall\mbox{}\vspace*{-1.5mm}\par\hrulefill}}
+   \def\@evenhead{\parbox[t]{\textwidth}{\mbox{}\\[-6.3mm]\mbox{}\headerlogoall\hfill{\raisebox{-2pt}{\headerfont\leftmark}}\vspace*{-1.5mm}\par\hrulefill}}
+   \def\@oddfoot{\raisebox{8pt}{%
+     \hbox to 0pc{\hbox to \textwidth{{\footervolfont \footerline}\hfill\mbox{}}}%
+     \hbox to 0pc{\hbox to \textwidth{\mbox{}\hfill{\footerpagefont\thepage}}}%
+     }}
+   \def\@evenfoot{\raisebox{8pt}{%
+     \hbox to 0pc{\hbox to \textwidth{{\footerpagefont\thepage}\mbox{}\hfill}}\hspace*{1.8pc}%
+     \hspace*{-1.8pc}\hbox to 0pc{\hbox to \textwidth{\mbox{}\hfill{\footervolfont \footerline}}}\hspace*{1.8pc}%
+   }}
+}
+\ps@headings
+\let\originalfontencoding\fontencoding
+\renewcommand{\fontencoding}[1]{%
+  \originalfontencoding{TU}}
+\makeatother
+\def\abstracttitle{{\color{accessblue}\abstractheadfont TÓM TẮT}\ifjtehm\quad\else\space\fi}
+\def\indextitle{{\color{accessblue}\indexheadfont TỪ KHÓA}\ifjtehm\quad\else\space\fi}
+\def\figurename{HÌNH}
+\def\tablename{BẢNG}
+\def\listfigurename{Danh sách hình}
+\def\listtablename{Danh sách bảng}
+\def\refname{TÀI LIỆU THAM KHẢO}
+\AtBeginDocument{%
+  \def\figurename{HÌNH}%
+  \def\tablename{BẢNG}%
+  \def\refname{TÀI LIỆU THAM KHẢO}%
+  \renewcommand\captionsvietnamese{%
+    \def\figurename{HÌNH}%
+    \def\tablename{BẢNG}%
+    \def\refname{TÀI LIỆU THAM KHẢO}%
+  }%
+}
+
+\graphicspath{{../../figures/ml/}{../../figures/}}
+
+% Headline numbers (test, TH + VN, Delta = 30, unconditional protocol). Every value comes from docs/report/tables/ml/;
+% update this block and the tables below when a rerun replaces a table.
+\newcommand{\nRefCond}{0.206}        % t28, P1-frozen, conditional NDCG@20
+\newcommand{\nRefUncond}{0.095}      % t28, P1-frozen, unconditional NDCG@20, TH + VN
+\newcommand{\nNoPosShare}{40.7}      % t28, % of anchors with no positive among the 200 candidates
+\newcommand{\nNoSource}{58}          % t28b, % of positives proposed by no source
+\newcommand{\nCandOld}{0.370}        % t30, R1-R5@200 coverage
+\newcommand{\nCandNew}{0.450}        % t30, candidates_v2 coverage
+\newcommand{\nExpOld}{0.307}         % t30, R1-R5@200 explore coverage
+\newcommand{\nExpNew}{0.400}         % t30, candidates_v2 explore coverage
+\newcommand{\nK}{300}                % candidate cap of candidates_v2
+\newcommand{\nBest}{0.1020}          % t31, best model on valid (P3 one head)
+\newcommand{\nTuned}{0.1011}         % t31, P1-tuned
+\newcommand{\nBaseline}{0.0788}      % t31, best next-basket baseline (TIFU-KNN)
+
+\def\footerline{IT2043 Advanced Machine Learning and Applications, báo cáo cuối kỳ, 2026}
+
+\begin{document}
+\history{Báo cáo cuối kỳ học phần Advanced Machine Learning and Applications (IT2043.26.1.CH.01), chương trình Thạc sĩ Công nghệ Thông tin,
+tháng 11 năm 2026. Mã nguồn: github.com/haiiyins/retail\_multidim\_pipeline}
+\doi{}
+
+\title{Đánh giá và cải thiện hệ thống gợi ý sản phẩm cá nhân hóa bằng học máy đa tín hiệu trên dữ liệu bán lẻ quy mô lớn}
+
+\author{\uppercase{Yen Phan}\authorrefmark{1,*}, \uppercase{Manh Le}\authorrefmark{1,*}, và
+\uppercase{Kha Nguyen}\authorrefmark{1,*}}
+\address[1]{University of Information Technology, Vietnam National University, Ho Chi Minh City, Vietnam}
+\address[*]{Tác giả liên hệ}
+
+\markboth
+{Y. Phan \headeretal: Đánh giá và cải thiện hệ thống gợi ý sản phẩm cá nhân hóa}
+{Y. Phan \headeretal: Đánh giá và cải thiện hệ thống gợi ý sản phẩm cá nhân hóa}
+
+\corresp{Tác giả liên hệ: Yen Phan (email: 26848274@grad.uit.edu.vn), Manh Le (email: 26848126@grad.uit.edu.vn) và
+Kha Nguyen (email: 26848091@grad.uit.edu.vn).}
+
+\begin{abstract}
+Một nhà bán lẻ đa kênh ghi nhận giao dịch mua, hành vi trên web và ứng dụng, giá, khuyến mãi, tồn kho và cửa hàng, nhưng vẫn thường đề xuất cùng một danh sách cho mọi người: sản phẩm bán chạy nhất hoặc những mặt hàng thành viên từng mua. Việc kết hợp các tín hiệu này thành danh sách cá nhân hóa hằng tuần gặp ba trở ngại: mỗi tín hiệu nằm trong một bảng riêng với mức độ chi tiết và mốc thời gian riêng; đặc trưng chỉ được dùng thông tin đã biết tại thời điểm tạo đề xuất; và cách chấm điểm ngoại tuyến thông thường bỏ qua những thành viên mà danh sách không tìm thấy sản phẩm đã mua. Trên 11 bản xuất vận hành của một nhà bán lẻ đồ thể thao đa quốc gia (66.1\,M dòng bán hàng, 1.0\,B sự kiện web, 4.7\,M thành viên có giao dịch), lakehouse Bronze / Silver / Gold với bảy cổng kiểm soát chất lượng xây dựng kho đặc trưng theo thời điểm, không có vi phạm rò rỉ dữ liệu. Trên nền tảng đó, hệ thống gợi ý hai giai đoạn dựa trên luật đạt normalized discounted cumulative gain tại 20 là \nRefCond{} khi chỉ chấm những thành viên có sản phẩm mua nằm trong danh sách ứng viên như thông lệ; nếu tính mọi giao dịch mua, điểm là \nRefUncond{}, còn \nNoSource{}\,\% tổng số sản phẩm mua trong tập kiểm tra (63.1\,\% số sản phẩm mua không nằm trong top 10) chưa từng được truy xuất, hầu hết là sản phẩm thành viên chưa mua trước đó.
+Vì vậy, chúng tôi xem truy xuất ứng viên là một mô hình: tám nguồn ứng viên học được, gồm autoencoder tuyến tính, random-walk, nearest-neighbour, two-tower và mô hình tuần tự self-attention, chỉ xét sản phẩm mới đối với thành viên; được huấn luyện lại theo quý trong mỗi phân hoạch, tối ưu theo mức tăng độ bao phủ khám phá và kết hợp bằng bộ trộn hạn ngạch thứ hạng với giới hạn \nK{} ứng viên. Độ bao phủ tăng từ \nCandOld{} lên \nCandNew{}. Với ngân sách tinh chỉnh đồng nhất 10 lượt cho mọi mô hình có thể tinh chỉnh, chúng tôi so sánh bộ xếp hạng gradient-boosted đã tinh chỉnh, biến thể stacking và bộ xếp hạng đa nhiệm sâu có các đầu repeat và explore cùng cổng học được trên tập chung 300 ứng viên với năm họ mô hình cơ sở next-basket dùng danh sách ứng viên riêng. Mọi bộ xếp hạng hai giai đoạn đều vượt mô hình cơ sở mạnh nhất hơn một phần tư. So với bộ xếp hạng cơ sở trên cùng ứng viên, đặc trưng mới đóng góp khoảng 70\,\% mức cải thiện, tinh chỉnh siêu tham số đóng góp phần còn lại; họ mô hình đóng góp ít nhất: mô hình sâu chỉ cải thiện khoảng một phần trăm so với cây đã tinh chỉnh ở dạng một đầu ra, trong khi ở dạng hai đầu ra, cổng học được tốt hơn cổng cố định dựa trên tỷ trọng lịch sử; việc tách rõ đầu repeat/explore không đem lại lợi ích so với một đầu ra. Khi chỉ dùng các đặc trưng có thể suy ra từ nhật ký mua hàng, quy trình vẫn giữ được khoảng bốn phần năm mức cải thiện so với các luật tần suất nhà bán lẻ đang dùng; các chiều dữ liệu khác đóng góp phần còn lại, chủ yếu ở sản phẩm mới. Một nghiên cứu có kiểm soát xác nhận stacking ngây thơ làm phóng đại các chỉ số trong mẫu huấn luyện.
+\end{abstract}
+
+\begin{keywords}
+Lakehouse dữ liệu, phương pháp đánh giá, gradient boosting, learning to rank, học đa nhiệm, gợi ý giỏ hàng kế tiếp, hệ thống gợi ý,
+phân tích bán lẻ, truy xuất hai giai đoạn.
+\end{keywords}
+
+\titlepgskip=-15pt
+
+\makeatletter
+\def\maketitle{\twocolumn[\thispagestyle{titlepage}\@maketitle
+\vskip 0.3\baselineskip plus 0.1\baselineskip minus 0.1\baselineskip
+\vspace*{-1pt}\vspace*{-24pt}]}
+\def\PARstart#1#2{\par\noindent\setbox0=\hbox{\bfseries\fontsize{26}{26}\selectfont\MakeUppercase{#1}\hspace{0.15em}}%
+\hangindent=\wd0\hangafter=-2\makebox[0pt][l]{\hspace{-\wd0}\raisebox{-1.05\baselineskip}[0pt][0pt]{\box0}}\MakeUppercase{#2}}
+\makeatother
+
+\maketitle
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Giới thiệu}
+\label{sec:introduction}
+
+\PARstart{M}{ột} nhà bán lẻ đa kênh nắm nhiều thông tin về thành viên thân thiết: họ đã mua và trả lại những gì, đã xem gì trên website và ứng dụng, họ quan tâm đến môn thể thao nào, cũng như giá, khuyến mãi, tồn kho và mùa vụ của từng sản phẩm. Tuy vậy, danh sách mỗi thành viên nhìn thấy thường giống nhau: các sản phẩm bán chạy toàn quốc hoặc lời nhắc mua lại những món họ từng mua. Mục tiêu kinh doanh của nghiên cứu này là tạo danh sách top-$K$ cá nhân hóa cho mỗi thành viên mỗi tuần, đồng thời đo lường trung thực chất lượng của danh sách đó.
+
+Ba trở ngại ngăn dữ liệu thô trở thành danh sách gợi ý. \emph{Dữ liệu}: mỗi tín hiệu nằm trong bảng vận hành riêng, có mức độ chi tiết, khóa và mốc thời gian riêng; riêng luồng nhấp chuột đã có một tỷ sự kiện. \emph{Thời điểm}: đặc trưng chỉ được sử dụng thông tin đã biết trước lúc tạo gợi ý, nếu không điểm ngoại tuyến sẽ hứa hẹn mức tăng biến mất khi triển khai. \emph{Đo lường}: điểm số chỉ tính ở những nơi danh sách ứng viên đã chứa sản phẩm được mua không cho biết gì về các thành viên bị bỏ sót.
+
+\textit{Bài toán.} Với thành viên $u$ tại mốc neo $t$ (một ngày thứ Hai), dự đoán các model sản phẩm mà $u$ mua trong $(t, t+30]$ dưới dạng danh sách top-$K$ có thứ tự; một kết quả đúng là model được mua và không bị trả lại, mọi đặc trưng chỉ sử dụng dữ liệu ghi nhận trước $t$. Mô hình cơ sở tự nhiên là hệ thống gợi ý hai giai đoạn dựa trên luật: năm luật ứng viên viết thủ công (R1 mua lại, R2 đồng mua, R3 ngành hàng trên web, R4 môn thể thao $\times$ ưu đãi, R5 sản phẩm bán chạy toàn quốc) đề xuất 200 model cho mỗi mốc neo (thành viên, thứ Hai), sau đó bộ xếp hạng LightGBM LambdaRank~\cite{ke2017lightgbm,burges2010lambdamart} (P1), được tinh chỉnh một lần trên 73 đặc trưng cặp Gold, sắp thứ tự chúng. Theo cách chấm điểm thông thường, chỉ trên các mốc neo có sản phẩm mua trong danh sách, hệ thống đạt normalized discounted cumulative gain NDCG@20 là \nRefCond{}. Khi tính mọi mốc neo có giao dịch mua và xem sản phẩm ngoài danh sách là bỏ lỡ, cùng mô hình đạt 0.090 (TH + VN: \nRefUncond{}), còn \nNoPosShare{}\,\% mốc neo hoàn toàn không có sản phẩm mua trong danh sách. Khoảng cách đó là vấn đề nghiên cứu.
+
+Nghiên cứu này xây dựng nền tảng dữ liệu trước, sau đó đo lường giá trị của từng bước mô hình hóa. Nghiên cứu chuyển 11 bản xuất vận hành thành lakehouse được kiểm soát rò rỉ dữ liệu, mô hình hóa lại bài toán gợi ý giỏ hàng kế tiếp (NBR) thành bài toán hai giai đoạn trong đó truy xuất là một mô hình có mục tiêu riêng, đồng thời so sánh cây gradient-boosted (GBDT), biến thể stacking và bộ xếp hạng đa nhiệm sâu với các mô hình cơ sở NBR mạnh trong cùng danh sách ứng viên, quy trình đánh giá và ngân sách tinh chỉnh. Các câu hỏi nghiên cứu được nêu dưới dạng câu hỏi, không mặc định thứ hạng kỳ vọng, bởi GBDT chiến thắng cũng là một kết quả hợp lệ~\cite{grinsztajn2022tabular}:
+\begin{itemize}
+\item \textbf{RQ1 (dữ liệu).} Liệu 11 bản xuất vận hành thô có thể trở thành kho đặc trưng theo thời điểm, không rò rỉ dữ liệu, ở mức thành viên--tuần trên một máy hay không, và kho đó cung cấp gì cho các mô hình?
+\item \textbf{RQ2 (truy xuất).} Khi tính mọi giao dịch mua, mô hình cơ sở dựa trên luật thất bại ở đâu; các nguồn ứng viên học được cải thiện candidate recall và độ bao phủ explore so với R1--R5 bao nhiêu, với chi phí nào, và bao nhiêu mức tăng đó chuyển thành NDCG@20 khi giữ nguyên bộ xếp hạng?
+\item \textbf{RQ3 (xếp hạng và tinh chỉnh).} Trên cùng ứng viên và ngân sách, bộ xếp hạng nào tốt nhất (GBDT đã tinh chỉnh, stacking, bộ xếp hạng đa nhiệm sâu với các đầu repeat và explore, các mô hình cơ sở NBR), và mức cải thiện đến từ đặc trưng, tinh chỉnh siêu tham số và họ mô hình lần lượt là bao nhiêu?
+\item \textbf{RQ4 (giá trị).} Hệ thống tốt nhất vượt trội bao nhiêu lần so với ``sản phẩm bán chạy'' và ``mua lại món cũ'', cho đối tượng nào, với chi phí tính toán ra sao, thu được bao nhiêu giá trị mua hàng (ước lượng ngoại tuyến), và bao nhiêu phần trong mức cải thiện đó cần đến dữ liệu ngoài lịch sử mua hàng?
+\item \textbf{H1 (giả thuyết).} Stacking ngây thơ làm phóng đại các chỉ số trên mốc neo huấn luyện và giả kiểm tra so với quy trình cuốn chiếu; trên tập kiểm tra thực, khoảng cách thu hẹp nhưng không biến mất.
+\end{itemize}
+
+Các đóng góp gồm: (1) lakehouse Bronze / Silver / Gold với bảy cổng kiểm soát chất lượng và sổ theo dõi thời điểm, chuyển các bản xuất thành đầu vào mô hình mà không có vi phạm rò rỉ dữ liệu; (2) quy trình đánh giá không điều kiện với phân tách repeat / explore và phân rã lỗi ở cấp sản phẩm, xác định \nNoSource{}\,\% tổng số sản phẩm mua trong tập kiểm tra (63.1\,\% số sản phẩm bị bỏ lỡ ngoài top 10) là lỗi truy xuất thay vì xếp hạng; (3) tầng truy xuất chỉ dành cho explore với tám nguồn học được, huấn luyện lại theo quý trong mỗi phân hoạch và kết hợp bằng bộ trộn hạn ngạch thứ hạng; (4) so sánh có kiểm soát P1-tuned, P2 và P3 trên tập chung 300 ứng viên cùng năm họ mô hình cơ sở NBR trên danh sách ứng viên riêng, tách biệt ảnh hưởng của đặc trưng, tinh chỉnh và họ mô hình, đồng thời đo lường rò rỉ stacking (ngây thơ, cuốn chiếu, rò rỉ); và (5) bản minh họa tĩnh có biện pháp bảo vệ quyền riêng tư, trình bày cả kết quả chấm điểm theo lô của mô hình tốt nhất trên thành viên thật đã ẩn danh.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Các công trình liên quan}
+\label{sec:related}
+
+\textit{Lakehouse và kiểm soát rò rỉ dữ liệu.} Kiến trúc lakehouse~\cite{armbrust2021lakehouse} dùng các tệp cột mở làm tầng lưu trữ, phía trên là bảng được quản lý và các phép biến đổi; DuckDB~\cite{raasveldt2019duckdb} thực thi SQL phân tích trong tiến trình trên một máy. Rò rỉ dữ liệu—đặc trưng sử dụng thông tin chưa có tại thời điểm dự đoán—là nguyên nhân phổ biến làm kết quả học máy ứng dụng bị thổi phồng và không thể tái lập~\cite{kapoor2023leakage}; chúng tôi kiểm tra vấn đề này tại mọi mốc neo.
+
+\textit{Gợi ý giỏ hàng kế tiếp.} Nghiên cứu kiểm chứng thực tế của Li và cộng sự~\cite{li2023nbr} cho thấy các giao dịch mua lặp lại chi phối những chỉ số NBR phổ biến và các mô hình cơ sở tần suất đơn giản (P-TopFreq, GP-TopFreq) khó bị vượt qua; nghiên cứu đó giới thiệu cách tách recall repeat / explore được dùng ở đây. TIFU-KNN~\cite{hu2020tifu} mô hình hóa tần suất mua sản phẩm cá nhân bằng suy giảm theo thời gian và làm trơn theo láng giềng. Nhìn chung, các mô hình cơ sở đơn giản được tinh chỉnh cẩn thận thường đạt kết quả ngang với hệ thống gợi ý thần kinh gần đây~\cite{dacrema2019progress}.
+
+\textit{Truy xuất dựa trên sản phẩm và đồ thị.} EASE~\cite{steck2019ease} là autoencoder tuyến tính có nghiệm dạng đóng; RP3beta~\cite{paudel2017rp3beta} tái trọng số random walk theo độ phổ biến của sản phẩm; item2vec~\cite{barkan2016item2vec} học embedding đồng xuất hiện.
+
+\textit{Truy xuất thần kinh và mô hình tuần tự.} Mô hình two-tower~\cite{yi2019twotower} chấm điểm người dùng và sản phẩm trong không gian chung bằng softmax trên các sản phẩm; SASRec~\cite{kang2018sasrec} áp dụng causal self-attention~\cite{vaswani2017attention} lên chuỗi hành vi, gSASRec~\cite{petrov2023gsasrec} khắc phục độ tự tin quá mức khi lấy mẫu âm, còn PinnerFormer~\cite{pancha2022pinnerformer} huấn luyện trên mục tiêu dày đặc bao gồm mọi hành động trong cửa sổ tương lai. DIN~\cite{zhou2018din} bổ sung attention mục tiêu, trong đó ứng viên chú ý lên chuỗi hành vi.
+
+\textit{Xếp hạng đa nhiệm và nhận biết mua lặp lại.} MMoE~\cite{ma2018mmoe} dùng cổng để chia sẻ các expert theo từng tác vụ. Các hệ thống gợi ý nhận biết mua lặp lại tách chế độ repeat và explore (RepeatNet~\cite{ren2019repeatnet}, ReCANet~\cite{ariannezhad2022recanet}). P3 của chúng tôi điều khiển hai đầu ra xếp hạng danh sách bằng xác suất học được ở cấp thành viên.
+
+\textit{Rò rỉ trong stacking.} Huấn luyện out-of-fold hoặc cuốn chiếu theo thời gian là thông lệ với mô hình stacking~\cite{wolpert1992stacking}; chúng tôi đo trực tiếp mức phóng đại khi khớp trên chính mẫu huấn luyện.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Nền tảng dữ liệu}
+\label{sec:data}
+
+Phần này trả lời RQ1: dữ liệu xuất thô được chuyển thành đầu vào mô hình như thế nào và sau xử lý, mô hình nhận được gì. Hình~\ref{fig:overview} trình bày tổng quan.
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.95\textwidth]{architecture_overview.png}{Nền tảng dữ liệu: các tầng Bronze, Silver và Gold của lakehouse DuckDB, cùng các cổng kiểm soát chất lượng QC-1 đến QC-7 trên mọi tầng.\label{fig:overview}}
+
+\subsection{Nguồn dữ liệu}
+Tập dữ liệu là bản xuất của 11 bảng vận hành tại Singapore (SG), Thái Lan (TH) và Việt Nam (VN) từ 2023-01 đến 2026-10, tổng dung lượng thô khoảng 230\,GB: giao dịch (89.3\,M dòng bán, hủy và trả hàng; 29.7\,M dòng thanh toán; 63.0\,M liên kết giao dịch--thành viên), dữ liệu chủ (5.7\,M tài khoản khách hàng thân thiết, 4.4\,M SKU, 275 cửa hàng và website, một lịch), chuỗi giá và tồn kho (42.4\,M và 36.7\,M dòng), 0.8\,M sự kiện về môn thể thao yêu thích và 999.7\,M sự kiện web, ứng dụng trong 1\,774 phần. Mỗi bảng có mức độ chi tiết, khóa và mốc thời gian riêng. Chúng tôi chỉ biến đổi dữ liệu sau khi đo lường các giả định: quét toàn bộ tệp đã phát hiện những vấn đề chi phối quy trình, gồm 9.5\,\% dòng bán hàng trùng do các bản trích xuất chồng lặp, giao dịch hủy được ghi thành dòng riêng và làm giá trị bán ròng bằng không, thời gian bán hàng dùng giờ địa phương trong khi dấu thời gian phiên bản dùng UTC, chỉ 34\,\% sự kiện web có thông tin thành viên, bảng tồn kho chỉ theo dõi phụ tùng (do đó tắt tín hiệu tồn kho), và danh mục có cả đồ trưng bày cửa hàng lẫn túi vận chuyển.
+
+\subsection{Xử lý qua các tầng}
+\textit{Bronze lưu giữ.} Hợp đồng dữ liệu của mỗi bảng khai báo khóa, các cột bắt buộc, kiểu của khóa nối và cách phân hoạch. Bộ nạp ghi dữ liệu thành Parquet nén ZSTD, phân hoạch theo quốc gia, năm và tháng (127\,GB; nạp toàn bộ trong 1\,h\,51\,min, riêng luồng nhấp chuột mất 87\,min); các dòng bộ phân tích cú pháp không đọc được được chuyển vào bảng cách ly kèm lý do thay vì bị loại bỏ (65 dòng).
+
+\textit{Silver hiệu chỉnh.} Mười lăm mô hình dbt làm sạch và chuẩn hóa dữ liệu, mỗi vấn đề dùng một kỹ thuật: loại trùng theo phiên bản và tính doanh số ròng có dấu bằng bán $-$ hủy theo giao dịch và sản phẩm, trạng thái được suy ra từ số tiền ròng; chuyển thời gian UTC qua múi giờ của từng đơn vị, loại bỏ độ lệch bảy giờ ở các dòng trực tuyến; quy đổi sang EUR; tạo cầu nối thành viên (mỗi giao dịch gắn với một thành viên, loại tài khoản nhân viên và doanh nghiệp); ánh xạ SKU $\to$ model; xác định khoảng giá toàn quốc cho từng SKU; suy ra lịch bán hàng từ các đỉnh tỷ trọng khuyến mãi kết hợp ngày lễ (SG 53, TH 106, VN 58 ngày); và liên kết định danh cookie web với thành viên qua đơn hàng web và đăng nhập, có hiệu lực trong phạm vi $\pm 90$ ngày quanh thời điểm liên kết. Có 5.58\,M dòng sau tính giá trị ròng bị từ chối theo một trong sáu lý do (chủ yếu là hàng phi thương mại và đơn bị hủy) và được giữ trong vùng cách ly.
+
+\textit{Gold tôn trọng thời gian.} Tám mô hình Gold tạo lưới mốc neo (các ngày thứ Hai sau lần mua thứ hai của thành viên), ba thực thể đặc trưng: thành viên tại $t$ (độ mới, tần suất, giá trị tiền tệ, hồ sơ giá, hoạt động web), model $\times$ quốc gia tại $t$ (giá, khuyến mãi, mùa vụ, độ phổ biến; 4.29\,M dòng) và cặp $(u, m, t)$ (lịch sử cá nhân và ngành hàng, đồng mua, ý định trên web), các ứng viên theo luật R1--R5 và nhãn: mọi model được mua, không bị trả lại trong $(t, t+\Delta]$, với $\Delta = 30$ ngày ($\Delta = 90$ là nhãn bổ trợ). Giá tại mốc neo lấy từ phép nối ASOF trên các khoảng thời gian SKU. Mọi đặc trưng chỉ đọc dữ liệu được ghi nhận trước mốc neo; một sự kiện web chỉ được tính nếu liên kết với thành viên đã được biết tại mốc đó.
+
+\textit{Cổng chất lượng.} Bảy kiểm tra được chạy xuyên các tầng: khóa null (QC-1), toàn vẹn tham chiếu (QC-2), miền giá trị (QC-3), tính duy nhất (QC-4), biến động khối lượng (QC-5), tính đúng thời điểm (QC-6: sáu kiểm thử đơn và sổ rò rỉ ghi lại mọi dòng vi phạm) và đối soát batch--stream cho luồng streaming tùy chọn (QC-7). Ba mươi mốt mô hình dbt có 182 kiểm thử thuộc năm tầng.
+
+\subsection{Sau xử lý}
+Bảng fact giữ 66.1\,M dòng bán ròng trong tổng số 89.3\,M dòng thô, thuộc 26.3\,M giao dịch của 4.7\,M thành viên có giao dịch mua. Ghép nối định danh làm tăng tỷ lệ sự kiện web liên kết với thành viên thêm 6--8 điểm (SG từ 36 lên 42\,\%, TH từ 34 lên 40\,\%, VN từ 30 lên 38\,\%). Cả 64 kiểm thử Gold đều đạt và sổ QC-6 ghi nhận không có vi phạm theo thời điểm ở cả ba quốc gia. Các ngưỡng đạt / không đạt theo quốc gia và năm gồm tỷ lệ liên kết thành viên ($\ge 60\,\%$), khớp sản phẩm ($\ge 95\,\%$), độ bao phủ giá ($\ge 90\,\%$) và số thành viên có từ hai giao dịch trở lên ($\ge 20\,000$) (Bảng~\ref{tab:gates}): TH và VN đạt mọi năm và tạo thành tập đánh giá chính; SG được xử lý đầy đủ nhưng gắn nhãn REVIEW vì tỷ lệ liên kết thành viên thấp và nhãn thiếu các lần mua lặp lại của giao dịch không được liên kết. Trừ khi có ghi chú khác, mọi số liệu dưới đây thuộc tập test, TH + VN, $\Delta = 30$.
+
+\begin{table}[t]
+\caption{Ngưỡng đạt / không đạt theo quốc gia và năm (QC-2 đến QC-4) cùng tỷ lệ giao dịch được liên kết với thành viên.}
+\label{tab:gates}
+\setlength{\tabcolsep}{4pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lccccr}
+\toprule
+Quốc gia & 2023 & 2024 & 2025 & 2026 & liên kết thành viên \\
+\midrule
+TH & PASS   & PASS   & PASS & PASS   & 86--100\,\% \\
+VN & PASS   & PASS   & PASS & PASS   & 62--76\,\% \\
+SG & REVIEW & REVIEW & PASS & REVIEW & 50--64\,\% \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Đầu vào mô hình và các tập phân hoạch}
+Đơn vị dự đoán là một cặp (thành viên, ngày thứ Hai mốc neo). Các tập được phân hoạch theo ngày mốc neo với khoảng loại bỏ 42 ngày: train đến 2025-09-15, mốc neo valid từ 2025-10-27 đến 2025-12-22, mốc neo test từ 2026-02-02 đến 2026-07-27. Số mốc neo mỗi quốc gia được giới hạn theo thứ hạng hash (50\,000 train, 15\,000 valid, 50\,000 test).
+
+Mọi bảng do mô hình tạo ra đều mang mốc cắt huấn luyện, dấu thời gian mới nhất của nguồn dữ liệu đã đọc và phiên bản mô hình; QC-6 kiểm tra các bảng này: không dòng nào được đọc sự kiện tại hoặc sau mốc neo và không phép huấn luyện nào được dùng mốc cắt muộn hơn mốc neo. Các nguồn ứng viên và mô hình tín hiệu học được huấn luyện lại tại 13 mốc quý (2023-07-01 đến 2026-07-01) trong mọi phân hoạch; mỗi mốc neo dùng mốc cắt mới nhất thỏa $\le t$. Nếu chỉ huấn luyện một lần vào cuối tập train, 27--34\,\% sản phẩm kiểm tra sẽ nằm ngoài vũ trụ 5\,000 model đã cũ 5--10 tháng; huấn luyện lại theo quý giảm một nửa tỷ lệ này, còn 15.5\,\% (TH + VN, Mục~\ref{sec:retrieval}). Mô hình được khớp tại mốc cắt nằm trong valid hoặc test sẽ đọc các giao dịch mua của phân hoạch đó trước mốc cắt; vì vậy khoảng cách loại bỏ 42 ngày ngăn các phân hoạch giao nhau đối với bộ xếp hạng nhưng không ngăn với nguồn ứng viên và tín hiệu; biện pháp bảo vệ của chúng là quy tắc theo thời điểm nêu trên. Mỗi quốc gia có nguồn, vũ trụ và lịch sử riêng: không đọc giao dịch mua của thành viên tại quốc gia khác. Bộ xếp hạng chỉ được huấn luyện một lần trên train và chọn trên valid. Hình~\ref{fig:arch} minh họa hệ thống hai giai đoạn được xây dựng từ các đầu vào này; Hình~\ref{fig:pit_timeline} đối chiếu lịch huấn luyện lại cuốn chiếu theo quý của nguồn truy xuất và tín hiệu stacking với lần khớp duy nhất trên tập train của bộ xếp hạng.
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_arch.png}{Hệ thống hai giai đoạn. Các nguồn ứng viên và mô hình tín hiệu được huấn luyện lại tại mốc cắt theo quý trước các mốc neo cần chấm điểm; bộ xếp hạng chỉ được khớp một lần trên train.\label{fig:arch}}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.95\textwidth]{fig_pit_timeline.png}{Quy trình phân hoạch theo thời gian: khoảng loại bỏ 42 ngày giữa các tập mốc neo; 13 mốc cắt cuốn chiếu theo quý cho nguồn truy xuất học được (R6--R13) và tín hiệu stacking P2; bộ xếp hạng (P1, P2, P3) chỉ được khớp một lần trên tập train; các ràng buộc theo thời điểm này được QC-6 kiểm tra.\label{fig:pit_timeline}}
+
+Lakehouse (DuckDB 2.0, dbt 1.12) chạy trên một máy: một quốc gia trên laptop, cả ba quốc gia trên máy chủ 16 luồng bằng cùng các câu lệnh. Các mô hình chạy trên một nút GH200 dùng chung (72 lõi Arm và một GPU cấp Hopper); mô hình sâu dùng độ chính xác hỗn hợp bfloat16. Mọi mô hình có siêu tham số đều nhận cùng ngân sách 10 lượt thử Optuna~\cite{akiba2019optuna} TPE~\cite{bergstra2011tpe} trên valid; để kiểm tra, các bộ xếp hạng được tinh chỉnh lại với 30 lượt (Mục~\ref{sec:results}) và phép khớp cuối cùng được lặp lại với ba seed.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Đánh giá không điều kiện và phân tích lỗi}
+\label{sec:protocol}
+
+Sau khi cố định đầu vào, nửa đầu RQ2 tìm hiểu mô hình cơ sở dựa trên luật thất bại ở đâu khi tính mọi giao dịch mua.
+
+\subsection{Quy trình đánh giá}
+Đơn vị đánh giá là mỗi mốc neo $a$ được sử dụng có ít nhất một sản phẩm mua và không bị trả lại trong $(t, t+\Delta]$; tập dương tính $P_a$ gồm mọi sản phẩm mua đó, kể cả sản phẩm ngoài danh sách ứng viên $C_a$ (được xếp dưới mọi ứng viên) và sản phẩm ngoài lưới model theo từng mốc neo dùng để lọc mọi danh sách ứng viên (0.04\,\% số dương tính). Với $L_a^K$ là $K$ sản phẩm đầu của danh sách đã xếp hạng,
+\begin{equation}
+\mathrm{Recall}@K = \frac{|P_a \cap L_a^K|}{|P_a|},
+\end{equation}
+\begin{equation}
+\mathrm{NDCG}@K = \frac{\sum_{k=1}^{K} \mathbf{1}[\ell_k \in P_a] / \log_2(k+1)}{\sum_{k=1}^{\min(K, |P_a|)} 1/\log_2(k+1)},
+\end{equation}
+Trong đó $\ell_k$ là sản phẩm ở thứ hạng $k$, do đó mức tăng lý tưởng tính mọi sản phẩm dương tính, dù có được truy xuất hay không~\cite{jarvelin2002ndcg}. Một sản phẩm dương tính được xem là \emph{repeat} nếu thành viên đã mua model đó vào hoặc trước $t$, và là \emph{explore} nếu ngược lại~\cite{li2023nbr} (đặc trưng chỉ đọc dữ liệu trước $t$; giao dịch vào đúng thứ Hai mốc neo tạo nên 0.3\,\% số repeat); recall\_repeat@20 và recall\_explore@20 được lấy trung bình trên các mốc neo có dương tính thuộc nhóm tương ứng. Chúng tôi cũng báo cáo HR@10 (có ít nhất một kết quả đúng trong top 10) và candidate recall (tỷ lệ dương tính xuất hiện ở bất kỳ vị trí nào trong $C_a$). Các chỉ số là trung bình theo thành viên; khoảng tin cậy lấy từ bootstrap trên thành viên~\cite{efron1993bootstrap} (500 mẫu lặp), còn chênh lệch mô hình lấy từ bootstrap ghép cặp trên cùng thành viên (1\,000 mẫu lặp).
+
+\subsection{Mô hình cơ sở dựa trên luật theo quy trình mới}
+Bảng~\ref{tab:t28} đặt hai quy trình cạnh nhau. Quy trình có điều kiện loại bỏ các mốc neo mà danh sách không chứa sản phẩm mua (\nNoPosShare{}\,\% số mốc neo có giao dịch mua trên cả ba quốc gia, 38.8\,\% tại TH + VN), khiến chỉ số nổi bật tăng gấp đôi.
+
+\begin{table}[t]
+\caption{P1-frozen theo quy trình có điều kiện và không điều kiện (test, $\Delta = 30$).}
+\label{tab:t28}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrrrr}
+\toprule
+Quy trình, phạm vi & mốc neo & NDCG@20 & HR@10 & rec.\ rep. & rec.\ exp. & ứng viên \\
+\midrule
+có điều kiện, TH + VN   & 25\,538 & 0.206 & 0.368 & 0.826 & 0.218 & 1.000 \\
+không điều kiện, TH + VN & 41\,734 & \textbf{0.095} & 0.225 & 0.824 & 0.073 & 0.370 \\
+không điều kiện, tất cả     & 63\,574 & 0.090 & 0.217 & 0.797 & 0.065 & 0.351 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Lỗi phát sinh ở đâu}
+Mỗi trong số 213\,289 sản phẩm dương tính của tập kiểm tra được xếp vào một nhóm: nằm trong top 10, xếp sau hạng 10, được nguồn đề xuất nhưng bị cắt bởi giới hạn 200, hoặc không được nguồn nào đề xuất (Bảng~\ref{tab:t28b}, Hình~\ref{fig:t28b}).
+
+\begin{table}[t]
+\caption{Phân bố sản phẩm dương tính của tập kiểm tra với P1-frozen trên ứng viên R1--R5 (tỷ lệ trên tổng dương tính).}
+\label{tab:t28b}
+\setlength{\tabcolsep}{4pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrrr}
+\toprule
+ & dương tính & top 10 & hạng 11+ & bị cắt & không nguồn \\
+\midrule
+repeat  & 18\,251  & 0.654 & 0.332 & 0.013 & 0.002 \\
+explore & 195\,038 & 0.028 & 0.227 & 0.111 & 0.634 \\
+tất cả  & 213\,289 & 0.082 & 0.236 & 0.103 & 0.580 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_t28b_errors.png}{Vị trí của các sản phẩm dương tính trong tập kiểm tra của mô hình cơ sở dựa trên luật.\label{fig:t28b}}
+
+Nhóm repeat phần lớn đã được xử lý; explore chiếm 91\,\% số dương tính và 74.5\,\% trong đó không đến được bộ xếp hạng. Trong các dương tính bị cắt, 95\,\% đến từ R5 (top 300 toàn quốc), trong đó các thứ hạng thấp hơn không vừa giới hạn. Các dương tính không có nguồn thuộc nhóm phổ biến trung bình chứ không phải đuôi dài: 95\,\% có thứ hạng phổ biến từ 301 đến 5\,000 tại mốc neo. Nguồn học được trên vũ trụ 5\,000 model của từng quốc gia có thể tiếp cận phần lớn chúng, nhưng vũ trụ được cố định tại mốc cắt theo quý chứ không phải mốc neo: vũ trụ chứa 84.5\,\% dương tính kiểm tra (TH + VN, 83.4\,\% nhóm explore), là mức trần của mọi nguồn học được (Bảng~\ref{tab:t28c}). R4 (môn thể thao $\times$ ưu đãi, recall 0.0002) bị loại bỏ: chỉ 1.07\,\% mốc neo có môn thể thao yêu thích. Những phát hiện này định hướng Mục~\ref{sec:retrieval}.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Truy xuất học được (RQ2)}
+\label{sec:retrieval}
+
+\subsection{Các nguồn}
+R1 (mua lại) đã chứa 99.7\,\% dương tính repeat, vì vậy mọi nguồn học được chỉ dành cho \emph{explore}: nguồn loại bỏ các model thành viên đã mua trước mốc neo và được tinh chỉnh theo độ bao phủ explore mà nó \emph{bổ sung} vào R1--R5@200 trên valid ($\Delta$ cand\_explore của hợp), chứ không theo recall riêng. Mỗi nguồn được khớp riêng cho từng quốc gia tại mỗi mốc cắt theo quý, trên top 5\,000 model theo số người mua trong 365 ngày trước đó, và đề xuất 100 ứng viên cho mỗi mốc neo (Bảng~\ref{tab:sources}). Với 5\,000 model mỗi quốc gia, tích ma trận chính xác trên GPU thay cho chỉ mục nearest-neighbour xấp xỉ.
+
+Hai nguồn thần kinh được điều chỉnh cho bài toán này; cả tám nguồn đại diện cho các cơ chế truy xuất khác nhau trên vũ trụ 5\,000 model tại mốc cắt:
+\begin{itemize}
+\item \textbf{Tuyến tính item--item và hồi quy theo cửa sổ (R6 EASE, R11 explin).} EASE~\cite{steck2019ease} tạo ma trận nhị phân thành viên $\times$ vũ trụ $X$ trong 730 ngày trước mốc cắt và giải autoencoder dạng đóng $P = (X^\top X + \lambda I)^{-1}$, $B = -P / \mathrm{diag}(P)$ với $\mathrm{diag}(B) = 0$, rồi chấm điểm lịch sử nhị phân trước mốc neo của thành viên bằng $s = xB$. Trong khi EASE tái tạo các lần đồng mua trước đây, R11 (\emph{explin}) khớp hồi quy ridge có giám sát $W = (X^\top X + \lambda I)^{-1} X^\top Y$ trực tiếp từ lịch sử suy giảm theo thời gian trước các ngày tham chiếu $t$ ($0.5^{\Delta d / h}$ cho lần mua mới nhất của mỗi model) đến vector nhị phân $Y$ biểu thị giao dịch explore trong $(t, t+\Delta]$ (tối đa ba ngày tham chiếu mỗi thành viên và $2\cdot 10^6$ dòng, với $t+\Delta < c$).
+\item \textbf{Embedding chuỗi và random walk đồ thị (R7 item2vec, R12 RP3beta).} R7 huấn luyện skip-gram với lấy mẫu âm~\cite{barkan2016item2vec} trên chuỗi giao dịch theo thời gian của từng thành viên trước mốc cắt ($d=64$, cửa sổ 10, 10 mẫu âm, 5 epoch), biểu diễn thành viên tại $t$ bằng trung bình vector sản phẩm đã mua có suy giảm hàm mũ ($0.5^{\Delta d / h}$), rồi truy xuất bằng độ tương đồng cosine chính xác. R12 (\emph{RP3beta}~\cite{paudel2017rp3beta}) tính chuyển tiếp ba bước trên đồ thị hai phía $W_{ij} = \mathrm{deg}(i)^{-\alpha}\bigl(\sum_u x_{ui}x_{uj}\mathrm{deg}(u)^{-\alpha}\bigr)\mathrm{deg}(j)^{-\beta}$ với $\mathrm{diag}(W)=0$, dùng $\beta$ để giảm ảnh hưởng của các nút phổ biến.
+\item \textbf{Láng giềng gần suy giảm theo thời gian (R8 TIFU-KNN).} Theo~\cite{hu2020tifu}, các ngày mua của thành viên trước $t$ được sắp từ mới đến cũ rồi chia thành nhóm $m=7$; giỏ hàng $b$ nhận trọng số $r_g^{\lfloor b/m \rfloor} r_b^{b \bmod m} / m$ để tạo vector cá nhân $u$, sau đó kết hợp thành $\alpha u + (1-\alpha)\bar{u}_{\mathcal{N}_k(u)}$ với $k$ láng giềng cosine gần nhất trong số tối đa 300\,000 thành viên hoạt động tại mốc cắt.
+\item \textbf{Two-tower và Transformer giỏ hàng nhân quả (R9, R10).} Mô hình two-tower (R9) mã hóa 50 token mua gần nhất (model ngoài vũ trụ được ánh xạ thành token OOV) bằng Transformer hai chiều (2 block, 2 head), nối masked mean pooling với số đếm RFM đã co giãn logarit và embedding tháng; mô hình chấm điểm biểu diễn sản phẩm đã chuẩn hóa (embedding dùng chung cho model, ngành hàng thể thao và phân vị giá) sau khi nhân với nhiệt độ học được $\tau$. Tối đa bốn ngày tham chiếu mỗi thành viên được lấy mẫu lại ở mỗi epoch và dùng để huấn luyện với softmax chính xác trên toàn vũ trụ, có mask các mặt hàng đã mua. SASRec (R10) chạy Transformer nhân quả trên 50 giỏ hàng theo ngày gần nhất (trung bình tối đa 16 embedding model mỗi ngày), cộng embedding khoảng cách giữa các giỏ hàng $\log_2$; mô hình được huấn luyện bằng hàm mất mát explore dày đặc trên mọi hành động~\cite{pancha2022pinnerformer}, trong đó mỗi giỏ hàng lịch sử dự đoán mọi giao dịch explore trong $\Delta$ ngày tiếp theo có cửa sổ kết thúc trước mốc cắt.
+\item \textbf{Xu hướng có xét ngữ cảnh (R13).} Để thay thế phần đuôi bị giới hạn của R5, R13 chấm điểm mỗi model trong vũ trụ tại mốc neo $t$ bằng $\log(1 + \text{số ngày-người mua trong } [t-w, t)) + w_{\mathrm{dept}}\log(\text{tỷ trọng ngành hàng của thành viên} + 0.01) + w_{\mathrm{price}}\mathbf{1}[|\text{phân vị giá sản phẩm} - \text{phân vị trung bình của thành viên}| \le 1]$, chỉ đọc số liệu trước $t$.
+\end{itemize}
+
+\begin{table}[t]
+\caption{Các nguồn ứng viên học được và mức tăng độ bao phủ explore trên valid so với R1--R5@200: kết quả tốt nhất trong 10 lượt đầu và các tham số được dùng. EASE, TIFU-KNN, explin, RP3beta và trend chạy 30 lượt; kết quả tốt nhất trong 30 lượt cao hơn tối đa 0.001. item2vec giữ tham số mặc định (mức tăng của lần dựng mô hình).}
+\label{tab:sources}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{llr}
+\toprule
+Nguồn & Mô hình (tham số tinh chỉnh) & $\Delta$ cand.\ exp. \\
+\midrule
+R6  & EASE, item--item dạng đóng ($\lambda$)                   & +0.085 \\
+R7  & item2vec trên chuỗi giao dịch mua (mặc định)                & +0.074 \\
+R8  & TIFU-KNN ($k$, $r_b$, $r_g$, $\alpha$)                      & +0.057 \\
+R9  & two-tower, softmax có mask trên toàn vũ trụ ($d$, $\tau$, lr, dropout) & +0.074 \\
+R10 & SASRec, loss dày đặc trên mọi hành động ($d$, blocks, dropout, lr)    & +0.085 \\
+R11 & explin, tuyến tính theo cửa sổ ($\lambda$, chu kỳ bán rã)              & +0.074 \\
+R12 & RP3beta, random walk ($\alpha$, $\beta$)                    & +0.088 \\
+R13 & xu hướng có ngữ cảnh (cửa sổ, trọng số)                       & +0.069 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Bộ trộn và giới hạn}
+Bộ xếp hạng nhận tối đa $K$ ứng viên. Bộ trộn xen kẽ các nguồn theo hạn ngạch thứ hạng có trọng số: ứng viên $i$ nhận khóa
+\begin{equation}
+\kappa(i) = \min_{s \,:\, i \in C_s} \frac{r_s(i) - 0.5}{w_s},
+\end{equation}
+trong đó $r_s(i)$ là thứ hạng của ứng viên trong nguồn $s$, còn $w_s$ là Recall@100 riêng của nguồn trên valid; giữ lại $K$ khóa nhỏ nhất. Trọng số là heuristic số kết quả đúng trên mỗi vị trí (tất cả dương tính, ba quốc gia), không phải tham số được tinh chỉnh cho mục tiêu xếp hạng: R1 nhận 0.106, thấp hơn mọi nguồn học được (0.13--0.20) và R5 (0.21), dù repeat đóng góp phần lớn NDCG (Bảng~\ref{tab:t31}); Mục~\ref{sec:results} thử biến thể ưu tiên repeat. Biến thể theo từng thành viên nhân $w_{R1}$ với tỷ trọng repeat của thành viên; kết quả ngang với chính sách cố định trên valid (độ bao phủ TH + VN ở 300: 0.4841 so với 0.4847), nên dùng chính sách cố định. Chọn $K = \nK{}$ theo đường cong recall--chi phí (Hình~\ref{fig:curve}).
+
+\subsection{Độ bao phủ}
+
+\begin{table}[t]
+\caption{Độ bao phủ ứng viên trên test (TH + VN, $\Delta = 30$).}
+\label{tab:t30}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrr}
+\toprule
+Tập ứng viên & danh sách & cand. & repeat & explore \\
+\midrule
+R1--R5 (tham chiếu)                       & 200     & 0.370 & 0.997 & 0.307 \\
+R1--R5 $\cup$ R12 RP3beta (nguồn đơn tốt nhất)  & 277     & 0.439 & 0.997 & 0.386 \\
+R1--R5 $\cup$ R6 / R10 / R7              & 260--282 & 0.430--0.435 & 0.997 & 0.375--0.381 \\
+R1--R5 $\cup$ toàn bộ nguồn học được (không giới hạn)     & 483     & 0.541 & 0.997 & 0.499 \\
+\textbf{candidates\_v2, mixer, $K = 300$} & 300    & \textbf{0.450} & 0.972 & \textbf{0.400} \\
+bộ trộn, $K = 500$                          & 470    & 0.535 & 0.994 & 0.492 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.8\textwidth]{fig_t30_curve.png}{Độ bao phủ ứng viên theo giới hạn $K$; bộ trộn cố định và bộ trộn theo thành viên trùng nhau tại mọi $K$.\label{fig:curve}}
+
+Độ bao phủ tăng từ \nCandOld{} lên \nCandNew{} tại $K = \nK{}$ (Bảng~\ref{tab:t30}), đạt mục tiêu 0.45 của kế hoạch; độ bao phủ explore tăng 1.30 lần (từ \nExpOld{} lên \nExpNew{}), chưa đạt mục tiêu 2 lần. Giới hạn làm giảm 2.5 điểm độ bao phủ repeat: phần lớn mốc neo có R1 ngắn (trung vị 12 model, phân vị 90 là 41), nhưng các danh sách R1 dài bị mất vị trí vào ứng viên explore. Các nguồn bổ sung cho nhau: hợp của cả tám nguồn tăng 0.17 so với R1--R5, trong khi nguồn đơn tốt nhất tăng 0.07. Các nguồn thần kinh không vượt các nguồn rẻ: SASRec ngang EASE, mô hình two-tower thấp hơn, còn RP3beta—nguồn đơn tốt nhất—huấn luyện trong vài phút so với khoảng sáu giờ GPU tinh chỉnh và dựng cho mỗi nguồn thần kinh (Mục~\ref{sec:feasibility}). Thứ hạng này một phần do giới hạn ngân sách: nguồn thần kinh huấn luyện cố định 8 epoch, không dừng sớm; loss huấn luyện vẫn giảm khoảng 0.2\,\% mỗi epoch ở cuối. Huấn luyện lại chúng trên TH tại mốc cắt valid với 4, 8 và 16 epoch cho $\Delta$ cand.\ exp.\ lần lượt là 0.074 / 0.077 / 0.082 với two-tower và 0.077 / 0.084 / 0.090 với SASRec: cả hai chưa được huấn luyện đủ ở 8 epoch; tăng gấp đôi epoch đem lại thêm 0.006 độ bao phủ explore (+8\,\%), lớn hơn khoảng cách giữa SASRec và RP3beta trong Bảng~\ref{tab:sources}. Nghiên cứu này giữ các nguồn 8 epoch khi tạo ứng viên và huấn luyện bộ xếp hạng. QC-6 trên candidates\_v2 không phát hiện dòng nào đọc sự kiện tại hoặc sau mốc neo hay mốc cắt huấn luyện nào sau mốc neo. Các cặp candidates\_v2 được dựng từ cùng SQL dbt với Gold và khớp với Gold trong ngày đối chiếu, sai khác tối đa ở mức nhiễu dấu phẩy động.
+
+\begin{table}[t]
+\caption{Phân bố dương tính trên test với candidates\_v2 ($K = \nK{}$) và P3 one head (TH + VN, tỷ lệ trên tổng dương tính). ``Không có nguồn'' được chia theo việc model có nằm trong vũ trụ 5\,000 model tại mốc cắt của mốc neo hay không.}
+\label{tab:t28c}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrrrr}
+\toprule
+ & dương tính & top 20 & hạng 21+ & bị cắt & \multicolumn{2}{c}{không nguồn} \\
+ & & & & & trong vũ trụ & ngoài \\
+\midrule
+repeat  & 11\,533  & 0.785 & 0.151 & 0.043 & 0.019 & 0.002 \\
+explore & 126\,810 & 0.073 & 0.293 & 0.099 & 0.383 & 0.153 \\
+tất cả  & 138\,343 & 0.132 & 0.281 & 0.094 & 0.352 & 0.140 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\textit{Phần còn lại.} Bảng~\ref{tab:t28c} lặp lại phân tích lỗi ở Bảng~\ref{tab:t28b} trên danh sách mới. Giới hạn không còn là nguyên nhân mất chính: 9.4\,\% dương tính được đề xuất nhưng bị cắt, trong đó R5 đề xuất 42\,\% (so với 95\,\% ở R1--R5). Mức trần đến từ vũ trụ: vũ trụ chứa 84.5\,\% dương tính (trung bình theo thành viên là 85.9\,\%), và tổng cộng 86.0\,\% có thể được tiếp cận (nằm trong vũ trụ hoặc được nguồn theo luật đề xuất), trong khi candidate recall là 0.450. Trong phần chênh lệch còn lại, 35\,\% dương tính nằm trong vũ trụ nhưng không nguồn nào đề xuất—vấn đề truy xuất; 14\,\% nằm ngoài vũ trụ nên không nguồn học được nào trên vũ trụ này xử lý được. 4.3\,\% repeat bị cắt chủ yếu đến từ danh sách R1 dài bị hạn ngạch cắt (không nguồn học được nào đề xuất chúng vì chúng bị mask theo chế độ chỉ explore).
+
+\subsection{Từ Recall đến NDCG}
+Khi cố định bộ xếp hạng (siêu tham số và tập đặc trưng gốc của P1-frozen, khớp lại trên các cặp v2), mức tăng từ truy xuất chỉ chuyển một phần thành NDCG@20. Chênh lệch ghép cặp v2 $-$ v1 là $+0.0025$ $[+0.0018, +0.0032]$ về NDCG@20 và $+0.0052$ về HR@10, với recall\_explore@20 tăng $+0.0101$ và recall\_repeat@20 giảm $-0.0315$. Mức tăng có ý nghĩa nhưng nhỏ (0.0947 lên 0.0973): bộ xếp hạng cố định không có đặc trưng cho biết nguồn học được nào đề xuất ứng viên; nó đánh đổi recall repeat lấy recall explore, và phần lớn ứng viên explore mới xếp dưới hạng 20.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Các mô hình xếp hạng}
+\label{sec:ranking}
+
+Mọi bộ xếp hạng hai giai đoạn đều chấm cùng danh sách candidates\_v2 ($K = \nK{}$) và được chọn theo NDCG@20 không điều kiện trên valid với 10 lượt TPE; mục tiêu chọn mô hình là trung bình trên ba quốc gia (có SG), còn các bảng chính báo cáo TH + VN. Huấn luyện theo danh sách nên chỉ sử dụng mốc neo train có ít nhất một dương tính trong danh sách ứng viên: 44\,795 trên 150\,000 mốc neo lấy mẫu (30\,\%, 13.2\,M cặp). Với các lượt thử GBDT, LightGBM dừng sớm (100 vòng, tối đa 6\,000 cây) theo dõi NDCG@20 có điều kiện trên các nhóm validation dương tính; trong khi Optuna chọn lượt thử bằng cách đánh giá dự đoán theo quy trình không điều kiện trên mọi mốc neo validation có giao dịch mua. Do đó, bộ xếp hạng được huấn luyện trên quần thể có điều kiện nhưng được chọn và đánh giá trên quần thể không điều kiện (Hình~\ref{fig:rankers_compare}).
+\begin{itemize}
+\item \textbf{P1-frozen}: LambdaRank cơ sở ở Mục~\ref{sec:protocol}, giữ nguyên siêu tham số (được tinh chỉnh một lần trên ứng viên R1--R5) và 73 đặc trưng cặp Gold, khớp lại trên các cặp v2; đây là dòng tham chiếu, không phải đối thủ được tinh chỉnh.
+\item \textbf{P1-tuned}: LightGBM LambdaRank ($\text{truncation level } 20$) trên mọi cột cặp của candidates\_v2 (85 đặc trưng: 73 đặc trưng cơ sở Gold cộng 12 cột truy xuất v2, gồm thứ hạng theo từng nguồn R6--R13 và siêu dữ liệu bộ trộn cập nhật; loại trừ mã định danh, nhãn, cột quản lý lưới mốc neo và cột kiểm toán theo thời điểm; \texttt{country\_code} và \texttt{promo\_kind} được khai báo là đặc trưng phân loại gốc).
+\item \textbf{P2 (stacked GBDT)}: P1-tuned được bổ sung năm cột tín hiệu theo thời gian (\texttt{hazard\_p}, \texttt{wtp\_q50}, \texttt{wtp\_q90}, \texttt{wtp\_gap50}, \texttt{wtp\_gap90}), tạo bởi ba mô hình LightGBM được khớp lại theo quy trình cuốn chiếu 13 mốc cắt: (i) mô hình nhị phân về nguy cơ mua theo ngành hàng trên các dòng thành viên $\times$ ngành hàng (ngành đã mua trước $t$ cộng top 10 toàn quốc trong 90 ngày trước đó), dự đoán $P(\text{buy in department } d \text{ during } (t, t+\Delta])$ từ RFM thành viên, độ mới/chu kỳ/tỷ lệ quá hạn ngành hàng và xu hướng độ phổ biến của ngành hàng trong 30/90 ngày; và (ii) hai mô hình hồi quy phân vị LightGBM về mức sẵn lòng chi trả, khớp trên mốc neo dương tính, trong đó $\alpha = 0.5$ dự đoán trung vị log giá đơn vị (\texttt{y\_lp\_q50}) trong các giao dịch mua của thành viên ở $(t, t+\Delta]$, còn $\alpha = 0.9$ dự đoán log giá đơn vị \emph{cao nhất} (\texttt{y\_lp\_max}); cùng với chênh lệch có dấu giữa log giá địa phương của ứng viên và từng phân vị dự đoán.
+\item \textbf{P3 (UMTR)}: bộ User Multi-Task Ranker (3.73\,M tham số đăng ký, Hình~\ref{fig:p3_arch}), kết hợp encoder Transformer hai chiều (2 block, 2 head, Pre-LN, GELU) trên $L=50$ dòng mua gần nhất của thành viên (\texttt{member} $\times$ \texttt{model} $\times$ \texttt{day}, không nhóm thành giỏ; embedding model dùng chung trên toàn bộ từ vựng model đã bán, embedding khoảng cách độ mới mốc neo $\log_2$ chia 17 nhóm và embedding vị trí ngược tính từ giao dịch mới nhất), một MLP ngữ cảnh, tháp sản phẩm trên embedding ứng viên và đặc trưng cặp, cùng attention mục tiêu kiểu DIN~\cite{zhou2018din} dạng tích vô hướng có tỷ lệ của mỗi ứng viên trên các trạng thái chuỗi.
+\item \textbf{Mô hình cơ sở}: năm họ mô hình cơ sở NBR toàn danh mục (sáu dòng trong Bảng~\ref{tab:t31}), tự tạo danh sách xếp hạng thay vì xếp hạng lại candidates\_v2: P-TopFreq, GP-TopFreq~\cite{li2023nbr}, EASE và TIFU-KNN được tinh chỉnh làm bộ xếp hạng NBR toàn danh mục với ngân sách riêng 10 lượt trên NDCG@20 valid; và SASRec dùng lại mạng cùng siêu tham số R10 (không có lượt tìm kiếm tinh chỉnh NDCG@20 riêng) dưới hai dạng: mô hình R10 huấn luyện trên explore, bỏ mask sản phẩm đã xem khi chấm điểm; và \emph{SASRecAll}, cùng mạng nhưng huấn luyện lại trên mọi mục tiêu trong cửa sổ, gồm cả repeat.
+\end{itemize}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.95\textwidth]{fig_rankers_compare.png}{So sánh ba bộ xếp hạng hai giai đoạn (P1-tuned, GBDT stacking P2 và UMTR P3) trên tập ứng viên chung \texttt{candidates\_v2} ($K=300$).\label{fig:rankers_compare}}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.98\textwidth]{fig_p3_arch.png}{Kiến trúc bộ xếp hạng sâu P3 (UMTR), đối chiếu dạng hai đầu có cổng (\texttt{p3\_full}) với dạng xếp hạng danh sách một đầu (\texttt{p3\_onehead}).\label{fig:p3_arch}}
+
+Cụ thể, P3 biến đổi 84 cột số của cặp (toàn bộ 85 cột GBDT trừ \texttt{country\_code}, còn \texttt{promo\_kind} được băm vào $1\,000$ nhóm) bằng $t(v) = \mathrm{sign}(v)\log(1+|v|)$, chuẩn hóa theo trung bình và độ lệch chuẩn của tập train, ánh xạ $\mathrm{NaN} \to 0$, rồi thêm 16 cờ nhị phân về giá trị thiếu cho các cột có tỷ lệ NaN train $>1\,\%$ ($F=100$ đầu vào dày đặc cho mỗi ứng viên). Một chi tiết triển khai của nhánh ngữ cảnh: \texttt{self.ctx(x[:, 0])} chiếu toàn bộ vector đặc trưng của vị trí ứng viên đầu tiên (các cột thực thể thành viên giống nhau giữa $K$ ứng viên, nhưng vector cũng bao gồm cột ứng viên ở vị trí đó), thay vì chỉ lấy các cột dành cho thành viên. Biểu diễn người dùng nối masked mean pooling của chuỗi, trạng thái chuỗi mới nhất $h_{L}$ và vector ngữ cảnh $c$ thành $u = \mathrm{MLP}_{\mathrm{user}}([\bar{h}, h_L, c]) \in \mathbb{R}^d$. Mỗi ứng viên $k$ được mã hóa thành $v_k = \mathrm{MLP}_{\mathrm{item}}([e(m_k), d(\mathrm{dept}_k), \mathrm{MLP}_{\mathrm{feat}}(x_k)]) \in \mathbb{R}^d$, attention trên các trạng thái chuỗi hợp lệ bằng attention tích vô hướng có tỷ lệ $a_k = \mathrm{softmax}(v_k h_{1:L}^\top / \sqrt{d})\,h_{1:L}$, rồi tạo biểu diễn tương tác $h_k = \mathrm{MLP}_{\mathrm{inter}}([u, v_k, a_k, u \odot v_k])$.
+
+Ở chế độ hai đầu (\texttt{p3\_full}), P3 có các đầu tuyến tính riêng $s^r_i, s^e_i$ cho ứng viên repeat và explore; mỗi đầu được chuẩn hóa softmax trong nhóm ứng viên tương ứng ($R_a$: model có \texttt{hist\_buy\_cnt} $> 0$; $E_a$: các model còn lại). Cổng ở cấp thành viên $g(u) = \sigma(w_g^\top u) \in (0, 1)$ chia khối xác suất:
+\begin{equation}
+p(i) = \begin{cases}
+g(u)\, \dfrac{e^{s^{r}_i}}{\sum_{j \in R_a} e^{s^{r}_j}}, & i \in R_a,\\[2ex]
+\bigl(1 - g(u)\bigr)\, \dfrac{e^{s^{e}_i}}{\sum_{j \in E_a} e^{s^{e}_j}}, & i \in E_a.
+\end{cases}
+\end{equation}
+Khi một nhóm rỗng (thành viên không có lịch sử có $R_a = \emptyset$; danh sách có thể có $E_a = \emptyset$), cổng hiệu dụng được đặt thành 0 hoặc 1 (giới hạn trong $[10^{-6}, 1-10^{-6}]$), và nhóm còn lại nhận toàn bộ khối xác suất. Hàm mất mát huấn luyện là negative log-likelihood theo danh sách trên các dương tính trong danh sách, cộng hai thành phần phụ, $\mathcal{L} = -\frac{1}{|P_a \cap C_a|}\sum_{i \in P_a \cap C_a} \log p(i) + \lambda_g\,\mathrm{BCE}(g(u), y^{\mathrm{rep}})
++ \lambda_{90}\,\mathcal{L}_{90}$, trong đó $y^{\mathrm{rep}}$ là tỷ trọng repeat trong các dương tính không điều kiện của thành viên ở $(t, t+30]$, còn $\mathcal{L}_{90}$ là binary cross-entropy trên nhãn ứng viên $\Delta = 90$. Mỗi lượt huấn luyện chạy đủ 6 epoch với AdamW ($\text{weight decay } 0.01$, cắt gradient $1.0$, batch 256 mốc neo, bfloat16) và khôi phục checkpoint có NDCG@20 không điều kiện trên valid cao nhất. Biến thể một đầu (\texttt{p3\_onehead}) thay hai softmax theo nhóm và cổng bằng một softmax duy nhất $p(i) = e^{s_i}/\sum_{j \in C_a} e^{s_j}$ trên toàn bộ $K$ ứng viên (bỏ loss của cổng). Siêu tham số ($d, \text{dropout}, \text{lr}, \lambda_{90}, \lambda_g$) được tinh chỉnh trên \texttt{p3\_full}; các biến thể ablation (\texttt{onehead}, \texttt{fixedgate}, \texttt{noseq}) dùng lại siêu tham số đã chọn, không tìm kiếm tinh chỉnh riêng.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Kết quả}
+\label{sec:results}
+
+\subsection{RQ3: So sánh mô hình}
+
+\begin{table*}[t]
+\caption{Kết quả xếp hạng trên test (TH + VN, 41\,734 mốc neo, $\Delta = 30$, không điều kiện), kèm khoảng bootstrap theo thành viên 95\,\% cho NDCG@20. Chọn mô hình trên valid với 10 lượt; kết quả khớp cuối dùng seed 0 (seed 1 và 2 trong Bảng~\ref{tab:seeds}). P1-frozen (v2, 85 đặc trưng) giữ siêu tham số và số vòng cố định nhưng đọc mọi cột cặp của P1-tuned.}
+\label{tab:t31}
+\centering
+\begin{tabular}{lrcrrrr}
+\toprule
+Mô hình & NDCG@20 & 95\,\% CI & HR@10 & recall\_repeat@20 & recall\_explore@20 & cand.\ recall \\
+\midrule
+P-TopFreq                 & 0.0615 & [0.0597, 0.0632] & 0.156 & 0.877 & 0.000 & 0.093 \\
+GP-TopFreq                & 0.0752 & [0.0734, 0.0769] & 0.184 & 0.878 & 0.041 & 0.262 \\
+EASE NBR                  & 0.0548 & [0.0535, 0.0561] & 0.146 & 0.368 & 0.072 & 0.231 \\
+TIFU-KNN NBR              & 0.0788 & [0.0770, 0.0806] & 0.187 & 0.885 & 0.043 & 0.234 \\
+SASRec NBR (R10, explore-trained) & 0.0606 & [0.0589, 0.0622] & 0.156 & 0.435 & 0.067 & 0.235 \\
+SASRec NBR (all targets)  & 0.0751 & [0.0732, 0.0769] & 0.180 & 0.571 & 0.068 & 0.245 \\
+\midrule
+P1-frozen (R1--R5 candidates) & 0.0947 & [0.0925, 0.0968] & 0.225 & 0.824 & 0.073 & 0.370 \\
+P1-frozen (v2)            & 0.0973 & [0.0949, 0.0994] & 0.230 & 0.793 & 0.083 & 0.450 \\
+P1-frozen (v2, 85 features) & 0.1001 & [0.0981, 0.1022] & 0.236 & 0.793 & 0.090 & 0.450 \\
+P1-tuned (v2)             & 0.1011 & [0.0990, 0.1033] & 0.239 & 0.817 & 0.092 & 0.450 \\
+P2 (v2)                   & 0.1013 & [0.0994, 0.1034] & 0.240 & 0.806 & 0.093 & 0.450 \\
+P3 two heads              & 0.1009 & [0.0988, 0.1029] & 0.237 & 0.845 & 0.089 & 0.450 \\
+\textbf{P3 one head}      & \textbf{0.1020} & [0.0999, 0.1040] & 0.240 & 0.838 & 0.090 & 0.450 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{table}[t]
+\caption{Chênh lệch bootstrap ghép cặp theo thành viên trên test (TH + VN), $a - b$ [95\,\% CI].}
+\label{tab:paired}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lll}
+\toprule
+$a - b$ & NDCG@20 & rec.\ explore@20 \\
+\midrule
+P1-tuned $-$ P1-frozen (v2) & +0.0039 [+0.0032, +0.0045] & +0.0085 \\
+\quad đặc trưng mới: 85 đặc trưng\ $-$ P1-frozen (v2) & +0.0028 [+0.0021, +0.0035] & +0.0069 \\
+\quad tinh chỉnh: P1-tuned $-$ 85 đặc trưng          & +0.0011 [+0.0005, +0.0016] & +0.0016 \\
+P2 $-$ P1-tuned             & +0.0002 [$-$0.0002, +0.0006] & +0.0007 \\
+P3 two heads $-$ P1-tuned   & $-$0.0002 [$-$0.0009, +0.0005] & $-$0.0031 \\
+P3 one head $-$ P1-tuned    & +0.0009 [+0.0002, +0.0016] & $-$0.0016 \\
+P3 one head $-$ P2          & +0.0007 [+0.0000, +0.0014] & $-$0.0023 \\
+P1-tuned $-$ TIFU-KNN NBR   & +0.0224 [+0.0214, +0.0234] & +0.0488 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_t31_ndcg.png}{NDCG@20 của mọi mô hình trên test, kèm khoảng bootstrap theo thành viên 95\,\%.\label{fig:t31}}
+
+Bảng~\ref{tab:t31}, Bảng~\ref{tab:paired} và Hình~\ref{fig:t31} được diễn giải như câu trả lời nghiên cứu, không phải bảng xếp hạng đơn thuần.
+\begin{itemize}
+\item Mọi bộ xếp hạng hai giai đoạn đều vượt xa mọi mô hình cơ sở NBR (P1-tuned $-$ TIFU-KNN: $+0.022$, 28\,\%). Mô hình cơ sở mạnh nhất là TIFU-KNN, kế đến GP-TopFreq; EASE và SASRec khi xếp hạng toàn danh mục bỏ sót các giao dịch repeat (recall\_repeat 0.37--0.57 so với 0.88). Với SASRec R10, điều này một phần là do thiết kế: mô hình chỉ được huấn luyện trên mục tiêu explore, và mask explore chỉ bị gỡ khi chấm điểm. Khi huấn luyện lại trên mọi model của cửa sổ, SASRec tăng NDCG@20 thêm $+0.0146$ $[+0.0135, +0.0157]$ (recall repeat từ 0.43 lên 0.57) và ngang GP-TopFreq, nhưng vẫn thấp hơn TIFU-KNN $-0.0036$ $[-0.0049, -0.0025]$. Kết luận về các mô hình cơ sở không thay đổi.
+\item Đặc trưng quan trọng hơn tinh chỉnh hoặc họ mô hình. P1-tuned tăng $+0.0039$ so với P1-frozen trên cùng các cặp, nhưng phần lớn đến từ đặc trưng mới chứ không phải tinh chỉnh: siêu tham số cố định với 85 đặc trưng đã đem lại $+0.0028$ (chủ yếu là recall explore, $+0.007$), còn tinh chỉnh bổ sung $+0.0011$ (chủ yếu là recall repeat, $+0.024$). Phần đóng góp của tinh chỉnh tương đương khoảng cách giữa P3 one head và P1-tuned ($+0.0009$).
+\item Mô hình sâu và GBDT chênh nhau dưới một phần nghìn. P3 one head là mô hình duy nhất vượt P1-tuned có ý nghĩa ($+0.0009$, khoảng 1\,\%), và chỉ nhỉnh hơn P2. P3 two heads ngang P1-tuned: giữ được nhiều repeat hơn ($+0.029$ recall\_repeat@20) nhưng tìm thấy ít giao dịch explore hơn ($-0.003$).
+\item Stacking không đem lại cải thiện đo được (P2 $-$ P1-tuned $+0.0002$, khoảng tin cậy cắt qua 0), phù hợp với Mục~\ref{sec:h1}: các đặc trưng cặp Gold đã chứa độ mới ngành hàng, chu kỳ và chênh lệch giá.
+\end{itemize}
+Trên valid, ở cả ba quốc gia thuộc mục tiêu tinh chỉnh, thứ tự vẫn như cũ (P3 one head 0.1049, P3 two heads 0.1037, P2 0.1034, P1-tuned 0.1033).
+
+\textit{Phương sai theo seed.} Các lượt khớp cuối của P1-tuned và hai biến thể P3 được lặp với seed 1 và 2, giữ nguyên siêu tham số (Bảng~\ref{tab:seeds}, Hình~\ref{fig:seeds}). Mức dao động giữa seed ($\le 0.0003$) nhỏ hơn khoảng cách giữa P3 one head và P1-tuned; chênh lệch ghép cặp cùng seed lần lượt là $+0.0009$ ($[+0.0002, +0.0016]$), $+0.0010$ ($[+0.0003, +0.0017]$) và $+0.0006$ ($[-0.0000, +0.0013]$; ước lượng điểm dương ở cả ba seed, có ý nghĩa thống kê ở seed 0 và 1, còn cận dưới 95\,\% của seed 2 chạm 0). Mô hình một đầu vượt mô hình hai đầu ở mọi seed ($+0.0011$, $+0.0018$, $+0.0011$). Mô hình hai đầu kém ổn định nhất: recall repeat dao động từ 0.79 đến 0.85 giữa các seed, tức cổng học được hội tụ về các giá trị khác nhau qua từng lần chạy.
+
+\begin{table}[t]
+\caption{Phương sai theo seed của các lượt khớp cuối (test, TH + VN, NDCG@20).}
+\label{tab:seeds}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lccc}
+\toprule
+Mô hình & seed 0 / 1 / 2 & trung bình $\pm$ sd & trung bình rec.\ repeat $\pm$ sd \\
+\midrule
+P1-tuned     & 0.1011 / 0.1013 / 0.1016 & 0.1013 $\pm$ 0.0002 & 0.809 $\pm$ 0.007 \\
+P3 two heads & 0.1009 / 0.1005 / 0.1011 & 0.1008 $\pm$ 0.0003 & 0.824 $\pm$ 0.030 \\
+P3 one head  & 0.1020 / 0.1022 / 0.1022 & 0.1022 $\pm$ 0.0001 & 0.831 $\pm$ 0.008 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_t31_seeds.png}{NDCG@20 của các lượt khớp cuối qua ba seed.\label{fig:seeds}}
+
+\textit{Giới hạn có ràng buộc không?} Cắt danh sách bộ trộn ở $K = 500$ thay vì 300 làm độ bao phủ test tăng từ 0.450 lên 0.535 với số cặp gấp 1.6 lần. P1-frozen được khớp lại nguyên trạng; P1-tuned và P3 được tinh chỉnh lại với 10 lượt. Trên valid (TH + VN), dữ liệu dùng để quyết định, NDCG@20 không tăng: P1-tuned từ 0.1088 xuống 0.1079, P3 two heads từ 0.1087 lên 0.1092, P3 one head từ 0.1096 lên 0.1097, nên giữ $K = 300$. Sau đó mới báo cáo một lần trên test (ghép cặp, $K = 500$ $-$ $K = 300$): P1-frozen $-0.0009$ $[-0.0016, -0.0003]$, P1-tuned $-0.0003$ $[-0.0008, +0.0001]$, P3 two heads $+0.0006$ $[-0.0000, +0.0011]$, P3 one head $+0.0012$ $[+0.0007, +0.0017]$ (0.1032). Mức tăng của mô hình một đầu trên test không được xác nhận trên valid và không được dùng để chọn mô hình, vì như vậy sẽ chọn theo test. GBDT mất 0.025 recall repeat do các mẫu âm bổ sung. Độ chính xác không bị giới hạn bởi cap mà bởi khả năng xếp hạng các ứng viên explore khó.
+
+\textit{Trọng số bộ trộn có ràng buộc không?} Trọng số không được tinh chỉnh cho NDCG và làm mất 2.5 điểm độ bao phủ repeat (Mục~\ref{sec:retrieval}). Biến thể đặt toàn bộ danh sách R1 lên trước rồi điền phần còn lại theo cùng hạn ngạch khôi phục độ bao phủ repeat (0.972 lên 0.997 trên test), đổi lại độ bao phủ explore giảm $-0.001$. P1-tuned khớp lại trên các cặp với cùng siêu tham số cho NDCG@20 valid tương đương (TH + VN: 0.1087 so với 0.1088), nên giữ trọng số cố định; chênh lệch ghép cặp trên test là $+0.0004$ $[-0.0001, +0.0009]$. Các repeat bị hạn ngạch cắt nằm ở cuối danh sách R1 dài và hiếm khi lọt vào top 20.
+
+\textit{Ngân sách tinh chỉnh có ràng buộc không?} Với 10 lượt, lượt GBDT tốt nhất là lượt cuối và gần ngưỡng dưới của learning rate; lượt P3 tốt nhất cũng ở ngưỡng dưới. Vì vậy, P1-tuned, P2 và P3 được tinh chỉnh lại trên cùng cặp v2 với 30 lượt mỗi mô hình và ngưỡng dưới thấp hơn (learning rate GBDT $\ge 0.005$, tối đa 6\,000 vòng; learning rate P3 $\ge 2 \cdot 10^{-5}$), cùng ngân sách cho mọi bộ xếp hạng. Trên valid (TH + VN, tập dữ liệu ra quyết định), NDCG@20 không tăng khi chuyển từ 10 lên 30 lượt: P1-tuned 0.1088 lên 0.1089, P2 0.1089 xuống 0.1088, P3 two heads 0.1087 xuống 0.1086, P3 one head 0.1096 xuống 0.1092; do đó giữ các lượt khớp 10 lần. Sau đó mới báo cáo một lần trên test (ghép cặp, 30 $-$ 10 lượt): P1-tuned $+0.0001$ $[-0.0003, +0.0006]$, P2 $+0.0007$ $[+0.0003, +0.0011]$ (0.1020), P3 two heads $-0.0002$ $[-0.0005, +0.0001]$, P3 one head $-0.0000$ $[-0.0003, +0.0003]$ (0.1020). Tìm kiếm đã hội tụ sau 10 lượt và thứ tự trong Bảng~\ref{tab:t31} vẫn đúng: với 30 lượt, P2 ngang P3 one head trên test nhưng không ngang trên valid.
+
+\subsection{Theo quốc gia và phân khúc}
+Bảng~\ref{tab:segments} phân tách NDCG@20 theo quốc gia và phân khúc thành viên (số giao dịch trong 365 ngày trước mốc neo: mới $\le 1$, trung bình 2, thân thiết $\ge 3$; mọi quốc gia). Thứ hạng giữ nguyên ở mọi quốc gia và phân khúc; chênh lệch giữa P1-tuned và P3 luôn dưới 0.002. Mức tăng lớn nhất của toàn quy trình so với tham chiếu thuộc về thành viên mới (0.079 lên 0.090, +14\,\%), với giao dịch hầu hết là explore và hưởng lợi nhiều nhất từ nguồn học được. SG (phạm vi REVIEW) tăng tương đương TH và VN. Không báo cáo phân tách có/không có web: 2--19\,\% mốc neo có sự kiện web và đặc trưng web chỉ chiếm khoảng 1\,\% khối lượng SHAP (Mục~\ref{sec:shap}).
+
+\begin{table}[t]
+\caption{NDCG@20 trên test theo quốc gia và phân khúc.}
+\label{tab:segments}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrrrr}
+\toprule
+Mô hình & SG & TH & VN & mới & trung bình & thân thiết \\
+\midrule
+TIFU-KNN NBR    & 0.069 & 0.085 & 0.072 & 0.065 & 0.080 & 0.078 \\
+P1-frozen (v1)  & 0.082 & 0.101 & 0.088 & 0.079 & 0.094 & 0.095 \\
+P1-tuned (v2)   & 0.089 & 0.108 & 0.093 & 0.089 & 0.101 & 0.099 \\
+P3 two heads    & 0.089 & 0.107 & 0.093 & 0.088 & 0.101 & 0.100 \\
+P3 one head     & 0.090 & 0.109 & 0.094 & 0.090 & 0.101 & 0.100 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{RQ3: Các đầu repeat và explore}
+
+\begin{table}[t]
+\caption{Thí nghiệm loại bỏ thành phần P3, chênh lệch ghép cặp so với P3 two heads có cổng học được (test, TH + VN).}
+\label{tab:t32}
+\setlength{\tabcolsep}{2.5pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrr}
+\toprule
+Biến thể $-$ hai đầu & NDCG@20 & HR@10 & rec.\ rep. & rec.\ exp. \\
+\midrule
+một đầu                & +0.0011 & +0.0025 & $-$0.0073 & +0.0016 \\
+cổng cố định           & $-$0.0066 & $-$0.0105 & $-$0.2753 & +0.0159 \\
+không chuỗi             & $-$0.0003 & +0.0001 & $-$0.0240 & +0.0020 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\\[1ex]
+{\footnotesize Khoảng tin cậy NDCG@20: một đầu [+0.0007, +0.0016]; cổng cố định [$-$0.0074, $-$0.0058]; không chuỗi [$-$0.0007, +0.0000].
+Cổng cố định: $g$ = tỷ trọng repeat lịch sử của thành viên.}
+\end{table}
+
+\Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.8\textwidth]{fig_t32_ablation.png}{Thí nghiệm loại bỏ thành phần P3 trên test.\label{fig:t32}}
+
+Việc tách riêng không cải thiện explore (Bảng~\ref{tab:t32}, Hình~\ref{fig:t32}): mô hình một đầu tốt hơn về NDCG@20 và recall explore, chỉ giảm nhẹ recall repeat. Trong kiến trúc hai đầu, cổng học được tốt hơn nhiều so với luật cố định: thay $g$ học được bằng tỷ trọng repeat lịch sử đã làm trơn Bayes của thành viên khiến NDCG@20 giảm 0.0066 và recall repeat giảm 27.5 điểm, dù biến thể một đầu đạt điểm tổng thể tốt nhất mà không cần cổng. Có thể tỷ trọng lịch sử (khoảng 10\,\% dương tính) đánh giá thấp nhóm repeat tại những mốc neo sắp có giao dịch mua lặp lại; cổng học được nhận biết điều đó từ ngữ cảnh. Cổng học được xếp hạng phân khúc đúng (trung bình $g$: thân thiết 0.23, trung bình 0.17, mới 0.14) nhưng chưa được hiệu chuẩn: giá trị này xấp xỉ gấp đôi tỷ trọng repeat quan sát (0.12, 0.08, 0.06) và chỉ tương quan yếu với mục tiêu theo mốc neo (0.11--0.19). Ở biến thể \texttt{noseq}, tắt đồng thời encoder chuỗi và attention mục tiêu (\texttt{sequence=False, din=False}) làm recall repeat giảm $0.024$ nhưng NDCG@20 không thay đổi đáng kể ($-0.0003$ $[-0.0007, +0.0000]$): đặc trưng cặp dạng bảng đã tóm tắt phần lớn lịch sử thành viên; do hai mô-đun chuỗi bị tắt cùng nhau, không thể tách riêng ảnh hưởng của từng mô-đun.
+
+\subsection{H1: Rò rỉ trong stacking}
+\label{sec:h1}
+Nguy cơ mua theo ngành hàng được khớp theo ba cách: cuốn chiếu (mốc cắt theo quý, biến thể duy nhất đúng theo thời điểm), ngây thơ (khớp một lần trên train rồi áp dụng trong mẫu) và rò rỉ (khớp trên mọi phân hoạch). Mỗi lượt khớp lấy tối đa 120\,000 mốc neo, nên các biến thể khác nhau ở những mốc neo được thấy chứ không phải số lượng: ngây thơ lấy 80\,\% trong 150\,000 mốc neo train; rò rỉ lấy 120\,000 trong tổng số 345\,000 mốc neo của ba phân hoạch, tức khoảng 35\,\% mốc neo train. Tập giả kiểm tra là quý cuối của train (mốc neo từ 2025-07-01 đến hết train), nằm trong các lượt khớp ngây thơ và rò rỉ nhưng sau các mốc neo huấn luyện của bộ xếp hạng hợp nhất bên dưới. AUC trên train / giả kiểm tra / test lần lượt là 0.681 / 0.703 / 0.708 với cuốn chiếu, 0.725 / 0.744 / 0.705 với ngây thơ và 0.710 / 0.717 / 0.723 với rò rỉ. Mô hình khớp trong mẫu có AUC cao hơn 0.04 trên các mốc neo đã thấy nhưng mất lợi thế đó trên test; mô hình rò rỉ vẫn tốt hơn trên test vì đã thấy các nhãn này.
+
+Khi hợp nhất các tín hiệu vào bộ xếp hạng (tham số P1-frozen, khớp trên mốc neo train đến 2025-05-31), NDCG@20 thu được như trong Bảng~\ref{tab:t29b}. H1 đúng về chiều trên cả hai tập ứng viên, rõ hơn với v2: mô hình ngây thơ hợp nhất vượt cuốn chiếu trên các mốc neo huấn luyện đã thấy ($+0.0026$) và giả kiểm tra ($+0.0029$), nhưng thấp hơn trên test ($-0.0004$). Mô hình rò rỉ là biến thể duy nhất tốt hơn trên test ($+0.0011$ với v2), vì các tín hiệu đã được khớp trên nhãn test. Trên train và giả kiểm tra, mô hình rò rỉ thấp hơn mô hình ngây thơ dù cũng khớp trong mẫu: nó chỉ thấy nhãn của khoảng 35\,\% mốc neo đó so với 80\,\% ở mô hình ngây thơ, nên mức phóng đại trong mẫu nhỏ hơn. Mức phóng đại nhỏ vì các tín hiệu yếu khi đã có đặc trưng Gold; chênh lệch cùng cấp với khoảng bootstrap theo thành viên ($\pm 0.002$ trên test, $\pm 0.005$ trên 5\,337 mốc neo giả kiểm tra). Dù vậy, tín hiệu stacking khớp trong mẫu vẫn có thể bị báo cáo nhầm là mức tăng không tồn tại trên test.
+
+\begin{table}[t]
+\caption{Rò rỉ stacking: NDCG@20 không điều kiện của bộ xếp hạng hợp nhất theo quy trình tín hiệu (TH + VN).}
+\label{tab:t29b}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{3}{c}{ứng viên v1} & \multicolumn{3}{c}{ứng viên v2} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Tín hiệu & train & giả kiểm tra & test & train & giả kiểm tra & test \\
+\midrule
+không tín hiệu & 0.1219 & 0.1072 & 0.0941 & 0.1246 & 0.1097 & 0.0961 \\
+rolling & 0.1227 & 0.1090 & 0.0945 & 0.1255 & 0.1097 & 0.0964 \\
+naive   & 0.1246 & 0.1095 & 0.0934 & 0.1281 & 0.1126 & 0.0959 \\
+leaky   & 0.1232 & 0.1087 & 0.0944 & 0.1256 & 0.1091 & 0.0975 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{GBDT sử dụng những gì}
+\label{sec:shap}
+Grouped TreeSHAP~\cite{lundberg2020treeshap} trên 3\,000 mốc neo test (Bảng~\ref{tab:shap}) mô tả các yếu tố mà mô hình cây đã khớp dựa vào: thứ hạng nguồn học được là nhóm đặc trưng lớn thứ hai của P1-tuned (chiếm 16.5\,\% giá trị SHAP tuyệt đối trung bình), phù hợp với kết quả thực nghiệm trong Bảng~\ref{tab:paired}: bổ sung 12 đặc trưng v2 mới đóng góp $+0.0028$ trong tổng mức tăng $+0.0039$ so với cấu hình 73 đặc trưng cố định. Ở P2, năm tín hiệu stacking chiếm 2.4\,\% tổng khối lượng SHAP.
+
+\begin{table}[t]
+\caption{P1-tuned: tỷ trọng $|\mathrm{SHAP}|$ trung bình theo nhóm đặc trưng (test, đủ 11 nhóm).}
+\label{tab:shap}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrr}
+\toprule
+Nhóm đặc trưng & tất cả & ứng viên repeat & ứng viên explore \\
+\midrule
+model: độ phổ biến / mùa vụ / tồn kho      & 0.475 & 0.298 & 0.492 \\
+truy xuất: thứ hạng nguồn học được         & 0.165 & 0.202 & 0.162 \\
+truy xuất: cờ / điểm / thứ hạng R1--R5 & 0.085 & 0.140 & 0.079 \\
+thành viên: hồ sơ giá                   & 0.080 & 0.031 & 0.085 \\
+model: giá / khuyến mãi                    & 0.045 & 0.044 & 0.045 \\
+cặp: độ mới / chu kỳ ngành hàng        & 0.035 & 0.041 & 0.034 \\
+thành viên: hoạt động / RFM                  & 0.028 & 0.048 & 0.026 \\
+cặp: đồng mua / thể thao / ngân sách      & 0.027 & 0.022 & 0.028 \\
+cặp: lịch sử cá nhân                       & 0.027 & 0.155 & 0.014 \\
+quốc gia                                & 0.020 & 0.006 & 0.022 \\
+hành vi web                             & 0.013 & 0.013 & 0.013 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Giá trị, chi phí và bản minh họa (RQ4)}
+\label{sec:feasibility}
+
+\subsection{Giá trị so với các luật đơn giản}
+Mô hình tốt nhất trên valid, P3 one head, được so sánh với ba tham chiếu theo HR@10 trên test (Bảng~\ref{tab:t38}). ``Ngẫu nhiên'' chọn đều 10 vị trí trong vũ trụ 5\,000 model (tính giải tích); ``phổ biến'' là top 10 model toàn quốc theo số người mua trong 28 ngày trước mốc neo, dùng cùng danh sách cho mọi thành viên; ``mua lại'' là P-TopFreq. Tổng thể, mô hình tốt hơn sản phẩm bán chạy 1.8 lần và ``mua lại món cũ'' 1.5 lần. Với repeat, mô hình ngang mua lại (cả hai khoảng 0.78); với giao dịch explore, thấp hơn nhẹ so với sản phẩm bán chạy (0.110 so với 0.115). Giá trị của mô hình là kết hợp được cả hai mục tiêu trong cùng danh sách mười sản phẩm, điều mà không luật đơn lẻ nào làm được.
+
+\begin{table}[t]
+\caption{HR@10 của P3 one head so với các tham chiếu kinh doanh (test, TH + VN).}
+\label{tab:t38}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrrrr}
+\toprule
+Dương tính & P3 & ngẫu nhiên & phổ biến & mua lại & $\times$ phổ biến & $\times$ mua lại \\
+\midrule
+tất cả  & 0.240 & 0.007 & 0.137 & 0.156 & 1.76 & 1.54 \\
+repeat  & 0.775 & 0.003 & 0.178 & 0.777 & 4.36 & 1.00 \\
+explore & 0.110 & 0.006 & 0.115 & 0.000 & 0.96 & --- \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+Đây là ước lượng đại diện ngoại tuyến, không phải ước lượng nhân quả: Recall@10 có trọng số GMV là 0.077 so với 0.053 của mua lại và 0.023 của phổ biến, tương đương giá trị mua quan sát trong 30 ngày kế tiếp là 268\,EUR trên 1\,000 đề xuất, so với 184 và 79. Mẫu số chỉ tính các mốc neo có giao dịch mua trong cửa sổ (41.7\,\% mốc neo test); nếu tính 1\,000 đề xuất cho mọi mốc neo, bất kể có mua hay không, các giá trị lần lượt là 112, 77 và 33\,EUR. Các giao dịch này vốn đã xảy ra; cần thử nghiệm trực tuyến để biết có bao nhiêu giao dịch do đề xuất tạo ra.
+
+\textit{Chỉ dùng lịch sử mua hàng.} Hiện trạng là đề xuất dựa riêng vào lịch sử mua. Để tách đóng góp của các chiều dữ liệu bổ sung khỏi đóng góp của quy trình hai giai đoạn, P1 được tinh chỉnh lại (10 lượt) và khớp trên cùng các cặp nhưng chỉ với 39/85 đặc trưng có thể suy ra từ nhật ký mua hàng: R1, R2, R5 và thứ hạng nguồn học được; lịch sử cá nhân và ngành hàng; đồng mua; độ phổ biến doanh số; mùa vụ và tuổi model; số lượt hoạt động; quốc gia. Đã loại hành vi web (R3 và thứ hạng ứng viên đã trộn), giá và khuyến mãi, tồn kho, cửa hàng, lịch, sở thích thể thao và hồ sơ giá thành viên. Bảng~\ref{tab:hist} đối chiếu dữ liệu với phương pháp. Quy trình chỉ dùng lịch sử tăng NDCG@20 thêm $+0.0214$ $[+0.0204, +0.0225]$ so với GP-TopFreq; các chiều dữ liệu khác bổ sung $+0.0045$ $[+0.0039, +0.0052]$ cho P1-tuned và $+0.0054$ $[+0.0046, +0.0062]$ cho P3 one head so với P1-hist (ghép cặp trên test; thứ tự trên valid tương tự: 0.0819, 0.1044, 0.1088, 0.1096). Trong mức tăng $+0.0268$ của P3 one head so với GP-TopFreq, khoảng bốn phần năm đạt được nhờ truy xuất và bộ xếp hạng học được từ nhật ký mua hàng; một phần năm còn lại cần các dữ liệu khác, chủ yếu qua recall explore (P1-tuned $-$ P1-hist $+0.0077$, repeat $-0.0086$). Dòng chỉ dùng lịch sử hơi lạc quan: tập ứng viên vẫn là tập đa chiều (còn ứng viên ý định web nhưng không có đặc trưng giải thích chúng), và nguồn two-tower cùng trend dùng đơn giá trả trên dòng bán hàng.
+
+\begin{table}[t]
+\caption{Dữ liệu $\times$ phương pháp trên test (TH + VN, NDCG@20). P1-hist: P1 tinh chỉnh lại trên 39 đặc trưng lịch sử mua hàng.}
+\label{tab:hist}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lllr}
+\toprule
+Dữ liệu & Phương pháp & Mô hình & NDCG@20 \\
+\midrule
+lịch sử mua hàng & luật tần suất & GP-TopFreq & 0.0752 \\
+                 & NBR            & TIFU-KNN   & 0.0788 \\
+                 & quy trình       & P1-hist    & 0.0966 \\
+\midrule
+đa chiều & quy trình      & P1-tuned    & 0.1011 \\
+                  &               & P3 one head & \textbf{0.1020} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Độ bao phủ phục vụ}
+Mọi mốc neo test được đánh giá đều có danh sách cá nhân hóa gồm 300 ứng viên (trung vị 300; mọi mốc neo có ít nhất 10 ứng viên). Điều này đúng theo thiết kế vì lưới mốc neo bắt đầu sau lần mua thứ hai của thành viên, nên không trả lời RQ4. Trong doanh số thực của cửa sổ test, thành viên được nhận diện tạo ra 93\,\% GMV tại TH và 81\,\% tại VN; thành viên đã mua trước ngày bán hàng và do đó được dùng luồng cá nhân hóa tạo ra 71\,\% và 56\,\% (68\,\% và 58\,\% số thành viên mua hàng). Phần còn lại—giao dịch ẩn danh và lần mua đầu tiên—nhận danh sách bán chạy toàn quốc; các mô hình trong nghiên cứu phục vụ khoảng hai phần ba giá trị doanh số.
+
+\subsection{Chi phí}
+Bảng~\ref{tab:cost} liệt kê chi phí của các nguồn ứng viên trên GH200 dùng chung (thời gian thực tế là giới hạn trên). Các nguồn thần kinh tốn tài nguyên tính toán gấp 50--100 lần EASE hoặc RP3beta để đạt mức tăng độ bao phủ tương đương hoặc thấp hơn. Chi phí các bộ xếp hạng đều nhỏ ở quy mô này (13.2\,M cặp huấn luyện từ 44\,795 mốc neo train có dương tính): tinh chỉnh mất 0.22--0.38\,h, khớp cuối 1.3--5.1\,min; P3 (3.7\,M tham số) chấm điểm 1\,000 mốc neo test trong 0.09\,s trên GPU.
+
+\begin{table}[t]
+\caption{Chi phí của các nguồn ứng viên (13 mốc cắt $\times$ 3 quốc gia).}
+\label{tab:cost}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{llrrrr}
+\toprule
+Nguồn & thiết bị & tinh chỉnh h & dựng h & $\Delta$ exp. & mỗi lần dựng h \\
+\midrule
+R6 EASE       & GPU & 0.04 & 0.07 & +0.085 & 1.27 \\
+R12 RP3beta   & GPU & 0.05 & 0.08 & +0.088 & 1.16 \\
+R8 TIFU-KNN   & GPU & 0.04 & 0.08 & +0.057 & 0.75 \\
+R13 trend     & CPU & 0.03 & 0.13 & +0.069 & 0.54 \\
+R11 explin    & GPU & 0.07 & 0.47 & +0.074 & 0.16 \\
+R7 item2vec   & CPU & ---  & 0.56 & ---    & --- \\
+R9 two-tower  & GPU & 2.48 & 3.05 & +0.074 & 0.02 \\
+R10 SASRec    & GPU & 4.19 & 3.18 & +0.085 & 0.03 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Bản minh họa}
+Một trang tĩnh trên Hugging Face Space công khai chạy hệ thống gợi ý trong trình duyệt (Pyodide). Người dùng tải lên tệp giao dịch mua (thành viên, quốc gia, model, ngày mua, số lượng); trang kiểm tra dữ liệu và trả về top $K$ cho từng thành viên, kèm nguồn của mỗi sản phẩm (repeat có suy giảm thời gian, đồng mua từ láng giềng EASE, xu hướng quốc gia gần đây), được trộn theo cùng quy tắc hạn ngạch thứ hạng và giải thích bằng lời. Mã định danh model là hash có salt, ngành hàng dùng nhãn chung, độ phổ biến hiển thị dưới dạng phân vị, thành viên mẫu là dữ liệu tổng hợp và salt không rời khỏi máy chủ. Phần này dùng bảng tham chiếu cố định tại 2026-07-28 để minh họa tầng truy xuất và lời giải thích.
+
+Mô hình tốt nhất cần các đầu vào không có trong tệp mua tải lên: đặc trưng web, giá, khuyến mãi, tồn kho và cửa hàng của tầng Gold, cùng thứ hạng từ tám nguồn học được; hai nguồn trong số đó (và chính P3) là mạng PyTorch không chạy trong trình duyệt. Do vậy, hệ thống được phục vụ như ở nhà bán lẻ thực tế: chấm điểm theo lô trong kho dữ liệu. Tab thứ hai hiển thị kết quả batch này: với 500 mốc neo test lấy ngẫu nhiên (250 mỗi quốc gia, một mốc mỗi thành viên), hiển thị top 10 của P3 one head bên cạnh top 10 của GP-TopFreq, giao dịch mua của thành viên trước mốc neo và các model họ mua trong 30 ngày tiếp theo. Trong mẫu này, tỷ lệ thành viên đã mua ít nhất một trong mười model là 0.240 với P3 so với 0.190 với GP-TopFreq (toàn bộ test: 0.240 so với 0.184). Mẫu được công bố với sự đồng ý của chủ sở hữu dữ liệu và đã được giảm thiểu: thành viên nhận mã tuần tự theo thứ tự xáo trộn, model được thay bằng hash có salt và ngành hàng dùng nhãn chung của bảng tham chiếu, ngày tháng chuyển thành số ngày trước mốc neo, lịch sử chỉ giữ 40 dòng cuối, không đưa giá, cửa hàng, web hay thuộc tính thành viên vào. Mỗi lần triển khai Space đều quét trước các tệp công bố (bao gồm kết quả batch) để tìm mã model thô và mã thành viên, đồng thời đối chiếu cục bộ với danh sách tên tổ chức.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Thảo luận và hạn chế}
+\label{sec:discussion}
+
+\textit{GBDT so với mô hình sâu.} Với cùng ngân sách và tập ứng viên, bộ xếp hạng đa nhiệm sâu tăng khoảng 1\,\% NDCG@20 so với GBDT đã tinh chỉnh, nhưng chỉ ở dạng một đầu, phù hợp với nghiên cứu về dữ liệu dạng bảng~\cite{grinsztajn2022tabular}. Nỗ lực đem lại nhiều giá trị nhất ở truy xuất (+22\,\% độ bao phủ tương đối) và các đặc trưng giúp bộ xếp hạng tận dụng kết quả đó (+3\,\% NDCG@20 nhờ thứ hạng nguồn học được cùng các cột cặp mới khác khi cố định tham số); tinh chỉnh bổ sung 1\,\%.
+
+\textit{Phương pháp so với dữ liệu.} Phần lớn mức cải thiện so với hiện trạng đến từ phương pháp chứ không phải dữ liệu bổ sung: chỉ với lịch sử mua hàng, quy trình đạt 0.0966 so với 0.0752 của GP-TopFreq; đặc trưng web, giá, khuyến mãi, tồn kho và cửa hàng bổ sung 0.005 NDCG@20. Vì vậy, nhà bán lẻ chỉ có nhật ký doanh số vẫn có thể nhận được phần lớn lợi ích; các chiều dữ liệu khác hữu ích cho giao dịch explore.
+
+\textit{Explore vẫn là nút thắt.} Độ bao phủ explore tăng 1.30 lần chứ không phải 2 lần; ở top 10, mô hình không tốt hơn sản phẩm bán chạy đối với giao dịch explore. Trung bình 60\,\% giao dịch explore của thành viên vẫn nằm ngoài 300 ứng viên. Nâng giới hạn lên 500 khôi phục độ bao phủ (0.535) nhưng không cải thiện NDCG@20 trên valid: các ứng viên bổ sung là model explore mà bộ xếp hạng chưa thể đưa vào top 20.
+
+\textit{Ngân sách tinh chỉnh.} Các lượt khớp được chọn dùng 10 lượt; tinh chỉnh lại mọi bộ xếp hạng với 30 lượt chỉ làm NDCG@20 valid thay đổi tối đa 0.0004 nên không được áp dụng. Các lượt khớp cuối được lặp với ba seed: mức dao động giữa seed ($\le 0.0003$ NDCG@20) nhỏ hơn mức tăng của P3 one head so với P1-tuned. Các phép tìm kiếm dùng một seed lấy mẫu; biến thể ablation P3 (\texttt{onehead}, \texttt{fixedgate}, \texttt{noseq}) dùng lại siêu tham số tinh chỉnh trên \texttt{p3\_full}; nguồn ứng viên và mô hình cơ sở NBR giữ ngân sách 10 lượt. SASRec NBR không có ngân sách riêng để tinh chỉnh NDCG@20 (giữ tham số R10, kể cả khi huấn luyện lại trên mọi mục tiêu). Khoảng cách giữa P1-tuned, P2 và P3 dưới 0.001; thứ hạng P2 phụ thuộc ngân sách (30 lượt giúp P2 ngang P3 one head trên test nhưng không trên valid), còn P3 one head có ước lượng điểm ghép cặp dương so với P1-tuned ở cả ba seed (có ý nghĩa thống kê ở seed 0 và 1; cận dưới 95\,\% ở seed 2 là $-0.0000$) và ở cả hai ngân sách tinh chỉnh.
+
+\textit{Chỉ đánh giá ngoại tuyến.} Các con số GMV chỉ là ước lượng đại diện; đề xuất làm thay đổi hành vi, điều mà phát lại ngoại tuyến không thể đo lường.
+
+\textit{Phạm vi.} Nhãn SG là REVIEW; kết quả SG được báo cáo nhưng không dùng để rút ra kết luận. gSASRec, chưng cất P3 thành GBDT, khoảng conformal, giám sát drift, cùng phân tích what-if và kiểm tra parity của bản minh họa đã bị loại khỏi kế hoạch.
+
+\textit{Nguồn thần kinh chưa được huấn luyện đủ.} Nguồn two-tower và SASRec tăng 8\,\% độ bao phủ explore khi dùng 16 thay vì 8 epoch (TH, valid); do đó phép so sánh nguồn thần kinh với nguồn rẻ được thực hiện dưới ngân sách epoch cố định và có ràng buộc. Việc dựng lại mô hình với dừng sớm theo độ bao phủ valid là ưu tiên đầu tiên cho công việc tương lai.
+
+\textit{Công việc tương lai.} Vũ trụ toàn danh mục với huấn luyện lại hằng tháng sẽ xử lý mức trần độ bao phủ của vũ trụ 5\,000 model (84.5\,\% dương tính test); embedding nội dung văn bản danh mục và dùng luồng nhấp chuột web làm chuỗi hành vi thứ hai, có thể kết hợp mô hình tuần tự sinh như HSTU~\cite{zhai2024hstu}, nhắm đến các giao dịch explore mà tín hiệu đồng mua không tiếp cận được.
+
+% ---------------------------------------------------------------------------------------------------------------------------------
+\section{Kết luận}
+\label{sec:conclusion}
+
+Mười một bản xuất vận hành được chuyển thành kho đặc trưng theo thời điểm trên một máy: giữ lại 66.1\,M dòng bán hàng, truy vết được mọi dòng bị từ chối, có 182 kiểm thử và không có vi phạm rò rỉ dữ liệu (RQ1). Khi tính mọi giao dịch mua, hệ thống gợi ý dựa trên luật đạt kết quả chỉ bằng một nửa so với cách đánh giá thông thường; phần lớn trường hợp bỏ lỡ là sản phẩm chưa từng được truy xuất. Xem truy xuất là một mô hình, với tám nguồn chỉ dành cho explore được huấn luyện lại theo quý và trộn dưới giới hạn 300 ứng viên, đã tăng tỷ lệ giao dịch mua có thể tiếp cận từ \nCandOld{} lên \nCandNew{} (RQ2); với bộ xếp hạng tinh chỉnh có thể đọc thứ hạng nguồn, NDCG@20 tăng từ \nRefUncond{} lên \nTuned{}--\nBest{} (+7--8\,\%), cao hơn mô hình cơ sở next-basket tốt nhất hơn 25\,\% (\nBaseline{}). Đặc trưng đóng góp nhiều hơn tinh chỉnh, và tinh chỉnh nhiều hơn họ mô hình: bộ xếp hạng sâu hai đầu có cổng học được không vượt GBDT đã tinh chỉnh, trong khi biến thể một đầu không có cổng vượt 1\,\% (RQ3). Trong cấu hình hai đầu, cổng học được tốt hơn luật cố định dựa trên tỷ trọng lịch sử, còn việc tách riêng đầu repeat/explore là không cần thiết. Mô hình tốt nhất vượt sản phẩm bán chạy 1.8 lần và ``mua lại món cũ'' 1.5 lần trong cùng danh sách mười sản phẩm, đồng thời tiếp cận khoảng hai phần ba giá trị doanh số; chỉ dùng lịch sử mua hàng, quy trình giữ được khoảng bốn phần năm mức tăng so với luật tần suất, còn các chiều dữ liệu khác bổ sung phần còn lại (RQ4). Stacking ngây thơ gây ra mức phóng đại như H1 dự đoán, nhưng nhỏ vì tín hiệu bổ sung rất ít so với kho đặc trưng tốt.
+
+\section*{Lời cảm ơn}
+Công trình này được thực hiện trong khuôn khổ dự án học phần Advanced Machine Learning and Applications (IT2043.26.1.CH.01), chương trình Thạc sĩ Công nghệ Thông tin tại University of Information Technology, Vietnam National University Ho Chi Minh City, dưới sự hướng dẫn của TS. Ha Minh Tan, người mà các tác giả xin cảm ơn vì những chỉ dẫn quý báu. Chủ sở hữu đã cung cấp tập dữ liệu cho mục đích học thuật; báo cáo và kho mã nguồn không chứa định danh đặc thù của tổ chức.
+
+\bibliographystyle{IEEEtran}
+\bibliography{custom}
+\EOD
+
+\end{document}

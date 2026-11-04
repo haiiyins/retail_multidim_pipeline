@@ -227,7 +227,7 @@
 \ifdim \xfigwd >\columnwidth%
 % if caption is longer than a line, let it wrap around
 \setbox\@tempboxa\hbox{{\color{accessblue}\figcapheadfont #1. \ }}%
-\mbox{}\hfill\begin{tabular}{@{}l@{}}\noindent\raggedright\unhbox\@tempboxa\figcapfont#2\end{tabular}\hfill\mbox{}%
+\mbox{}\hfill\begin{tabular}{@{}p{\textwidth}@{}}\noindent\raggedright\unhbox\@tempboxa\figcapfont#2\end{tabular}\hfill\mbox{}%
 % if caption is shorter than a line,
 % allow user to control short figure caption justification (left or center)
 \else%

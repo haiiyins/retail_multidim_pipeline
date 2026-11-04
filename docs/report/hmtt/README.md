@@ -7,9 +7,9 @@ pdfLaTeX (it uses `spotcolor` and T1 Times / Helvetica), not XeLaTeX; on the GH2
 and the tables that quote it, then rerun `make ml-figures` and `make report-pdf`. Author names, affiliation and biographies are
 placeholders to complete.
 
-Drafts of the IEEE Access paper of the course plan (§13): I Introduction · II Related work · III Data and infrastructure · IV
-Unconditional evaluation protocol and error analysis · V Learned retrieval · VI Ranking · VII Results (RQ1–RQ3, H1) · VIII Feasibility
-and demo · IX Discussion and limitations · X Conclusion. The slide outline is [`slides.md`](slides.md).
+Drafts of the IEEE Access paper of the course plan (§13): I Introduction · II Related work · III Data foundation (RQ1) · IV
+Unconditional evaluation protocol and error analysis (RQ2) · V Learned retrieval (RQ2) · VI Ranking models · VII Results (RQ3, H1) · VIII Value, cost
+and demonstrator (RQ4) · IX Discussion and limitations · X Conclusion. The slide outline is [`slides.md`](slides.md).
 
 Every number comes from a table in [`../tables/ml/`](../tables/ml/), copied from `data/ml/report/` by
 `python ml/analysis/export_tables.py`; decisions taken during the run are in [`ml/DECISIONS.md`](../../../ml/DECISIONS.md). Unless a
