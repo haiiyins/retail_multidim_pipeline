@@ -226,6 +226,14 @@ def main():
             FROM gold.anchor_grid GROUP BY 1, 2 ORDER BY 1, CASE split WHEN 'train' THEN 1 WHEN 'valid' THEN 2 ELSE 3 END""")
         index.append(write_table(out, "t10_anchor_funnel", "Anchor grid: every Monday after the second purchase, then the label-horizon rule, the training stride and the per-country cap", cols, rows,
                                  "`gold.anchor_grid` (`evaluation/build_anchor_grid.py`, `evaluation/split.yml`)"))
+    if want("t10b"):
+        *setup, final = [s for s in re.sub(r"--[^\n]*", "", pathlib.Path("sql/sample_representativeness.sql").read_text()).split(";") if s.strip()]
+        for s in setup:
+            con.execute(s)
+        cols, rows = q(con, final)
+        index.append(write_table(out, "t10b_sample_representativeness", "Sample representativeness: segment, label horizon and quarter shares of the used anchors against the rest of the pool", cols, rows,
+                                 "`gold.anchor_grid`, `silver.slv_fact_sales_line` (`sql/sample_representativeness.sql`)",
+                                 "Segment from transactions in the 365 days before the anchor (new ≤ 1, mid 2, loyal ≥ 3), recomputed for the whole pool; quarter = week_idx // 13."))
     if want("t11"):
         block = con.execute("SELECT block_size FROM pragma_database_size()").fetchone()[0]
         rows = []
