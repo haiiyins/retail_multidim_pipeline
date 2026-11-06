@@ -46,6 +46,19 @@ rp3beta:
   params: {alpha: 0.8, beta: 0.4}
 trend:
   params: {window_days: 14, w_dept: 1.0, w_price: 0.5}
+rex:                      # single-stage Repeat–Explore network (ml/retrieval/rex.py), a t31 row via ml/baselines/nbr.py
+  max_len: 50             # baskets (purchase days)
+  width: 16
+  heads: 2
+  batch: 1024             # reference days
+  epochs: 8
+  refs_per_epoch: 4
+  price_buckets: 10
+  web_window_days: 30
+  params: {d: 128, blocks: 2, dropout: 0.1, lr: 0.001}
+rex2:                     # REX v2: + price / promotion inputs and the member's own repeat features; other settings of rex
+  epochs: 8
+  params: {d: 128, blocks: 2, dropout: 0.1, lr: 0.001}
 mixer:                    # ml/retrieval/mixer.py (ML-13)
   learned: [ease, item2vec, tifuknn, two_tower, sasrec, explin, rp3beta, trend]
   k: 300                  # cap of ml.candidates_v2 for the rankers, read off the t30 curve

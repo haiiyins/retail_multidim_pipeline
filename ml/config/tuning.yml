@@ -46,6 +46,14 @@ two_tower:
     temperature: {type: float, low: 0.02, high: 0.2, log: true}
     lr:          {type: float, low: 0.0001, high: 0.003, log: true}
     dropout:     {type: float, low: 0.0, high: 0.5}
+rex:                  # single-stage model, own budget on NDCG@20 like the other t31 NBR rows
+  space: &rex
+    d:       {type: categorical, choices: [64, 128, 256]}
+    blocks:  {type: int, low: 1, high: 3}
+    dropout: {type: float, low: 0.0, high: 0.4}
+    lr:      {type: float, low: 0.0001, high: 0.003, log: true}
+rex2:
+  space: *rex
 p3:
   space:
     d:          {type: categorical, choices: [64, 128]}
