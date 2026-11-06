@@ -698,6 +698,60 @@ Bayesian-smoothed historical repeat share loses 0.0066 NDCG@20 and 27.5 points o
 the context. The learned gate ranks segments correctly (mean $g$: loyal 0.23, mid 0.17, new 0.14) but is not calibrated: it is about
 twice the observed repeat share (0.12, 0.08, 0.06) and correlates only weakly with the per-anchor target (0.11--0.19). In the \texttt{noseq} variant, disabling both the sequence encoder and target attention together (\texttt{sequence=False, din=False}) reduces repeat recall by $0.024$ with no significant change in NDCG@20 ($-0.0003$ $[-0.0007, +0.0000]$): the tabular pair features already summarize most of the member's history, and because both sequence modules are switched off jointly, their individual effects are not separated here.
 
+\subsection{A Single-Stage Alternative (REX)}
+\label{sec:rex}
+The candidate pool holds 45\,\% of the positives (cand\_recall, Table~\ref{tab:t31}), which caps every ranker. REX
+(Repeat--Explore network, \texttt{ml/retrieval/rex.py}) removes the candidate stage: one network per country $\times$ cutoff scores the
+whole 5\,000-model universe, with the rolling protocol, the grid filter and the top-100 output of the other single-stage rows. The
+logit of model $i$ for a member at day $t$ is the sum of four channels learned in one softmax over the universe:
+an explore term $u(t)\cdot v_i$ (a basket transformer over the last 50 purchase days with gap and age embeddings, plus RFM and
+month, against a model / department / price-bucket item vector); a popularity MLP on the buyers of $i$ in the 7 / 30 / 90 days
+before $t$, its trend and the same 30 days a year earlier; a repeat MLP on the member's own history of $i$ (purchase days, recency,
+age, decayed counts, repurchase rate and cycle of $i$ before the cutoff), added only for models she bought; and a web MLP on her
+product views and cart events of $i$ in the 30 days before $t$, by the day the attribution is known. Training reference days are
+drawn uniformly in the 30 days before a purchase (not the first), with $t + \Delta$ before the cutoff, and the target is every
+model bought in $(t, t + \Delta]$, repeats included. $d$, blocks, dropout and learning rate are tuned with the same 10-trial budget on
+valid NDCG@20; the components are standard (SASRec-style encoder, two-tower scoring, TIFU-style repeat features), the
+contribution is their combination in one model over the full catalogue.
+
+\begin{table}[t]
+\caption{REX against the best rows of Table~\ref{tab:t31} and its ablation (test, TH + VN, NDCG@20; three training seeds for
+REX and P3 one head; ablations with the parameters of REX, paired differences against REX).}
+\label{tab:rex}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrr}
+\toprule
+Model & NDCG@20 & HR@10 & rec.\ rep. & rec.\ exp. \\
+\midrule
+TIFU-KNN (single stage)   & 0.0788 & 0.1868 & 0.8847 & 0.0430 \\
+P1-tuned                  & 0.1011 & 0.2393 & 0.8165 & 0.0918 \\
+P3 one head, 3 seeds      & 0.1021 & 0.2398 & 0.8307 & 0.0910 \\
+REX, 3 seeds              & 0.1031 & 0.2427 & 0.8051 & 0.0905 \\
+\midrule
+REX without web           & $-$0.0027 & & & \\
+REX without popularity    & $-$0.0155 & & & \\
+REX without repeat        & $-$0.0133 & & & \\
+REX without sequence      & $-$0.0121 & & & \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\\[1ex]
+{\footnotesize Seed means. REX $-$ P3 one head, paired by seed: +0.0012 [+0.0001, +0.0023], +0.0006 [$-$0.0004, +0.0017],
++0.0008 [$-$0.0002, +0.0019]; REX $-$ TIFU-KNN +0.0245 [+0.0234, +0.0255]. Every ablation interval excludes 0.}
+\end{table}
+
+A single network matches the two-stage pipeline with 13 sources and a learned ranker (Table~\ref{tab:rex}): REX is
+$+0.0010$ NDCG@20 above P3 one head on the seed mean, with an interval above zero for one seed of three, and $+0.0245$ above the best
+single-stage baseline. It reaches the pipeline's explore recall without its candidate pool and loses 2.6 points of repeat recall. Every channel is needed:
+popularity ($-0.0155$), repeat ($-0.0133$) and the sequence encoder ($-0.0121$) carry most of the score, and web adds $0.0027$, the
+only dimension beyond purchases that REX uses. Three extensions were rejected on valid (REX: 0.1054, all countries; seeds 0.1040 to
+0.1054): the price and promotion of the model on $t - 1$ with the member's price affinity and her own repeat features (0.1055), her
+repeat features alone (0.1058) and 16 epochs instead of 8 (0.1015, overfitting at the tuned dropout of 0.008). REX does not replace the pipeline: it uses
+no price, store or member attribute, its scores are harder to explain than the GBDT's, and it needs a GPU to train. It shows that the
+candidate cap, not the ranker, bounds the pipeline, and it can serve as one more source or as a ranker feature (not tested).
+
 \subsection{H1: Stacking Leakage}
 \label{sec:h1}
 The department hazard is fitted three ways: rolling (quarterly cutoffs, the only point-in-time-correct variant), naive (fitted once on

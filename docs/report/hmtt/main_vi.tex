@@ -556,6 +556,59 @@ Cổng cố định: $g$ = tỷ trọng repeat lịch sử của thành viên.}
 
 Việc tách riêng không cải thiện explore (Bảng~\ref{tab:t32}, Hình~\ref{fig:t32}): mô hình một đầu tốt hơn về NDCG@20 và recall explore, chỉ giảm nhẹ recall repeat. Trong kiến trúc hai đầu, cổng học được tốt hơn nhiều so với luật cố định: thay $g$ học được bằng tỷ trọng repeat lịch sử đã làm trơn Bayes của thành viên khiến NDCG@20 giảm 0.0066 và recall repeat giảm 27.5 điểm, dù biến thể một đầu đạt điểm tổng thể tốt nhất mà không cần cổng. Có thể tỷ trọng lịch sử (khoảng 10\,\% dương tính) đánh giá thấp nhóm repeat tại những mốc neo sắp có giao dịch mua lặp lại; cổng học được nhận biết điều đó từ ngữ cảnh. Cổng học được xếp hạng phân khúc đúng (trung bình $g$: thân thiết 0.23, trung bình 0.17, mới 0.14) nhưng chưa được hiệu chuẩn: giá trị này xấp xỉ gấp đôi tỷ trọng repeat quan sát (0.12, 0.08, 0.06) và chỉ tương quan yếu với mục tiêu theo mốc neo (0.11--0.19). Ở biến thể \texttt{noseq}, tắt đồng thời encoder chuỗi và attention mục tiêu (\texttt{sequence=False, din=False}) làm recall repeat giảm $0.024$ nhưng NDCG@20 không thay đổi đáng kể ($-0.0003$ $[-0.0007, +0.0000]$): đặc trưng cặp dạng bảng đã tóm tắt phần lớn lịch sử thành viên; do hai mô-đun chuỗi bị tắt cùng nhau, không thể tách riêng ảnh hưởng của từng mô-đun.
 
+\subsection{Một phương án một tầng (REX)}
+\label{sec:rex}
+Tập ứng viên chỉ chứa 45\,\% dương tính (cand\_recall, Bảng~\ref{tab:t31}), đây là trần của mọi ranker. REX (Repeat--Explore
+network, \texttt{ml/retrieval/rex.py}) bỏ hẳn tầng sinh ứng viên: mỗi quốc gia $\times$ cutoff có một mạng duy nhất chấm điểm toàn
+bộ universe 5\,000 model, cùng giao thức rolling, bộ lọc grid và danh sách top-100 như các dòng một tầng khác. Logit của model $i$
+cho thành viên tại ngày $t$ là tổng của bốn kênh học chung trong một softmax trên universe: kênh explore $u(t)\cdot v_i$ (transformer
+trên 50 ngày mua gần nhất với embedding khoảng cách và tuổi giỏ, cộng RFM và tháng, đối chiếu vector model / ngành hàng / mức giá);
+MLP độ phổ biến trên số người mua $i$ trong 7 / 30 / 90 ngày trước $t$, xu hướng và cùng 30 ngày năm trước; MLP repeat trên lịch sử
+của chính thành viên với $i$ (số ngày mua, độ gần, độ cũ, số lần mua có suy giảm, tỷ lệ và chu kỳ mua lại của $i$ trước cutoff), chỉ
+cộng cho model đã mua; và MLP web trên lượt xem sản phẩm và sự kiện giỏ hàng với $i$ trong 30 ngày trước $t$, tính theo ngày định
+danh được xác thực. Ngày tham chiếu khi huấn luyện được lấy đều trong 30 ngày trước một lần mua (không phải lần đầu), với
+$t + \Delta$ trước cutoff; mục tiêu là mọi model mua trong $(t, t + \Delta]$, kể cả repeat. $d$, số block, dropout và learning rate
+được tinh chỉnh với cùng ngân sách 10 lượt trên NDCG@20 của valid. Các thành phần đều chuẩn (encoder kiểu SASRec, chấm điểm
+two-tower, đặc trưng repeat kiểu TIFU); đóng góp nằm ở việc kết hợp chúng thành một mô hình trên toàn catalogue.
+
+\begin{table}[t]
+\caption{REX so với các dòng tốt nhất của Bảng~\ref{tab:t31} và thí nghiệm loại bỏ kênh (test, TH + VN, NDCG@20; ba seed huấn
+luyện cho REX và P3 một đầu; các biến thể dùng tham số của REX, chênh lệch ghép cặp so với REX).}
+\label{tab:rex}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrr}
+\toprule
+Mô hình & NDCG@20 & HR@10 & rec.\ rep. & rec.\ exp. \\
+\midrule
+TIFU-KNN (một tầng)       & 0.0788 & 0.1868 & 0.8847 & 0.0430 \\
+P1-tuned                  & 0.1011 & 0.2393 & 0.8165 & 0.0918 \\
+P3 một đầu, 3 seed        & 0.1021 & 0.2398 & 0.8307 & 0.0910 \\
+REX, 3 seed               & 0.1031 & 0.2427 & 0.8051 & 0.0905 \\
+\midrule
+REX bỏ web                & $-$0.0027 & & & \\
+REX bỏ độ phổ biến        & $-$0.0155 & & & \\
+REX bỏ repeat             & $-$0.0133 & & & \\
+REX bỏ chuỗi              & $-$0.0121 & & & \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\\[1ex]
+{\footnotesize Trung bình theo seed. REX $-$ P3 một đầu, ghép cặp theo seed: +0.0012 [+0.0001, +0.0023], +0.0006 [$-$0.0004, +0.0017],
++0.0008 [$-$0.0002, +0.0019]; REX $-$ TIFU-KNN +0.0245 [+0.0234, +0.0255]. Mọi khoảng của thí nghiệm loại bỏ đều không chứa 0.}
+\end{table}
+
+Một mạng duy nhất đạt ngang pipeline hai tầng với 13 nguồn và một ranker học được (Bảng~\ref{tab:rex}): REX cao hơn P3 một đầu
+$+0.0010$ NDCG@20 theo trung bình seed, khoảng tin cậy trên 0 ở một trong ba seed, và cao hơn baseline một tầng tốt nhất $+0.0245$.
+REX đạt recall explore của pipeline mà không cần tập ứng viên, đổi lại mất 2.6 điểm recall repeat. Kênh nào cũng cần thiết: độ phổ
+biến ($-0.0155$), repeat ($-0.0133$) và encoder chuỗi ($-0.0121$) mang phần lớn điểm, web thêm $0.0027$ và là chiều duy nhất ngoài
+giao dịch mua mà REX dùng. Ba mở rộng bị loại trên valid (REX: 0.1054, mọi quốc gia; các seed từ 0.1040 đến 0.1054): giá và khuyến
+mãi của model tại $t - 1$ kèm độ hợp giá của thành viên và đặc trưng repeat riêng của thành viên (0.1055), chỉ đặc trưng repeat riêng
+(0.1058) và 16 epoch thay vì 8 (0.1015, quá khớp với dropout đã tinh chỉnh 0.008). REX không thay thế pipeline: nó không dùng giá,
+cửa hàng hay thuộc tính thành viên, điểm số khó giải thích hơn GBDT và cần GPU để huấn luyện. REX cho thấy trần của tầng ứng viên,
+chứ không phải ranker, mới là giới hạn của pipeline, và có thể dùng làm thêm một nguồn hoặc một đặc trưng cho ranker (chưa thử).
+
 \subsection{H1: Rò rỉ trong stacking}
 \label{sec:h1}
 Nguy cơ mua theo ngành hàng được khớp theo ba cách: cuốn chiếu (mốc cắt theo quý, biến thể duy nhất đúng theo thời điểm), ngây thơ (khớp một lần trên train rồi áp dụng trong mẫu) và rò rỉ (khớp trên mọi phân hoạch). Mỗi lượt khớp lấy tối đa 120\,000 mốc neo, nên các biến thể khác nhau ở những mốc neo được thấy chứ không phải số lượng: ngây thơ lấy 80\,\% trong 150\,000 mốc neo train; rò rỉ lấy 120\,000 trong tổng số 345\,000 mốc neo của ba phân hoạch, tức khoảng 35\,\% mốc neo train. Tập giả kiểm tra là quý cuối của train (mốc neo từ 2025-07-01 đến hết train), nằm trong các lượt khớp ngây thơ và rò rỉ nhưng sau các mốc neo huấn luyện của bộ xếp hạng hợp nhất bên dưới. AUC trên train / giả kiểm tra / test lần lượt là 0.681 / 0.703 / 0.708 với cuốn chiếu, 0.725 / 0.744 / 0.705 với ngây thơ và 0.710 / 0.717 / 0.723 với rò rỉ. Mô hình khớp trong mẫu có AUC cao hơn 0.04 trên các mốc neo đã thấy nhưng mất lợi thế đó trên test; mô hình rò rỉ vẫn tốt hơn trên test vì đã thấy các nhãn này.

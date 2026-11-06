@@ -270,3 +270,23 @@ Test, TH + VN, Δ = 30 unless stated; valid is the decision data.
   in the CSVs and showcase.json, only the published showcase fields, member ids `<country>-NNN`, no UUID / local path / salt) and,
   in `make demo-push`, also the raw model codes and member ids of the lakehouse (`--db`) and the REDACT_TERMS tokens
   (`--require-terms`). Current Space (11 files, showcase included): 0 hits; a tampered copy is caught (serve/tests).
+
+## 2026-11-06 · REX, a single-stage Repeat–Explore network (t31_rex, t32_rex)
+
+Question: the candidate pool holds 45 % of the positives and caps every ranker; can one model over the whole universe, with no
+candidate stage and no ranker, match the pipeline? REX (`ml/retrieval/rex.py`, run as a t31 NBR row by `nbr.py --source rex`) is
+fitted per country × cutoff like the learned sources and scores the 5 000-model universe; logit = explore u · v (basket transformer
++ RFM + month against model / department / price bucket) + popularity MLP (buyers in the 7 / 30 / 90 days before t, trend, same
+30 days a year earlier) + repeat MLP on the member's history of the model (purchase days, recency, age, decayed counts, repurchase
+rate and cycle of the model before the cutoff) + web MLP (views and cart events in the 30 days before t, attribution known before
+t). Reference days uniform in the 30 days before a purchase, t + Δ < cutoff; target every model bought in (t, t + Δ]; 8 epochs.
+Tuned with the 10-trial budget on valid NDCG@20 (all countries): best 0.1060 (d 128, 2 blocks, dropout 0.008, lr 0.0008).
+Test, TH + VN, reported once (t31_rex, three seeds): REX 0.1033 / 0.1029 / 0.1030, P3 one head 0.1020 / 0.1022 / 0.1022;
+paired by seed +0.0012 [0.0001, 0.0023], +0.0006 [−0.0004, 0.0017], +0.0008 [−0.0002, 0.0019]; over TIFU-KNN +0.0245
+[0.0234, 0.0255]. Recall repeat 0.805 vs 0.831, explore 0.0905 vs 0.0910. Ablation (t32_rex, parameters of REX, paired against
+it): no web −0.0027, no popularity −0.0155, no repeat −0.0133, no sequence (member = RFM + month) −0.0121, every interval below 0.
+Rejected on valid (all countries, REX 0.1054, seeds 0.1040–0.1054), never run on test: REX v2 = price / promotion of the model on
+t − 1, the member's price affinity and her own repeat share and cycle (`rex2`, 0.1055); her repeat features alone
+(`rex2_noprice`, 0.1058); 16 epochs (0.1015, overfits at dropout 0.008). Stock stays out (spare parts only, issue #21).
+Reading: one model matches the 13-source pipeline, so the candidate cap rather than the ranker bounds it; REX uses no price, store
+or member attribute, is harder to explain than the GBDT and needs a GPU. REX as a source or as a ranker feature is not tested.
