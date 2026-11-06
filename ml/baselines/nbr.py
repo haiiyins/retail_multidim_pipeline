@@ -2,9 +2,12 @@
 masked, unlike their explore-only candidate sources), with their own tuning budget (tuning.yml space of the source, n_trials trials,
 objective unconditional NDCG@20 on valid); SASRec = the unmasked top-100 list written by the R10 build (retrieval.full_catalogue),
 with the R10 parameters (trained on the explore target only); sasrec_all = the R10 network and parameters trained on every model
-bought in the window, repeats included (ml/retrieval/sasrec.py SASRecAll). Every list comes from the rolling model of
-cutoff_for(anchor) and keeps the anchor_model_grid filter.
-Usage: python ml/baselines/nbr.py --source ease|tifuknn [--tune] [--build]
+bought in the window, repeats included (ml/retrieval/sasrec.py SASRecAll); rex = the single-stage Repeat–Explore network
+(ml/retrieval/rex.py), tuned like EASE / TIFU-KNN, rex2 its v2 (price dimension), and <rex|rex2>_<variant> their ablations with the
+parameters of the full model. Every list comes from the rolling model of cutoff_for(anchor) and keeps the anchor_model_grid filter.
+Usage: python ml/baselines/nbr.py --source ease|tifuknn|rex [--tune] [--build]
+       python ml/baselines/nbr.py --source rex --build --seed 1   →  rex_nbr_seed1
+       python ml/baselines/nbr.py --source rex_noweb|rex_nopop|rex_norep|rex_noseq|rex2_noprice|... --build
        python ml/baselines/nbr.py --source sasrec|sasrec_all --build   →  data/ml/scores/<source>_nbr_{valid,test}_d30.parquet"""
 import argparse, glob, importlib, json, os, sys, time
 import pandas as pd
@@ -48,9 +51,11 @@ def main():
     ap.add_argument("--source", required=True)
     ap.add_argument("--tune", action="store_true")
     ap.add_argument("--build", action="store_true")
+    ap.add_argument("--seed", type=int, default=0, help="training seed of a stochastic source; seed > 0 writes <source>_nbr_seed<N>")
     a = ap.parse_args()
+    assert not (a.seed and a.tune), "seeds rebuild the tuned parameters"
     con = connect()
-    name = f"{a.source}_nbr"
+    name = f"{a.source}_nbr" + (f"_seed{a.seed}" if a.seed else "")
     if a.source == "sasrec":
         for split in ("valid", "test"):
             files = glob.glob(ml_path("candidates", "sasrec_full", "*.parquet"))
@@ -62,6 +67,11 @@ def main():
         from ml.retrieval.sasrec import SASRecAll
         assert not a.tune, "sasrec_all keeps the R10 parameters"
         src = SASRecAll()
+    elif a.source.split("_")[0] in ("rex", "rex2"):
+        from ml.retrieval.rex import REX
+        rex_base, _, variant = a.source.partition("_")
+        assert not (a.tune and variant), "REX ablations keep the parameters of the full model"
+        src = REX(variant or "full", rex_base)
     else:
         src = source(a.source)
     loaded = {}
@@ -85,8 +95,9 @@ def main():
         study, _ = tune(name, objective, space=space)
         print(f"best {study.best_value:.4f}  {study.best_params}", flush=True)
     if a.build:
-        params = base.tuned_params("sasrec") if a.source == "sasrec_all" else tuned(a.source)
-        with Run(f"baseline:{name}", config={"source": a.source}, params=params) as run:
+        params = base.tuned_params("sasrec") if a.source == "sasrec_all" else tuned(src.base if hasattr(src, "base") else a.source)
+        src.seed = a.seed
+        with Run(f"baseline:{name}", config={"source": a.source, "seed": a.seed}, params=params) as run:
             for split in ("valid", "test"):
                 t0 = time.time()
                 sc = pd.concat([to_scores(p) for _, _, p in generate(src, params, con, [split], COUNTRIES, events, explore_only=False)])
