@@ -327,6 +327,18 @@ REX is its equal on test, stronger on explore, weaker on repeat (−0.036).
 Reading: the combination adds 3–5 thousandths, the size of every model step so far; NDCG@20 0.2 at the model level is out of reach
 of model changes alone (t40).
 
+## 2026-11-07 · Seed and three-way rank fusion at the model level (t31_ens)
+
+`ml/eval/fusion.py` generalised to weighted RRF of N score sets (DuckDB; weight set and k selected on valid, all countries).
+Equal-weight fusion of the three REX seeds (`rex_ens3`, valid 0.1069 against 0.1054 for one seed) and of the three P3 one-head
+seeds (`p3_ens3`, 0.1051); REX ensemble + P3 ensemble 0.1102 (the one-seed fusion 0.1098); with P1 + REX features as a third list
+(`ens_main`, weights 0.4 / 0.3 / 0.3 over five sets, k 5) 0.1111, paired on valid against the one-seed fusion +0.0013
+[0.0006, 0.0020]. Test, TH + VN, reported once: `ens_main` 0.1082 (HR@10 0.2536, explore recall 0.0982), REX ensemble 0.1050;
+paired: `ens_main` − one-seed fusion +0.0017 [0.0013, 0.0021], − REX +0.0050 [0.0043, 0.0057], − P1 + REX +0.0023
+[0.0018, 0.0028]; REX ensemble − REX +0.0017 [0.0013, 0.0022]. Rejected on valid, never run on test: REX supermodel ranking as a
+prior of the fusion (RRF of the model rank and the rank of its supermodel, +0.0009 on the one-seed fusion, +0.0004 on `ens_main`).
+Reading: `ens_main` is the best model-level list; it costs three REX and three P3 trainings plus the P1 pipeline.
+
 ## 2026-11-07 · NDCG@20 at coarser product levels (t40_granularity)
 
 Question: the target NDCG@20 ≥ 0.2 is out of reach at the model level; which change of the task reaches it, and does the model
