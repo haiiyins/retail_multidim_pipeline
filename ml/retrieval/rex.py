@@ -32,6 +32,7 @@ import numpy as np, pandas as pd, torch, torch.nn as nn, torch.nn.functional as 
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from ml.common.data import connect, ml_path
+from ml.common.levels import group_map
 from ml.retrieval.base import CFG, DAY_BITS, DEVICE, EPOCH, Source, day_num, item_attributes
 from ml.retrieval.neural import (GAP_BUCKETS, OFFSET, OOV, PAD, Encoder, basket_windows, gap_buckets, months, seed_everything,
                                  train)
@@ -63,7 +64,7 @@ class WebEvents:
             WHERE country_code = ? AND model_code IS NOT NULL AND event_name IN ({names})
             GROUP BY ALL""", [ev.country]).df()
         m = ev.member_index(r["member_id"])
-        i = pd.Index(ev.items).get_indexer(r["model_code"])
+        i = ev.item_index(r["model_code"])
         keep = (m >= 0) & (i >= 0)
         m, i = m[keep], i[keep]
         day, views, carts = (r[c].to_numpy()[keep] for c in ("day", "views", "carts"))
@@ -109,7 +110,8 @@ class Prices:
         r = pd.read_parquet(path)
         self.day0 = day_num(PRICE_FROM)
         n_days = int(ev.day.max()) - self.day0 + 1
-        i = pd.Index(ev.items).get_indexer(r["model_code"])
+        assert ev.level == "model", "national prices are per model"
+        i = ev.item_index(r["model_code"])
         k = (i >= 0) & (r["day"].to_numpy() >= self.day0) & (r["day"].to_numpy() < self.day0 + n_days)
         i, d = i[k], r["day"].to_numpy()[k] - self.day0
         self.log_price = np.full((n_days, len(ev.items)), np.nan, np.float32)
@@ -266,11 +268,15 @@ def mlp(i, h, o, dropout):
 
 
 class REXNet(nn.Module):
-    def __init__(self, size, item_dept, item_price, d, blocks, dropout, drop=(), item_lp=None):
+    def __init__(self, size, item_dept, item_price, d, blocks, dropout, drop=(), item_lp=None, item_hier=()):
         """drop: channels left out: web, pop, rep, seq (member = RFM + month, no basket transformer), and the v2 inputs price
         (price features, price affinity) and rep2 (φ2); REX v1 drops both. item_lp: mean log unit price paid for each universe model
-        before the cutoff, the fallback of the affinity when the model has no price interval."""
+        before the cutoff, the fallback of the affinity when the model has no price interval. item_hier: per universe model, its
+        group index at each extra product level (variant hier), embedded into the item tower."""
         super().__init__()
+        self.hier = nn.ModuleList(nn.Embedding(int(h.max()) + 1, d) for h in item_hier)
+        for j, h in enumerate(item_hier):
+            self.register_buffer(f"item_hier{j}", torch.as_tensor(h))
         self.drop = set(drop)
         self.use_price, self.use_rep2 = "price" not in self.drop, "rep2" not in self.drop
         self.enc = Encoder(size + OFFSET, d, blocks, C["heads"], dropout, C["max_len"], causal=True)
@@ -279,7 +285,7 @@ class REXNet(nn.Module):
         self.user = mlp(3 * d, d, d, dropout)
         self.dept = nn.Embedding(int(item_dept.max()) + 1, d)
         self.price = nn.Embedding(C["price_buckets"], d)
-        self.item = mlp(3 * d, d, d, dropout)
+        self.item = mlp((3 + len(item_hier)) * d, d, d, dropout)
         n_price = N_PRICE if self.use_price else 0
         self.pop = mlp(N_POP + n_price, d, 1, 0.0)
         self.rep = mlp(N_REP + (N_REP2 if self.use_rep2 else 0) + n_price + 2 * d, d, 1, dropout)
@@ -297,7 +303,8 @@ class REXNet(nn.Module):
 
     def items(self):
         e = self.enc.emb.weight[OFFSET:]
-        return self.item(torch.cat([e, self.dept(self.item_dept), self.price(self.item_price)], 1))
+        hier = [emb(getattr(self, f"item_hier{j}")) for j, emb in enumerate(self.hier)]
+        return self.item(torch.cat([e, self.dept(self.item_dept), self.price(self.item_price)] + hier, 1))
 
     def users(self, b):
         x, days, lens = b["x"], b["days"], b["lens"]
@@ -389,22 +396,27 @@ def targets(ev, uni, m, t):
 
 class REX(Source):
     """base rex (v1: no price, no φ2) or rex2 (v2); variant = full or an ablation (VARIANTS), named <base>_<variant>."""
-    VARIANTS = {"full": (), "noweb": ("web",), "nopop": ("pop",), "norep": ("rep",), "noseq": ("seq",), "noprice": ("price",)}
+    VARIANTS = {"full": (), "noweb": ("web",), "nopop": ("pop",), "norep": ("rep",), "noseq": ("seq",), "noprice": ("price",),
+                "hier": ()}
     V1 = ("price", "rep2")
+    HIER = ("nature", "family")   # product levels embedded by the hier variant
 
-    def __init__(self, variant="full", base="rex"):
-        self._web, self._prices, self.variant, self.base = {}, {}, variant, base
+    def __init__(self, variant="full", base="rex", level="model"):
+        self._web, self._prices, self.variant, self.base, self.level = {}, {}, variant, base, level
         self.drop = self.VARIANTS[variant] + (self.V1 if base == "rex" else ())
         self.name = base if variant == "full" else f"{base}_{variant}"
+        if level != "model":
+            self.name = f"{base}_{level}" + ("" if variant == "full" else f"_{variant}")
         self.version = 1 if base == "rex" else 2
         self.epochs = CFG[base].get("epochs", C["epochs"])
 
     def web(self, ev):
-        if ev.country not in self._web:
+        key = (ev.country, ev.level)
+        if key not in self._web:
             con = connect(threads=16)
-            self._web[ev.country] = WebEvents(con, ev)
+            self._web[key] = WebEvents(con, ev)
             con.close()
-        return self._web[ev.country]
+        return self._web[key]
 
     def prices(self, ev):
         if ev.country not in self._prices:
@@ -421,7 +433,14 @@ class REX(Source):
         dept, price, _ = item_attributes(ev, uni, cutoff, C["price_buckets"])
         cum, day0 = daily_buyers(ev, uni)
         prep = {"m": bm[ok], "lo": lo[ok], "hi": hi[ok], "dept": dept, "price": price, "stats": item_repeat_stats(ev, uni, cutoff),
-                "cum": cum, "day0": day0}
+                "cum": cum, "day0": day0, "hier": ()}
+        if self.variant == "hier":
+            con = connect(threads=16)
+            g = pd.read_parquet(group_map(con), columns=["model_code", *self.HIER]).set_index("model_code")
+            con.close()
+            codes = g.reindex(ev.items[uni.items])
+            prep["hier"] = tuple(np.unique(codes[lv].fillna("?").to_numpy(), return_inverse=True)[1].astype(np.int64)
+                                 for lv in self.HIER)
         if "price" not in self.drop:
             pt = self.prices(ev)
             f, lp = pt.features(uni.items)
@@ -442,7 +461,7 @@ class REX(Source):
         web = self.web(ev)
         cum = prep["cum"].to(DEVICE)
         model = REXNet(uni.size, prep["dept"], prep["price"], params["d"], params["blocks"], params["dropout"], self.drop,
-                       prep.get("item_lp")).to(DEVICE)
+                       prep.get("item_lp"), prep.get("hier", ())).to(DEVICE)
         model.price_f = prep["price_f"].to(DEVICE) if "price_f" in prep else None
         model.price_lp = prep["price_lp"].to(DEVICE) if "price_lp" in prep else None
         model.price_day0 = prep.get("price_day0")

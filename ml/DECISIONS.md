@@ -309,3 +309,41 @@ t − 1, the member's price affinity and her own repeat share and cycle (`rex2`,
 (`rex2_noprice`, 0.1058); 16 epochs (0.1015, overfits at dropout 0.008). Stock stays out (spare parts only, issue #21).
 Reading: one model matches the 13-source pipeline, so the candidate cap rather than the ranker bounds it; REX uses no price, store
 or member attribute, is harder to explain than the GBDT and needs a GPU. REX as a source or as a ranker feature is not tested.
+
+## 2026-11-07 · REX with the pipeline: rank fusion and REX ranker features (t31_hybrid)
+
+Question: do REX and the two-stage pipeline err on different anchors, so that combining them beats both? Ceilings on test TH + VN
+first: a perfect order of the repeat positives alone gives 0.114, a perfect re-order of the REX top 20 0.190 and of its top 100
+0.372, so the room is in the order of explore models REX already lists. (1) Rank fusion (`ml/eval/fusion.py`): w / (k + rank_REX)
++ (1 − w) / (k + rank_other), w ∈ {0.3…0.7}, k ∈ {5, 20, 60} and the partner (P1 tuned, P2, P3 one head) selected on valid
+(all countries): P3 one head, w 0.5, k 5, valid 0.1098. (2) REX as ranker features (`ml/retrieval/rex_pairs.py`): REX refitted per
+country × cutoff over the anchors of candidates_v2 (train anchors included, the model of cutoff_for(anchor), assert_pit clean),
+log-softmax probability and rank of each candidate pair → pairs_v2rex (102,686,571 rows, as pairs_v2; coverage 94–99.7 %, the
+rest train anchors before the first cutoff and models outside the universe); P1 retuned on it with the same 10-trial budget
+(valid 0.1083). Test, TH + VN, reported once: fusion 0.1066 (HR@10 0.2503), P1 + REX features 0.1060, REX 0.1033, P3 0.1020,
+P1 0.1011. Paired: fusion − REX +0.0033 [0.0027, 0.0039], fusion − P3 +0.0045 [0.0039, 0.0052]; P1 + REX − P1 +0.0048
+[0.0041, 0.0056] (explore recall +0.0054), P1 + REX − fusion −0.0006 [−0.0012, 0.0001]. The fusion is kept (best on valid); P1 +
+REX is its equal on test, stronger on explore, weaker on repeat (−0.036).
+Reading: the combination adds 3–5 thousandths, the size of every model step so far; NDCG@20 0.2 at the model level is out of reach
+of model changes alone (t40).
+
+## 2026-11-07 · NDCG@20 at coarser product levels (t40_granularity)
+
+Question: the target NDCG@20 ≥ 0.2 is out of reach at the model level; which change of the task reaches it, and does the model
+still beat popularity there? Label windows first (valid, the Δ = 30 lists re-scored): Δ 7 / 14 / 30 / 60 / 90 and the next basket
+only give 0.106–0.118 for the fusion, so the window is not the lever. Product level: `ml/eval/granularity.py` re-runs D3 with the
+positives = the distinct groups bought in (anchor, anchor + Δ] (returns netted, repeat = a model of the group bought before), a
+model list turned into a group list by the best model score of each group; levels from bronze.dim_item (one group per model):
+supermodel (all variants of a product), product nature (the product type), retail family, sub-department, department. REX is
+also trained directly at a level (`nbr.py --source rex --level <level>`: Events, web attention, universe, targets and the
+anchor_model_grid filter at the group level, the model-level parameters, no retuning).
+Test, TH + VN, reported once (NDCG@20; most popular / best model-level list aggregated / REX trained at the level): model 0.075 /
+0.107 / –; supermodel 0.111 / 0.140 / 0.147; nature 0.297 / 0.323 / 0.372; family 0.270 / 0.298 / –; sub-department 0.430 /
+0.452 / –; department 0.560 / 0.592 / –. Paired at nature: REX nature − aggregated fusion +0.0491 [0.0473, 0.0508], − most popular
++0.0750 [0.0730, 0.0770] (explore recall +0.140); at supermodel: REX supermodel − aggregated fusion +0.0074 [0.0063, 0.0085].
+Rejected on valid, never run on test: the nature ranking of REX nature as a prior of the model-level fusion (RRF of the model rank
+and the rank of its nature, w and k on valid: +0.0004, within the seed spread); REX with product-nature and retail-family
+embeddings in the item tower (`rex_hier`, 0.1047 against 0.1054, seeds 0.1040–0.1054).
+Reading: the 0.2 target is met by predicting the product type a member buys next (0.372, 0.075 over popularity), a different and
+coarser question than the model; coarser still (sub-department, department) popularity alone exceeds 0.4 and the model adds less
+than at nature. The model level stays the headline metric; the nature level is reported as the product-type task.

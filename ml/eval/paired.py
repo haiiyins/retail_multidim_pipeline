@@ -12,8 +12,10 @@ from ml.common.data import ML_DIR
 MAIN = ("TH", "VN")
 
 
-def results(name):
-    r = pd.read_parquet(os.path.join(ML_DIR, "eval", f"results_{name}_test_d30_unconditional.parquet"))
+def results(name, level="model"):
+    """level: a product level of ml/eval/granularity.py, whose per-anchor results it wrote."""
+    tag = "unconditional" if level == "model" else level
+    r = pd.read_parquet(os.path.join(ML_DIR, "eval", f"results_{name}_test_d30_{tag}.parquet"))
     return r[r["country_code"].isin(MAIN)]
 
 
@@ -27,8 +29,8 @@ def paired(a, b, metric, n=1000, seed=0):
             "ci_hi": np.percentile(boots, 97.5), "P(diff > 0)": float((boots > 0).mean())}
 
 
-def compare(a, b, metrics):
-    ra, rb = results(a), results(b)
+def compare(a, b, metrics, level="model"):
+    ra, rb = results(a, level), results(b, level)
     return pd.DataFrame([{"a": a, "b": b, **paired(ra, rb, m)} for m in metrics])
 
 
@@ -39,15 +41,16 @@ def main():
     ap.add_argument("--pairs", help="a:b,a:b,… instead of --a/--b")
     ap.add_argument("--out", help="write data/ml/report/<out>.md/.csv")
     ap.add_argument("--metrics", default="NDCG@20,HR@10,recall_repeat@20,recall_explore@20")
+    ap.add_argument("--level", default="model", help="product level of ml/eval/granularity.py results")
     a = ap.parse_args()
     pairs = [p.split(":") for p in a.pairs.split(",")] if a.pairs else [(a.a, a.b)]
-    df = pd.concat([compare(x, y, a.metrics.split(",")) for x, y in pairs], ignore_index=True)
+    df = pd.concat([compare(x, y, a.metrics.split(","), a.level) for x, y in pairs], ignore_index=True)
     print(df.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
     if a.out:
         base = os.path.join(ML_DIR, "report", a.out)
         df.to_csv(base + ".csv", index=False)
         with open(base + ".md", "w") as f:
-            f.write(f"# {a.out} — paired member bootstrap (test, TH + VN, Δ = 30, 1 000 resamples), diff = a − b\n\n")
+            f.write(f"# {a.out} — paired member bootstrap (test, TH + VN, Δ = 30, level {a.level}, 1 000 resamples), diff = a − b\n\n")
             f.write(df.to_markdown(index=False, floatfmt=".4f") + "\n")
 
 

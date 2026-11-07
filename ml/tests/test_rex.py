@@ -1,6 +1,7 @@
 import math
-import numpy as np, torch
+import numpy as np, pandas as pd, torch
 
+from ml.common.levels import native_level
 from ml.retrieval import rex
 from ml.retrieval.base import DAY_BITS, EPOCH, Events, Universe, day_num
 
@@ -21,6 +22,15 @@ def toy_web(ev):
     w.views, w.carts = np.array([1.0, 2.0, 0.0], np.float32), np.array([0.0, 0.0, 1.0], np.float32)
     w.key = w.m * DAY_BITS + w.day
     return w
+
+
+def test_item_index_at_a_coarser_level():
+    """Models A1 and A2 share group A: web or price rows of either model land on item A; a model of an unknown group on -1."""
+    ev = Events("TH", ["m0"], ["A", "B"], np.array([0, 0]), np.array([0, 1]), np.array([T, T]), np.zeros(2, np.int64),
+                level="nature", model_group=pd.Series({"A1": "A", "A2": "A", "B1": "B", "Z1": "Z"}))
+    assert ev.item_index(["A2", "B1", "A1", "Z1", "unknown"]).tolist() == [0, 1, 0, -1, -1]
+    assert rex.REX("full", "rex", "nature").name == "rex_nature" and native_level("rex_nature_nbr") == "nature"
+    assert native_level("rex_noweb_nbr") is None and native_level("rex_nbr") is None
 
 
 def universe(ev):
@@ -91,8 +101,9 @@ def test_forward_and_loss_of_every_variant():
     for base, variant in [(base, v) for base in ("rex", "rex2") for v in rex.REX.VARIANTS]:
         drop = rex.REX(variant, base).drop
         torch.manual_seed(0)
+        hier = (np.arange(uni.size) % 2, np.zeros(uni.size, np.int64)) if variant == "hier" else ()
         net = rex.REXNet(uni.size, np.zeros(uni.size, np.int64), np.zeros(uni.size, np.int64), 16, 1, 0.0, drop,
-                         np.zeros(uni.size, np.float32)).to(rex.DEVICE)
+                         np.zeros(uni.size, np.float32), hier).to(rex.DEVICE)
         logits = net(b.tensors(), pop, price)
         assert logits.shape == (2, uni.size) and logits.dtype == torch.float32, variant
         tgt = torch.zeros_like(logits, dtype=torch.bool)
