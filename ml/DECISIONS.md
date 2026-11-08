@@ -356,6 +356,13 @@ once: pooled REX 0.1056 (REX 0.1033, REX ensemble 0.1050), paired − REX +0.002
 Reading: pooling helps the smallest country most and replaces the three-seed REX ensemble with one training; `ens_pool3` is the
 best model-level list.
 
+Retuned (2026-11-09, tuning.yml rex_pool: the REX space with d up to 384, 10 trials, valid NDCG@20 all countries): best d 384,
+1 block, dropout 0.084, lr 0.00017, valid 0.1083 (REX parameters 0.1079; trials 0.0940–0.1083); the first build, kept as
+`rex_pool_v0_nbr`, is replaced by `rex_pool_nbr`. Fusion reselected on valid (`ens_pool3t`, weights 0.4 / 0.3 / 0.3, k 5,
+0.1122). Test, TH + VN, reported once: pooled REX 0.1076 (HR@10 0.2534, explore recall 0.1009), − untuned +0.0020
+[0.0013, 0.0026]; `ens_pool3t` 0.1102 (HR@10 0.2567, explore recall 0.1030), − `ens_pool3` +0.0009 [0.0005, 0.0014]. The
+valid gain (+0.0004) was within the seed spread, the test gain is larger; `ens_pool3t` is the best model-level list.
+
 ## 2026-11-07 · NDCG@20 at coarser product levels (t40_granularity)
 
 Question: the target NDCG@20 ≥ 0.2 is out of reach at the model level; which change of the task reaches it, and does the model

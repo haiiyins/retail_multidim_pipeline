@@ -41,7 +41,8 @@ def to_scores(df):
 
 
 def tuned(name):
-    p = dict(CFG[name]["params"])
+    """Best of the first N_TRIALS trials of <name>_nbr over the config defaults; rex_pool starts from the tuned REX."""
+    p = tuned("rex") if name == "rex_pool" else dict(CFG[name]["params"])
     path = ml_path("tuning", f"{name}_nbr.parquet")
     if os.path.exists(path):
         t = pd.read_parquet(path)
@@ -78,7 +79,7 @@ def main():
         src = SASRecAll()
     elif a.source == "rex_pool":
         from ml.retrieval.rex import REXPool
-        assert not a.tune and a.level == "model", "rex_pool keeps the REX parameters"
+        assert a.level == "model", "rex_pool: model level"
         src = REXPool()
     elif a.source.split("_")[0] in ("rex", "rex2"):
         from ml.retrieval.rex import REX
@@ -111,7 +112,7 @@ def main():
         space = load_config("tuning")[a.source]["space"]
 
         def objective(params, trial):
-            full = {**CFG[a.source]["params"], **params}
+            full = {**(tuned("rex") if a.source == "rex_pool" else CFG[a.source]["params"]), **params}
             sc = pd.concat([to_scores(p) for _, _, p in generate(src, full, con, ["valid"], COUNTRIES, events, cache, explore_only=False)])
             value, _ = unconditional(con, sc, "valid", 30)
             print(f"  trial {trial.number}: NDCG@20 (valid, unconditional) {value:.4f}  {params}", flush=True)
@@ -120,7 +121,8 @@ def main():
         study, _ = tune(name, objective, space=space)
         print(f"best {study.best_value:.4f}  {study.best_params}", flush=True)
     if a.build:
-        params = base.tuned_params("sasrec") if a.source == "sasrec_all" else tuned(src.base if hasattr(src, "base") else a.source)
+        params = (base.tuned_params("sasrec") if a.source == "sasrec_all" else tuned("rex_pool") if a.source == "rex_pool"
+                  else tuned(src.base if hasattr(src, "base") else a.source))
         src.seed = a.seed
         with Run(f"baseline:{name}", config={"source": a.source, "seed": a.seed}, params=params) as run:
             for split in ("valid", "test"):

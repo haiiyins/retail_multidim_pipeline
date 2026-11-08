@@ -583,6 +583,9 @@ class REXPool(REX):
     def fit(self, prep, params, ev, uni, cutoff):
         key = ("fit", cutoff, config_hash(params), self.seed)
         if key not in self._memo:
+            for old in [k for k in self._memo if k[0] == "fit" and k[2:] != key[2:]]:   # another tuning trial: free the GPU
+                del self._memo[old]
+            torch.cuda.empty_cache()
             self._memo[key] = super().fit(prep, params, ev, uni, cutoff)
         return self._memo[key]
 
