@@ -9,7 +9,7 @@ and model_version; view ml.cand_<source>. With retrieval.explore_only the models
 (explore-only candidates; R1 covers the repeats).
 Usage: python ml/retrieval/<source>.py --tune [--trials N]   (valid, objective: explore coverage added to R1–R5@200)
        python ml/retrieval/<source>.py --build               (every split, tuned parameters when they exist)"""
-import argparse, datetime as dt, glob, json, os, sys, time
+import argparse, copy, datetime as dt, glob, json, os, sys, time
 import numpy as np, pandas as pd, torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -73,7 +73,41 @@ class Events:
                    price=np.nan_to_num(np.ma.filled(r["price"], np.nan), nan=0.0), item_dept=it["dept"].to_numpy(),
                    level=level, model_group=model_group)
 
+    @classmethod
+    def pool(cls, evs):
+        """The purchases of several countries in one Events: members keyed '<country>|<member_id>' (a member of two countries is two
+        members), items = the union of the models, unit prices replaced by their percentile within the country (currencies differ).
+        member_country: country index of each member; view(country) scores the anchors of one country."""
+        items = np.unique(np.concatenate([e.items for e in evs]))
+        idx = pd.Index(items)
+        dept = np.full(len(items), -1, np.int64)
+        m, i, day, ts, price = [], [], [], [], []
+        off = 0
+        for e in evs:
+            dept[idx.get_indexer(e.items)] = e.item_dept
+            m.append(e.m.astype(np.int64) + off)
+            i.append(idx.get_indexer(e.items)[e.i])
+            day.append(e.day)
+            ts.append(e.ts)
+            p = pd.Series(np.where(e.price > 0, e.price, np.nan)).rank(pct=True).fillna(0.0).to_numpy(np.float32)
+            price.append(p)
+            off += len(e.members)
+        members = np.concatenate([[f"{e.country}|{x}" for x in e.members] for e in evs])
+        ev = cls("+".join(e.country for e in evs), members, items, *(np.concatenate(x) for x in (m, i, day, ts)),
+                 price=np.concatenate(price), item_dept=dept)
+        ev.countries = [e.country for e in evs]
+        ev.member_country = np.repeat(np.arange(len(evs)), [len(e.members) for e in evs])
+        return ev
+
+    def view(self, country):
+        """The pooled events seen from one country (shared arrays): member ids of that country map to their pooled index."""
+        v = copy.copy(self)
+        v.country = country
+        return v
+
     def member_index(self, member_ids):
+        if getattr(self, "countries", None) and self.country in self.countries:
+            member_ids = [f"{self.country}|{x}" for x in member_ids]
         return self.members.get_indexer(member_ids).astype(np.int64)
 
     def item_index(self, model_codes):
@@ -174,6 +208,9 @@ class Source:
     scores(): (n, universe) tensor on DEVICE for a Query."""
     name, version, seed = "", 1, 0
 
+    def universe(self, ev, cutoff):
+        return Universe(ev, cutoff)
+
     def prepare(self, ev, uni, cutoff):
         return None
 
@@ -219,7 +256,7 @@ def generate(src, params, con, splits, countries, events, cache=None, explore_on
             if cache is not None and key in cache:
                 uni, prep = cache[key]
             else:
-                uni = Universe(ev, cutoff)
+                uni = src.universe(ev, cutoff)
                 prep = src.prepare(ev, uni, cutoff)
                 if cache is not None:
                     cache[key] = (uni, prep)

@@ -9,6 +9,7 @@ Usage: python ml/baselines/nbr.py --source ease|tifuknn|rex [--tune] [--build]
        python ml/baselines/nbr.py --source rex --build --seed 1   →  rex_nbr_seed1
        python ml/baselines/nbr.py --source rex_noweb|rex_nopop|rex_norep|rex_noseq|rex2_noprice|... --build
        python ml/baselines/nbr.py --source rex --level nature --build   →  rex_nature_nbr, items = product natures (t40)
+       python ml/baselines/nbr.py --source rex_pool --build   →  rex_pool_nbr, one REX per cutoff over SG + TH + VN
        python ml/baselines/nbr.py --source sasrec|sasrec_all --build   →  data/ml/scores/<source>_nbr_{valid,test}_d30.parquet"""
 import argparse, glob, importlib, json, os, sys, time
 import pandas as pd
@@ -75,6 +76,10 @@ def main():
         from ml.retrieval.sasrec import SASRecAll
         assert not a.tune, "sasrec_all keeps the R10 parameters"
         src = SASRecAll()
+    elif a.source == "rex_pool":
+        from ml.retrieval.rex import REXPool
+        assert not a.tune and a.level == "model", "rex_pool keeps the REX parameters"
+        src = REXPool()
     elif a.source.split("_")[0] in ("rex", "rex2"):
         from ml.retrieval.rex import REX
         rex_base, _, variant = a.source.partition("_")
@@ -85,6 +90,10 @@ def main():
     loaded = {}
 
     def events(country):
+        if a.source == "rex_pool":
+            if "pool" not in loaded:
+                loaded["pool"] = Events.pool([Events.load(con, c) for c in COUNTRIES])
+            return loaded["pool"].view(country)
         if country not in loaded:
             loaded[country] = Events.load(con, country, a.level)
         return loaded[country]

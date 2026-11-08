@@ -33,6 +33,45 @@ def test_item_index_at_a_coarser_level():
     assert native_level("rex_noweb_nbr") is None and native_level("rex_nbr") is None
 
 
+def test_pooled_events_keep_countries_apart():
+    """TH: m0 buys A on T − 3; VN: m0 (another member, same id) buys B on T − 2 and m1 buys A on T − 1. One pooled network, but each
+    country keeps its own members, universe, popularity and score mask."""
+    th = Events("TH", ["m0"], ["A"], np.array([0]), np.array([0]), np.array([T - 3]), np.zeros(1, np.int64),
+                price=np.array([100.0]), item_dept=np.array([1]))
+    vn = Events("VN", ["m0", "m1"], ["A", "B"], np.array([0, 1]), np.array([1, 0]), np.array([T - 2, T - 1]), np.zeros(2, np.int64),
+                price=np.array([5e4, 9e4]), item_dept=np.array([1, 2]))
+    ev = Events.pool([th, vn])
+    assert list(ev.items) == ["A", "B"] and ev.member_country.tolist() == [0, 1, 1]
+    assert ev.view("TH").member_index(["m0"]).tolist() == [0] and ev.view("VN").member_index(["m0", "m1"]).tolist() == [1, 2]
+    assert set(np.round(ev.price, 2)) <= {1.0, 0.5}                     # percentiles within each country, not currencies
+    src = rex.REXPool()
+    cutoff = EPOCH.fromordinal(EPOCH.toordinal() + T + 1)
+    uni = src.universe(ev, cutoff)
+    assert uni.country_items.tolist() == [[True, False], [True, True]]  # B never sold in TH
+    prep = src.prepare(ev, uni, cutoff)
+    b = rex.Batch(ev, _no_web(), uni, prep["stats"], np.array([0, 2]), np.array([T, T]), country=np.array([0, 1]))
+    pop = src.pop(prep["cum"].to(rex.DEVICE), prep["day0"], b)
+    b7 = torch.expm1(pop[b.t_inv, :, 0] * 5).round().cpu().tolist()
+    assert b7 == [[1.0, 0.0], [1.0, 1.0]]                               # TH counts its own buyer of A only
+    net = rex.REXNet(uni.size, prep["dept"], prep["price"], 16, 1, 0.0, src.drop, n_countries=2).to(rex.DEVICE)
+    net.country_items = uni.country_items.to(rex.DEVICE)
+    ok = src.allowed(net, b.country)
+    logits = net(b.tensors(), pop).masked_fill(~ok, -torch.inf)
+    assert torch.isinf(logits[0, 1]) and torch.isfinite(logits[1]).all()
+    tgt = torch.tensor([[True, False], [False, True]], device=rex.DEVICE)
+    loss = rex.full_target_loss(logits, tgt)
+    assert math.isfinite(loss.item())
+    loss.backward()
+
+
+def _no_web():
+    w = rex.WebEvents.__new__(rex.WebEvents)
+    w.m = w.i = w.day = np.zeros(0, np.int64)
+    w.views = w.carts = np.zeros(0, np.float32)
+    w.key = np.zeros(0, np.int64)
+    return w
+
+
 def universe(ev):
     return Universe(ev, EPOCH.fromordinal(EPOCH.toordinal() + T + 100), size=10, window_days=1000)
 

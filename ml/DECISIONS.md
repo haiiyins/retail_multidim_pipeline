@@ -339,6 +339,23 @@ paired: `ens_main` − one-seed fusion +0.0017 [0.0013, 0.0021], − REX +0.0050
 prior of the fusion (RRF of the model rank and the rank of its supermodel, +0.0009 on the one-seed fusion, +0.0004 on `ens_main`).
 Reading: `ens_main` is the best model-level list; it costs three REX and three P3 trainings plus the P1 pipeline.
 
+## 2026-11-08 · REX pooled over the three countries (t31_pool)
+
+Question: VN has a third of the purchases of TH or SG and the country universes share 73–77 % of their models; does one network
+trained on every country learn better explore embeddings? `REXPool` (`nbr.py --source rex_pool`): one REX per cutoff on
+Events.pool(SG, TH, VN) (members keyed by country, a member of two countries counted twice; unit prices as percentiles within the
+country), models shared by code, a country embedding added to the month embedding; each country keeps its own universe (top
+5 000 by its buyers; the softmax, the targets and the scores masked to it) and its own popularity counts; web attention and
+repeat inputs as REX; the REX parameters, no retuning. `full_target_loss` now takes the log-probability on the targets only
+(0 × −inf off them under the mask; unchanged values without a mask). Valid (all countries): 0.1079 against REX 0.1054 (seeds
+0.1040–0.1054). Fusion, selected on valid: pooled REX + P3 ensemble + P1 + REX features (`ens_pool3`, weights 0.5 / 0.25 / 0.25,
+k 5) 0.1118; adding the REX seed ensemble as a fourth list 0.1119, not kept (one more list for 0.0001). Test, TH + VN, reported
+once: pooled REX 0.1056 (REX 0.1033, REX ensemble 0.1050), paired − REX +0.0024 [0.0017, 0.0032] (explore recall +0.0068, repeat
+−0.0134), − REX ensemble +0.0007 [−0.0001, 0.0014]; by country SG +0.0005, TH +0.0014, VN +0.0036. `ens_pool3` 0.1093 (HR@10
+0.2560, explore recall 0.1011), − `ens_main` +0.0011 [0.0005, 0.0016], − one-seed fusion +0.0027 [0.0022, 0.0033].
+Reading: pooling helps the smallest country most and replaces the three-seed REX ensemble with one training; `ens_pool3` is the
+best model-level list.
+
 ## 2026-11-07 · NDCG@20 at coarser product levels (t40_granularity)
 
 Question: the target NDCG@20 ≥ 0.2 is out of reach at the model level; which change of the task reaches it, and does the model
