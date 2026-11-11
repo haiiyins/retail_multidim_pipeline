@@ -589,6 +589,12 @@ class REXPool(REX):
             self._memo[key] = super().fit(prep, params, ev, uni, cutoff)
         return self._memo[key]
 
+    def forget(self, cutoff):
+        """Drop the universe, inputs and fitted models of a cutoff (rolling scoring over many cutoffs)."""
+        for k in [k for k in self._memo if isinstance(k, tuple) and k[1] == cutoff]:
+            del self._memo[k]
+        torch.cuda.empty_cache()
+
     def web(self, ev):
         if "web" not in self._memo:
             con = connect(threads=16)

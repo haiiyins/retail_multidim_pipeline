@@ -363,6 +363,18 @@ Retuned (2026-11-09, tuning.yml rex_pool: the REX space with d up to 384, 10 tri
 [0.0013, 0.0026]; `ens_pool3t` 0.1102 (HR@10 0.2567, explore recall 0.1030), − `ens_pool3` +0.0009 [0.0005, 0.0014]. The
 valid gain (+0.0004) was within the seed spread, the test gain is larger; `ens_pool3t` is the best model-level list.
 
+## 2026-11-11 · P1 with pooled REX features (t31_p1rexp)
+
+`rex_pairs.py --pool`: the tuned pooled REX fitted once per cutoff (13 cutoffs, every split's anchors of candidates_v2, the model of
+cutoff_for(anchor)), rex_lp / rex_rank of every candidate pair under the anchor country's universe mask → pairs_v2rexp
+(102,686,571 rows as pairs_v2; coverage train 94–97 %, valid / test 97.5–99.7 %; assert_pit 0 violations in every country). The
+scoring checkpoints one file per country × cutoff (data/ml/rex/pool_parts) so a stopped run resumes. P1 retuned with the same
+10-trial budget: valid 0.1100 against 0.1083 with single-country REX features, paired on valid +0.0017 [0.0008, 0.0027]. Test,
+TH + VN, reported once: 0.1091 (HR@10 0.2569, explore recall 0.1037), − P1 + single-country REX +0.0032 [0.0025, 0.0039],
+− P1 +0.0080 [0.0072, 0.0088]. Rejected on valid, never run on test: replacing P1 + single-country REX by it in the fusion
+(pooled REX + P3 ensemble + it, weights reselected, 0.1120 against `ens_pool3t` 0.1122, paired −0.0002 [−0.0007, 0.0003]).
+Reading: `ens_pool3t` stays the best list (0.1102); P1 + pooled REX features alone is within 0.0011 of it with one ranker and no P3.
+
 ## 2026-11-07 · NDCG@20 at coarser product levels (t40_granularity)
 
 Question: the target NDCG@20 ≥ 0.2 is out of reach at the model level; which change of the task reaches it, and does the model
