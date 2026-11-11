@@ -753,7 +753,95 @@ only dimension beyond purchases that REX uses. Three extensions were rejected on
 0.1054): the price and promotion of the model on $t - 1$ with the member's price affinity and her own repeat features (0.1055), her
 repeat features alone (0.1058) and 16 epochs instead of 8 (0.1015, overfitting at the tuned dropout of 0.008). REX does not replace the pipeline: it uses
 no price, store or member attribute, its scores are harder to explain than the GBDT's, and it needs a GPU to train. It shows that the
-candidate cap, not the ranker, bounds the pipeline, and it can serve as one more source or as a ranker feature (not tested).
+candidate cap, not the ranker, bounds the pipeline; Section~\ref{sec:hybrid} combines it with the pipeline.
+
+\subsection{REX With the Pipeline and Across Countries}
+\label{sec:hybrid}
+REX and the pipeline err on different anchors: on test, a perfect re-order of the REX top 20 would give 0.190 and of its top 100
+0.372, while a perfect order of the repeat positives alone gives 0.114, so the room is in the order of explore models REX already
+lists. Three combinations were tried, every choice (partner, weights, $k$, parameters) made on valid over the three countries.
+\emph{Rank fusion} (\texttt{ml/eval/fusion.py}) scores a model by $\sum_j w_j / (k + \mathrm{rank}_j)$ over $N$ lists, a model
+absent from a list adding nothing. \emph{REX features}: REX is refitted per country $\times$ cutoff over the anchors of
+candidates\_v2 (train anchors included, the model of the anchor's cutoff, point-in-time checks clean) and its log-probability and
+rank are added to every candidate pair, after which P1 is re-tuned with the same 10-trial budget. \emph{Pooled REX}: one network
+per cutoff over SG, TH and VN, members keyed by country, unit prices as percentiles within the country and a country embedding
+added to the month embedding; each country keeps its own universe (softmax, targets and scores masked to it) and its own popularity
+counts. Its search space allows $d$ up to 384 (selected: 384, one block, dropout 0.084, learning rate 0.00017).
+
+\begin{table}[t]
+\caption{REX combined with the pipeline (test, TH + VN, NDCG@20; reported once after selection on valid; paired differences
+against REX, 95\,\% member bootstrap).}
+\label{tab:hybrid}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrl}
+\toprule
+List & valid & NDCG@20 & HR@10 & $-$ REX \\
+\midrule
+REX (seed 0)                                   & 0.1054 & 0.1033 & 0.2427 & \\
+REX, 3 seeds fused                             & 0.1069 & 0.1050 & --     & +0.0017 [0.0013, 0.0022] \\
+Pooled REX                                     & 0.1083 & 0.1076 & 0.2534 & +0.0043 \\
+P1 + REX features                              & 0.1083 & 0.1060 & --     & +0.0027 \\
+P1 + pooled REX features                       & 0.1100 & 0.1091 & 0.2569 & +0.0058 \\
+REX $\oplus$ P3 one head                       & 0.1098 & 0.1066 & 0.2503 & +0.0033 [0.0027, 0.0039] \\
+\textbf{Pooled REX $\oplus$ P3 $\times$3 $\oplus$ P1 + REX} & 0.1122 & \textbf{0.1102} & 0.2567 & +0.0069 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\\[1ex]
+{\footnotesize $\oplus$: weighted rank fusion; last row weights 0.4 / 0.3 / 0.3, $k = 5$. Differences without an interval are
+differences of means.}
+\end{table}
+
+Each combination adds a few thousandths, the size of every model step so far (Table~\ref{tab:hybrid}). REX features lift P1 by
+$+0.0048$ $[+0.0041, +0.0056]$, mostly on explore recall, and pooled REX features by $+0.0080$ $[+0.0072, +0.0088]$. Pooling helps the
+smallest country most (by country, before re-tuning: SG $+0.0005$, TH $+0.0014$, VN $+0.0036$) and replaces the three-seed REX
+ensemble with one training; re-tuning adds $+0.0020$ $[+0.0013, +0.0026]$. The best list fuses pooled REX, the three P3 one-head
+seeds and P1 + REX features: 0.1102, $+0.0009$ $[+0.0005, +0.0014]$ over the same fusion with the untuned pooled REX and $+0.0082$
+over P3 one head alone. Replacing its third list by P1 + pooled REX features was rejected on valid (0.1120 against 0.1122).
+Rejected on valid and never run on test: the supermodel or product-nature ranking of REX as a prior of the fusion (+0.0004 to
++0.0009, within the seed spread) and product-nature and retail-family embeddings in the item tower (0.1047 against 0.1054). The
+cost is three REX-type trainings, three P3 trainings and the P1 pipeline on a GPU.
+
+\subsection{Coarser Product Levels}
+\label{sec:levels}
+NDCG@20 at the model level stays near 0.11 whatever the model, and changing the label window does not move it: re-scoring the
+valid lists with $\Delta$ of 7, 14, 30, 60 or 90 days or the next basket gives 0.106--0.118. The question was therefore changed in
+its item unit only. With \texttt{ml/eval/granularity.py}, D3 is re-run with the positives being the distinct groups bought in
+$(\text{anchor}, \text{anchor} + \Delta]$ at five levels of the catalogue (one group per model): supermodel (all variants of a
+product), product nature (the product type), retail family, sub-department and department. Returns are netted, a group is a repeat
+if the member bought one of its models before, and a model list becomes a group list by the best model score of each group. REX is
+also trained directly at a level, with events, web attention, universe, targets and the grid filter at the group level and the
+model-level parameters.
+
+\begin{table}[t]
+\caption{NDCG@20 by product level (test, TH + VN; most popular, the best model-level list aggregated to the level, REX trained at
+the level).}
+\label{tab:levels}
+\setlength{\tabcolsep}{4pt}
+\centering
+\begin{tabular}{lrrr}
+\toprule
+Level & popular & aggregated & REX at level \\
+\midrule
+Model          & 0.075 & 0.107 & -- \\
+Supermodel     & 0.111 & 0.140 & 0.147 \\
+Product nature & 0.297 & 0.323 & \textbf{0.372} \\
+Retail family  & 0.270 & 0.298 & -- \\
+Sub-department & 0.430 & 0.452 & -- \\
+Department     & 0.560 & 0.592 & -- \\
+\bottomrule
+\end{tabular}
+\\[1ex]
+{\footnotesize Aggregated: the fusion of REX and P3 one head (0.107 at the model level).}
+\end{table}
+
+The 0.2 target is met by predicting the product type a member buys next (Table~\ref{tab:levels}): REX trained at the nature level
+reaches 0.372, $+0.0491$ $[+0.0473, +0.0508]$ over the aggregated model-level list and $+0.0750$ $[+0.0730, +0.0770]$ over the most
+popular natures, with $+0.140$ explore recall. Training at the level matters less at the supermodel ($+0.0074$
+$[+0.0063, +0.0085]$). At the sub-department and department, popularity alone exceeds 0.4 and the model adds less than at the nature.
+This is a different, coarser question (which kind of product, not which product), so the model level stays the headline metric.
 
 \subsection{H1: Stacking Leakage}
 \label{sec:h1}
@@ -969,6 +1057,11 @@ best-sellers on explore purchases. On average 60\,\% of a member's explore purch
 recovers coverage (0.535) but not NDCG@20 on valid: the extra candidates are explore models the rankers cannot yet place in the top
 20.
 
+\textit{Model against product type.} Every model step, from the tuned rankers to REX and the fusions, moved model-level NDCG@20 by a
+few thousandths, up to 0.1102; the same lists aggregated to the product nature score about three times higher, and REX trained at
+that level reaches 0.372. A target of 0.2 is thus a choice of question rather than of model: which product type a member buys next
+is predictable, which variant within it much less so.
+
 \textit{Tuning budget.} The selected fits use 10 trials; a 30-trial re-tuning of every ranker changed valid NDCG@20 by at most
 0.0004 and was not adopted. The final fits were repeated with three seeds: the seed spread ($\le 0.0003$ NDCG@20) is smaller than the
 P3 one-head gain over P1-tuned. The searches themselves ran with one sampler seed, the P3 ablation variants (\texttt{onehead}, \texttt{fixedgate}, \texttt{noseq}) reused the hyper-parameters tuned on \texttt{p3\_full}, and the candidate sources and NBR baselines kept
@@ -1002,7 +1095,8 @@ share of purchases within reach from \nCandOld{} to \nCandNew{} (RQ2); with tune
 gave more than tuning, and tuning more than the model family: a deep two-head ranker with a learned gate does not beat a tuned GBDT,
 whereas a single-head version without a gate does by 1\,\% (RQ3). Within the two-head formulation, learning the gate outperforms a fixed historical-share rule, while the explicit repeat/explore head split itself is unnecessary. The best model is 1.8 times the best-sellers and 1.5 times ``buy the same again'' in one list of ten, and reaches
 about two thirds of the sales value; on purchase history alone the pipeline keeps about four fifths of its gain over the frequency
-rules, and the other data dimensions add the rest (RQ4). Naive stacking shows the inflation H1 predicted, small because the signals add little over a good feature store.
+rules, and the other data dimensions add the rest (RQ4). A single network over the whole catalogue (REX) matches the pipeline,
+and fused with it, pooled over the three countries, gives 0.1102; at the product-type level the same approach reaches 0.372. Naive stacking shows the inflation H1 predicted, small because the signals add little over a good feature store.
 
 \section*{Acknowledgment}
 This work was carried out as the project of the course Advanced Machine Learning and Applications (IT2043.26.1.CH.01) of the

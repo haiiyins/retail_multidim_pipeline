@@ -607,7 +607,94 @@ giao dịch mua mà REX dùng. Ba mở rộng bị loại trên valid (REX: 0.10
 mãi của model tại $t - 1$ kèm độ hợp giá của thành viên và đặc trưng repeat riêng của thành viên (0.1055), chỉ đặc trưng repeat riêng
 (0.1058) và 16 epoch thay vì 8 (0.1015, quá khớp với dropout đã tinh chỉnh 0.008). REX không thay thế pipeline: nó không dùng giá,
 cửa hàng hay thuộc tính thành viên, điểm số khó giải thích hơn GBDT và cần GPU để huấn luyện. REX cho thấy trần của tầng ứng viên,
-chứ không phải ranker, mới là giới hạn của pipeline, và có thể dùng làm thêm một nguồn hoặc một đặc trưng cho ranker (chưa thử).
+chứ không phải ranker, mới là giới hạn của pipeline; Mục~\ref{sec:hybrid} kết hợp REX với pipeline.
+
+\subsection{REX kết hợp với pipeline và gộp các quốc gia}
+\label{sec:hybrid}
+REX và pipeline sai ở những anchor khác nhau: trên test, sắp lại hoàn hảo top 20 của REX cho 0.190 và top 100 cho 0.372, trong khi
+sắp hoàn hảo riêng các dương tính repeat chỉ cho 0.114, nên dư địa nằm ở thứ tự các model explore mà REX đã liệt kê. Ba cách kết hợp
+được thử, mọi lựa chọn (đối tác, trọng số, $k$, tham số) đều thực hiện trên valid với cả ba quốc gia. \emph{Hợp nhất thứ hạng}
+(\texttt{ml/eval/fusion.py}) chấm điểm một model bằng $\sum_j w_j / (k + \mathrm{rank}_j)$ trên $N$ danh sách; model vắng mặt trong
+một danh sách không được cộng gì. \emph{Đặc trưng REX}: REX được huấn luyện lại theo quốc gia $\times$ mốc cắt trên các anchor của
+candidates\_v2 (gồm cả anchor train, dùng mô hình của mốc cắt tương ứng, kiểm tra theo thời điểm sạch); log-xác suất và thứ hạng của
+nó được gắn vào mọi cặp ứng viên, rồi P1 được tinh chỉnh lại với cùng ngân sách 10 lượt. \emph{REX gộp}: một mạng mỗi mốc cắt trên
+SG, TH và VN, thành viên được khóa theo quốc gia, đơn giá chuyển thành phân vị trong quốc gia và embedding quốc gia cộng vào
+embedding tháng; mỗi quốc gia giữ vũ trụ riêng (softmax, mục tiêu và điểm được che theo vũ trụ đó) và số đếm độ phổ biến riêng.
+Không gian tìm kiếm cho phép $d$ tới 384 (được chọn: 384, một block, dropout 0.084, learning rate 0.00017).
+
+\begin{table}[t]
+\caption{REX kết hợp với pipeline (test, TH + VN, NDCG@20; báo cáo một lần sau khi chọn trên valid; chênh lệch ghép cặp so với
+REX, bootstrap thành viên 95\,\%).}
+\label{tab:hybrid}
+\setlength{\tabcolsep}{3pt}
+\centering
+\begin{adjustbox}{max width=\columnwidth}
+\begin{tabular}{lrrrl}
+\toprule
+Danh sách & valid & NDCG@20 & HR@10 & $-$ REX \\
+\midrule
+REX (seed 0)                                   & 0.1054 & 0.1033 & 0.2427 & \\
+REX, hợp nhất 3 seed                           & 0.1069 & 0.1050 & --     & +0.0017 [0.0013, 0.0022] \\
+REX gộp                                        & 0.1083 & 0.1076 & 0.2534 & +0.0043 \\
+P1 + đặc trưng REX                             & 0.1083 & 0.1060 & --     & +0.0027 \\
+P1 + đặc trưng REX gộp                         & 0.1100 & 0.1091 & 0.2569 & +0.0058 \\
+REX $\oplus$ P3 một đầu                        & 0.1098 & 0.1066 & 0.2503 & +0.0033 [0.0027, 0.0039] \\
+\textbf{REX gộp $\oplus$ P3 $\times$3 $\oplus$ P1 + REX} & 0.1122 & \textbf{0.1102} & 0.2567 & +0.0069 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\\[1ex]
+{\footnotesize $\oplus$: hợp nhất thứ hạng có trọng số; dòng cuối trọng số 0.4 / 0.3 / 0.3, $k = 5$. Chênh lệch không kèm khoảng là
+chênh lệch trung bình.}
+\end{table}
+
+Mỗi cách kết hợp thêm vài phần nghìn, bằng cỡ mọi bước cải thiện mô hình trước đó (Bảng~\ref{tab:hybrid}). Đặc trưng REX nâng P1
+$+0.0048$ $[+0.0041, +0.0056]$, chủ yếu ở recall explore, và đặc trưng REX gộp nâng $+0.0080$ $[+0.0072, +0.0088]$. Gộp quốc gia giúp
+quốc gia nhỏ nhất nhiều nhất (theo quốc gia, trước khi tinh chỉnh lại: SG $+0.0005$, TH $+0.0014$, VN $+0.0036$) và thay ensemble
+ba seed REX bằng một lần huấn luyện; tinh chỉnh lại thêm $+0.0020$ $[+0.0013, +0.0026]$. Danh sách tốt nhất hợp nhất REX gộp, ba
+seed P3 một đầu và P1 + đặc trưng REX: 0.1102, hơn $+0.0009$ $[+0.0005, +0.0014]$ so với cùng phép hợp nhất dùng REX gộp chưa tinh
+chỉnh và $+0.0082$ so với riêng P3 một đầu. Thay danh sách thứ ba bằng P1 + đặc trưng REX gộp bị loại trên valid (0.1120 so với
+0.1122). Bị loại trên valid và chưa từng chạy trên test: thứ hạng supermodel hoặc product nature của REX làm tiên nghiệm cho phép hợp
+nhất (+0.0004 đến +0.0009, trong phạm vi dao động seed) và embedding product nature, retail family trong tháp item (0.1047 so với
+0.1054). Chi phí là ba lần huấn luyện kiểu REX, ba lần huấn luyện P3 và pipeline P1 trên GPU.
+
+\subsection{Các cấp sản phẩm thô hơn}
+\label{sec:levels}
+NDCG@20 ở cấp model quanh 0.11 bất kể mô hình, và đổi cửa sổ nhãn không thay đổi điều đó: chấm lại các danh sách valid với $\Delta$
+7, 14, 30, 60, 90 ngày hoặc giỏ kế tiếp cho 0.106--0.118. Vì vậy câu hỏi chỉ được đổi ở đơn vị item. Với
+\texttt{ml/eval/granularity.py}, D3 được chạy lại với dương tính là các nhóm phân biệt được mua trong
+$(\text{anchor}, \text{anchor} + \Delta]$ ở năm cấp danh mục (mỗi model thuộc một nhóm): supermodel (mọi biến thể của một sản phẩm),
+product nature (loại sản phẩm), retail family, sub-department và department. Hàng trả lại được trừ, một nhóm là repeat nếu thành viên
+đã mua một model của nhóm trước đó, và danh sách model được chuyển thành danh sách nhóm bằng điểm model cao nhất của mỗi nhóm. REX
+cũng được huấn luyện trực tiếp ở một cấp, với sự kiện, attention web, vũ trụ, mục tiêu và bộ lọc lưới ở cấp nhóm và tham số của cấp
+model.
+
+\begin{table}[t]
+\caption{NDCG@20 theo cấp sản phẩm (test, TH + VN; phổ biến nhất, danh sách cấp model tốt nhất gộp lên cấp, REX huấn luyện ở cấp).}
+\label{tab:levels}
+\setlength{\tabcolsep}{4pt}
+\centering
+\begin{tabular}{lrrr}
+\toprule
+Cấp & phổ biến & gộp & REX ở cấp \\
+\midrule
+Model          & 0.075 & 0.107 & -- \\
+Supermodel     & 0.111 & 0.140 & 0.147 \\
+Product nature & 0.297 & 0.323 & \textbf{0.372} \\
+Retail family  & 0.270 & 0.298 & -- \\
+Sub-department & 0.430 & 0.452 & -- \\
+Department     & 0.560 & 0.592 & -- \\
+\bottomrule
+\end{tabular}
+\\[1ex]
+{\footnotesize Gộp: phép hợp nhất REX và P3 một đầu (0.107 ở cấp model).}
+\end{table}
+
+Mục tiêu 0.2 đạt được khi dự đoán loại sản phẩm thành viên mua tiếp theo (Bảng~\ref{tab:levels}): REX huấn luyện ở cấp nature đạt
+0.372, hơn $+0.0491$ $[+0.0473, +0.0508]$ so với danh sách cấp model gộp lên và $+0.0750$ $[+0.0730, +0.0770]$ so với các nature phổ
+biến nhất, với recall explore $+0.140$. Huấn luyện ở đúng cấp ít tác dụng hơn ở supermodel ($+0.0074$ $[+0.0063, +0.0085]$). Ở
+sub-department và department, riêng độ phổ biến đã vượt 0.4 và mô hình thêm ít hơn so với ở nature. Đây là một câu hỏi khác, thô hơn
+(loại sản phẩm nào, không phải sản phẩm nào), nên cấp model vẫn là thước đo chính.
 
 \subsection{H1: Rò rỉ trong stacking}
 \label{sec:h1}
@@ -760,6 +847,8 @@ Mô hình tốt nhất cần các đầu vào không có trong tệp mua tải l
 
 \textit{Explore vẫn là nút thắt.} Độ bao phủ explore tăng 1.30 lần chứ không phải 2 lần; ở top 10, mô hình không tốt hơn sản phẩm bán chạy đối với giao dịch explore. Trung bình 60\,\% giao dịch explore của thành viên vẫn nằm ngoài 300 ứng viên. Nâng giới hạn lên 500 khôi phục độ bao phủ (0.535) nhưng không cải thiện NDCG@20 trên valid: các ứng viên bổ sung là model explore mà bộ xếp hạng chưa thể đưa vào top 20.
 
+\textit{Model so với loại sản phẩm.} Mọi bước cải thiện mô hình, từ các bộ xếp hạng đã tinh chỉnh đến REX và các phép hợp nhất, chỉ làm NDCG@20 cấp model thay đổi vài phần nghìn, tối đa 0.1102; cùng các danh sách đó gộp lên product nature cho điểm cao khoảng ba lần, và REX huấn luyện ở cấp này đạt 0.372. Mục tiêu 0.2 vì vậy là lựa chọn câu hỏi chứ không phải lựa chọn mô hình: loại sản phẩm thành viên mua tiếp theo có thể dự đoán được, còn biến thể cụ thể trong loại đó thì khó hơn nhiều.
+
 \textit{Ngân sách tinh chỉnh.} Các lượt khớp được chọn dùng 10 lượt; tinh chỉnh lại mọi bộ xếp hạng với 30 lượt chỉ làm NDCG@20 valid thay đổi tối đa 0.0004 nên không được áp dụng. Các lượt khớp cuối được lặp với ba seed: mức dao động giữa seed ($\le 0.0003$ NDCG@20) nhỏ hơn mức tăng của P3 one head so với P1-tuned. Các phép tìm kiếm dùng một seed lấy mẫu; biến thể ablation P3 (\texttt{onehead}, \texttt{fixedgate}, \texttt{noseq}) dùng lại siêu tham số tinh chỉnh trên \texttt{p3\_full}; nguồn ứng viên và mô hình cơ sở NBR giữ ngân sách 10 lượt. SASRec NBR không có ngân sách riêng để tinh chỉnh NDCG@20 (giữ tham số R10, kể cả khi huấn luyện lại trên mọi mục tiêu). Khoảng cách giữa P1-tuned, P2 và P3 dưới 0.001; thứ hạng P2 phụ thuộc ngân sách (30 lượt giúp P2 ngang P3 one head trên test nhưng không trên valid), còn P3 one head có ước lượng điểm ghép cặp dương so với P1-tuned ở cả ba seed (có ý nghĩa thống kê ở seed 0 và 1; cận dưới 95\,\% ở seed 2 là $-0.0000$) và ở cả hai ngân sách tinh chỉnh.
 
 \textit{Chỉ đánh giá ngoại tuyến.} Các con số GMV chỉ là ước lượng đại diện; đề xuất làm thay đổi hành vi, điều mà phát lại ngoại tuyến không thể đo lường.
@@ -774,7 +863,7 @@ Mô hình tốt nhất cần các đầu vào không có trong tệp mua tải l
 \section{Kết luận}
 \label{sec:conclusion}
 
-Mười một bản xuất vận hành được chuyển thành kho đặc trưng theo thời điểm trên một máy: giữ lại 66.1\,M dòng bán hàng, truy vết được mọi dòng bị từ chối, có 182 kiểm thử và không có vi phạm rò rỉ dữ liệu (RQ1). Khi tính mọi giao dịch mua, hệ thống gợi ý dựa trên luật đạt kết quả chỉ bằng một nửa so với cách đánh giá thông thường; phần lớn trường hợp bỏ lỡ là sản phẩm chưa từng được truy xuất. Xem truy xuất là một mô hình, với tám nguồn chỉ dành cho explore được huấn luyện lại theo quý và trộn dưới giới hạn 300 ứng viên, đã tăng tỷ lệ giao dịch mua có thể tiếp cận từ \nCandOld{} lên \nCandNew{} (RQ2); với bộ xếp hạng tinh chỉnh có thể đọc thứ hạng nguồn, NDCG@20 tăng từ \nRefUncond{} lên \nTuned{}--\nBest{} (+7--8\,\%), cao hơn mô hình cơ sở next-basket tốt nhất hơn 25\,\% (\nBaseline{}). Đặc trưng đóng góp nhiều hơn tinh chỉnh, và tinh chỉnh nhiều hơn họ mô hình: bộ xếp hạng sâu hai đầu có cổng học được không vượt GBDT đã tinh chỉnh, trong khi biến thể một đầu không có cổng vượt 1\,\% (RQ3). Trong cấu hình hai đầu, cổng học được tốt hơn luật cố định dựa trên tỷ trọng lịch sử, còn việc tách riêng đầu repeat/explore là không cần thiết. Mô hình tốt nhất vượt sản phẩm bán chạy 1.8 lần và ``mua lại món cũ'' 1.5 lần trong cùng danh sách mười sản phẩm, đồng thời tiếp cận khoảng hai phần ba giá trị doanh số; chỉ dùng lịch sử mua hàng, quy trình giữ được khoảng bốn phần năm mức tăng so với luật tần suất, còn các chiều dữ liệu khác bổ sung phần còn lại (RQ4). Stacking ngây thơ gây ra mức phóng đại như H1 dự đoán, nhưng nhỏ vì tín hiệu bổ sung rất ít so với kho đặc trưng tốt.
+Mười một bản xuất vận hành được chuyển thành kho đặc trưng theo thời điểm trên một máy: giữ lại 66.1\,M dòng bán hàng, truy vết được mọi dòng bị từ chối, có 182 kiểm thử và không có vi phạm rò rỉ dữ liệu (RQ1). Khi tính mọi giao dịch mua, hệ thống gợi ý dựa trên luật đạt kết quả chỉ bằng một nửa so với cách đánh giá thông thường; phần lớn trường hợp bỏ lỡ là sản phẩm chưa từng được truy xuất. Xem truy xuất là một mô hình, với tám nguồn chỉ dành cho explore được huấn luyện lại theo quý và trộn dưới giới hạn 300 ứng viên, đã tăng tỷ lệ giao dịch mua có thể tiếp cận từ \nCandOld{} lên \nCandNew{} (RQ2); với bộ xếp hạng tinh chỉnh có thể đọc thứ hạng nguồn, NDCG@20 tăng từ \nRefUncond{} lên \nTuned{}--\nBest{} (+7--8\,\%), cao hơn mô hình cơ sở next-basket tốt nhất hơn 25\,\% (\nBaseline{}). Đặc trưng đóng góp nhiều hơn tinh chỉnh, và tinh chỉnh nhiều hơn họ mô hình: bộ xếp hạng sâu hai đầu có cổng học được không vượt GBDT đã tinh chỉnh, trong khi biến thể một đầu không có cổng vượt 1\,\% (RQ3). Trong cấu hình hai đầu, cổng học được tốt hơn luật cố định dựa trên tỷ trọng lịch sử, còn việc tách riêng đầu repeat/explore là không cần thiết. Mô hình tốt nhất vượt sản phẩm bán chạy 1.8 lần và ``mua lại món cũ'' 1.5 lần trong cùng danh sách mười sản phẩm, đồng thời tiếp cận khoảng hai phần ba giá trị doanh số; chỉ dùng lịch sử mua hàng, quy trình giữ được khoảng bốn phần năm mức tăng so với luật tần suất, còn các chiều dữ liệu khác bổ sung phần còn lại (RQ4). Một mạng duy nhất trên toàn danh mục (REX) đạt ngang pipeline, và khi hợp nhất với pipeline, gộp ba quốc gia, cho 0.1102; ở cấp loại sản phẩm, cùng cách tiếp cận đạt 0.372. Stacking ngây thơ gây ra mức phóng đại như H1 dự đoán, nhưng nhỏ vì tín hiệu bổ sung rất ít so với kho đặc trưng tốt.
 
 \section*{Lời cảm ơn}
 Công trình này được thực hiện trong khuôn khổ dự án học phần Advanced Machine Learning and Applications (IT2043.26.1.CH.01), chương trình Thạc sĩ Công nghệ Thông tin tại University of Information Technology, Vietnam National University Ho Chi Minh City, dưới sự hướng dẫn của TS. Ha Minh Tan, người mà các tác giả xin cảm ơn vì những chỉ dẫn quý báu. Chủ sở hữu đã cung cấp tập dữ liệu cho mục đích học thuật; báo cáo và kho mã nguồn không chứa định danh đặc thù của tổ chức.
