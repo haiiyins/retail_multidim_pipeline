@@ -271,6 +271,25 @@ Test, TH + VN, Δ = 30 unless stated; valid is the decision data.
   in `make demo-push`, also the raw model codes and member ids of the lakehouse (`--db`) and the REDACT_TERMS tokens
   (`--require-terms`). Current Space (11 files, showcase included): 0 hits; a tampered copy is caught (serve/tests).
 
+## 2026-11-03 · Learned mixer (ML-13b, t30c, candidates_v2lm)
+
+A LightGBM binary model scores the mixer's k_max list (up to 500 per anchor, ≈ 468 on average) from the rank in each source, the
+number of proposing sources, the fixed-mixer rank and the country (`retrieval/learned_mixer.py`; 120 000 train anchors, positives
+weighted 1 / |positives in the list|, early stopping on 10 % of them). Train lists are cross-fitted (two folds by member).
+- Valid, TH + VN, K = 300: coverage 0.4847 → 0.5018, repeat 0.976 → 0.993, explore 0.4328 → 0.4495 (union of all sources 0.5669).
+  40 000 or 120 000 training anchors give the same gain (+0.017); the model stops before 100 rounds. Main features: fixed-mixer rank,
+  number of sources, R1 and R5 ranks.
+- candidates_v2lm (QC-6 0, pairs leakage 0), P1 refitted with the p1_v2 parameters (`p1_tuned_v2lm`): valid TH + VN NDCG@20 0.1084
+  against 0.1088 (repeat recall@20 0.817 → 0.792, explore 0.0996 → 0.1014). Test, paired against P1-tuned v2: +0.0004
+  [−0.0002, 0.0009], explore +0.0021 [0.0007, 0.0035], repeat −0.0243 [−0.0296, −0.0192].
+- Decision: candidates_v2 and the fixed mixer are kept. As with K = 500 and r1_first, more coverage does not reach NDCG@20: the
+  extra positives are explore candidates the ranker places below rank 20, and the extra repeat candidates dilute the repeat ranking.
+- Re-tune on v2lm (study p1_v2lm, 10 trials, `p1_retuned_v2lm`): best valid 0.1030 at trial 9, the same parameters as p1_v2, so the
+  final fit equals `p1_tuned_v2lm`. Optuna's TPESampler starts with 10 random trials (n_startup_trials default), so with a 10-trial
+  budget and sampler seed 0 every study of one model draws the same 10 configurations: the 10-trial budget is a seeded random
+  search, and a re-tune on other candidates only re-ranks those 10. The 30-trial check (t31_b30) is the one that goes past the
+  start-up phase. Stated in the report (Section III-D).
+
 ## 2026-11-06 · REX, a single-stage Repeat–Explore network (t31_rex, t32_rex)
 
 Question: the candidate pool holds 45 % of the positives and caps every ranker; can one model over the whole universe, with no
