@@ -48,24 +48,19 @@ Data}
 Kha Nguyen (e-mail: 26848091@grad.uit.edu.vn).}
 
 \begin{abstract}
-An omnichannel retailer records purchases, web and app behaviour, prices, promotions, stock and stores, yet recommends one list to
-everyone: the best-sellers, or the items a member bought before. Turning these signals into a personal weekly list meets three
-obstacles: each signal lives in its own table with its own grain and clock, a feature may only use what was known when the
-recommendation was made, and the usual offline score skips the members a list misses. On eleven operational exports of a
-multi-country sporting-goods retailer (66.1\,M sale lines, 1.0\,B web events, 4.7\,M buying members), a Bronze / Silver / Gold
-lakehouse with seven quality gates builds a point-in-time feature store with zero leakage violations. On it, a rule-based two-stage
-recommender scores a normalized discounted cumulative gain at 20 of \nRefCond{} when, as usual, only the members whose candidate list
-holds a purchase are scored; counting every purchase, it scores \nRefUncond{}, and \nNoSource{}\,\% of all test purchases (63.1\,\% of
-the purchases outside the top 10) were never retrieved, almost all of them items new to the member.
-We therefore treat retrieval as a model: eight learned candidate sources, including linear auto-encoders, random-walk, nearest-neighbour,
-two-tower and self-attentive sequential models, are restricted to items new to the member, refitted every quarter in every split, tuned
-on the explore coverage they add, and merged by a rank-quota mixer under a cap of \nK{} candidates. Coverage rises from \nCandOld{}
-to \nCandNew{}. Under a uniform 10-trial tuning budget for all tunable models, a tuned gradient-boosted ranker, a stacked variant and a deep multi-task ranker with
-repeat and explore heads and a learned gate on the shared 300-candidate pool are compared with five next-basket baseline families on their own candidate lists. All two-stage rankers beat the strongest
-baseline by more than a quarter. Over the baseline ranker on the same candidates, new features give about 70\,\% of the gain and
-hyper-parameter tuning the rest; the model family adds least: the deep model gains about one percent over the tuned trees only in its single-head form, whereas within its two-head form a learned gate outperforms a fixed historical-share gate, while the explicit repeat/explore head split brings no gain over a single head. Restricted to features a purchase log yields, the pipeline keeps about four
-fifths of its gain over the frequency rules a retailer uses today; the other data dimensions add the rest, mostly on new items. A
-controlled study confirms that naive stacking inflates in-sample metrics.
+An omnichannel retailer records purchases, web behaviour, prices, promotions, stock and stores, yet recommends the same
+best-sellers or past purchases to everyone. On eleven operational exports of a multi-country sporting-goods retailer (66.1\,M sale
+lines, 1.0\,B web events, 4.7\,M buying members), a Bronze / Silver / Gold lakehouse with seven quality gates builds a point-in-time
+feature store with zero leakage violations. Scored, as usual, only on members whose candidates hold a purchase, a rule-based
+two-stage recommender reaches an NDCG@20 of \nRefCond{}; counting every purchase it reaches \nRefUncond{}, and \nNoSource{}\,\% of the
+test purchases were never retrieved, almost all items new to the member. We therefore treat retrieval as a model: eight learned
+sources restricted to new items, refitted quarterly and mixed under a cap of \nK{} candidates, raise coverage from \nCandOld{} to
+\nCandNew{}. Under a uniform 10-trial tuning budget, gradient-boosted, stacked and deep multi-task rankers all beat five next-basket
+baseline families by more than a quarter; features give about 70\,\% of the gain over the baseline ranker, tuning the rest, and the
+model family least. A single network over the whole catalogue matches the two-stage pipeline, and its rank fusion with the
+pipeline, pooled over three countries, reaches 0.1102; predicting the product type instead of the model lifts NDCG@20 to 0.372. On
+purchase-log features alone the pipeline keeps about four fifths of its gain over frequency rules, and naive stacking inflates
+in-sample metrics.
 \end{abstract}
 
 \begin{keywords}
@@ -121,13 +116,12 @@ history?
 on the real test the gap narrows but does not vanish.
 \end{itemize}
 
-The contributions are: (1) a Bronze / Silver / Gold lakehouse with seven quality gates and a point-in-time ledger that turns the
-exports into model inputs with zero leakage violations; (2) an unconditional evaluation protocol with a repeat / explore split and a
-positive-level error decomposition that locates \nNoSource{}\,\% of all test purchases (63.1\,\% of those missed outside the top 10) in retrieval rather than ranking; (3) an
-explore-only retrieval layer of eight learned sources refitted quarterly in every split, with a rank-quota mixer; (4) a controlled
-comparison of P1-tuned, P2 and P3 on the shared 300-candidate pool and five NBR baseline families on their own candidate lists that separates features, tuning and model family, with a
-controlled measurement of stacking leakage (naive, rolling, leaky); and (5) a static demonstrator with privacy safeguards that also
-shows the best model's batch output on real, anonymised members.
+The contributions are: (1) a Bronze / Silver / Gold lakehouse with seven quality gates and a point-in-time ledger with zero leakage
+violations; (2) an unconditional protocol with a repeat / explore split and an error decomposition that locates \nNoSource{}\,\% of
+the test purchases in retrieval rather than ranking; (3) an explore-only retrieval layer of eight learned sources refitted
+quarterly, with a rank-quota mixer; (4) a controlled comparison of rankers and five NBR baseline families that separates features,
+tuning and model family, with a measurement of stacking leakage; (5) a single-stage network over the whole catalogue and its
+fusion with the pipeline; and (6) a static demonstrator with privacy safeguards.
 
 % ---------------------------------------------------------------------------------------------------------------------------------
 \section{Related Work}
@@ -616,30 +610,19 @@ P3 one head  & 0.1020 / 0.1022 / 0.1022 & 0.1022 $\pm$ 0.0001 & 0.831 $\pm$ 0.00
 
 \Figure[t!](topskip=0pt, botskip=0pt, midskip=0pt)[width=0.99\columnwidth]{fig_t31_seeds.png}{NDCG@20 of the final fits across three seeds.\label{fig:seeds}}
 
-\textit{Is the cap binding?} Cutting the mixer list at $K = 500$ instead of 300 raises test coverage from 0.450 to 0.535 for
-1.6 times the pairs. P1-frozen was refitted as is, P1-tuned and P3 were re-tuned with 10 trials. On valid (TH + VN), the decision
-data, NDCG@20 does not improve: P1-tuned 0.1088 to 0.1079, P3 two heads 0.1087 to 0.1092, P3 one head 0.1096 to 0.1097, so
-$K = 300$ is kept. Reported once afterwards on test (paired, $K = 500$ $-$ $K = 300$): P1-frozen $-0.0009$ $[-0.0016, -0.0003]$,
-P1-tuned $-0.0003$ $[-0.0008, +0.0001]$, P3 two heads $+0.0006$ $[-0.0000, +0.0011]$, P3 one head $+0.0012$ $[+0.0007, +0.0017]$
-(0.1032). The one-head test gain is not supported on valid and is not used for selection, which would select on test. The GBDT
-loses 0.025 repeat recall to the extra negatives. The cap is not what limits accuracy; ranking the hard explore candidates is.
+\textit{Is the cap binding?} $K = 500$ instead of 300 raises test coverage from 0.450 to 0.535 for 1.6 times the pairs. With the
+rankers refitted or re-tuned, valid NDCG@20 (TH + VN, the decision data) does not improve (P1-tuned 0.1088 to 0.1079, P3 one head
+0.1096 to 0.1097), so $K = 300$ is kept. On test, reported once, P3 one head gains $+0.0012$ $[+0.0007, +0.0017]$ and P1-tuned
+$-0.0003$ $[-0.0008, +0.0001]$; the one-head gain is not supported on valid and is not used for selection. The cap is not what
+limits accuracy; ranking the hard explore candidates is.
 
-\textit{Are the mixer weights binding?} The weights are not tuned for NDCG and cost 2.5 points of repeat coverage
-(Section~\ref{sec:retrieval}). A variant that places the whole R1 list first and fills the rest with the same quotas restores the
-repeat coverage (0.972 to 0.997 on test) for $-0.001$ explore coverage. P1-tuned refitted on its pairs with the same
-hyper-parameters gives the same valid NDCG@20 (TH + VN: 0.1087 against 0.1088), so the fixed weights are kept; on test the paired
-difference is $+0.0004$ $[-0.0001, +0.0009]$. The repeats the quotas cut sit at the end of long R1 lists and rarely reach the top 20.
-A learned mixer (LightGBM over the source ranks, top 300 of the union) lifts valid coverage to 0.502, but P1-tuned on its pairs
-gives 0.1084 on valid and $+0.0004$ $[-0.0002, +0.0009]$ on test.
+\textit{Are the mixer weights binding?} Placing the whole R1 list first restores the 2.5 points of repeat coverage the quotas cut
+(0.972 to 0.997 on test), and a learned mixer (LightGBM over the source ranks) lifts valid coverage to 0.502; P1-tuned on either
+gives the same valid NDCG@20 (0.1087 and 0.1084 against 0.1088) and $+0.0004$ on test, so the fixed weights are kept.
 
-\textit{Is the tuning budget binding?} With 10 trials the best GBDT trial was the last one and sat near the learning-rate floor, and the
-best P3 trial sat at its floor. P1-tuned, P2 and P3 were therefore re-tuned on the same v2 pairs with 30 trials each and lower floors
-(GBDT learning rate $\ge 0.005$ with up to 6\,000 rounds, P3 learning rate $\ge 2 \cdot 10^{-5}$), the same budget for every ranker.
-On valid (TH + VN, the decision data), NDCG@20 does not improve from 10 to 30 trials: P1-tuned 0.1088 to 0.1089, P2 0.1089 to
-0.1088, P3 two heads 0.1087 to 0.1086, P3 one head 0.1096 to 0.1092, so the 10-trial fits are kept. Reported once afterwards on test
-(paired, 30 $-$ 10 trials): P1-tuned $+0.0001$ $[-0.0003, +0.0006]$, P2 $+0.0007$ $[+0.0003, +0.0011]$ (0.1020), P3 two heads
-$-0.0002$ $[-0.0005, +0.0001]$, P3 one head $-0.0000$ $[-0.0003, +0.0003]$ (0.1020). The search had converged at 10 trials, and the
-order of Table~\ref{tab:t31} stands: with 30 trials P2 ties with P3 one head on test, but it does not on valid.
+\textit{Is the tuning budget binding?} The best 10-trial GBDT and P3 trials sat near their learning-rate floors, so every ranker
+was re-tuned with 30 trials and lower floors. Valid NDCG@20 does not improve (changes of at most 0.0004), so the 10-trial fits are
+kept; on test only P2 moves ($+0.0007$ $[+0.0003, +0.0011]$, to 0.1020, level with P3 one head on test but not on valid).
 
 \subsection{By Country and Segment}
 Table~\ref{tab:segments} splits NDCG@20 by country and by member segment (transactions in the 365 days before the anchor: new
@@ -757,16 +740,13 @@ candidate cap, not the ranker, bounds the pipeline; Section~\ref{sec:hybrid} com
 
 \subsection{REX With the Pipeline and Across Countries}
 \label{sec:hybrid}
-REX and the pipeline err on different anchors: on test, a perfect re-order of the REX top 20 would give 0.190 and of its top 100
-0.372, while a perfect order of the repeat positives alone gives 0.114, so the room is in the order of explore models REX already
-lists. Three combinations were tried, every choice (partner, weights, $k$, parameters) made on valid over the three countries.
-\emph{Rank fusion} (\texttt{ml/eval/fusion.py}) scores a model by $\sum_j w_j / (k + \mathrm{rank}_j)$ over $N$ lists, a model
-absent from a list adding nothing. \emph{REX features}: REX is refitted per country $\times$ cutoff over the anchors of
-candidates\_v2 (train anchors included, the model of the anchor's cutoff, point-in-time checks clean) and its log-probability and
-rank are added to every candidate pair, after which P1 is re-tuned with the same 10-trial budget. \emph{Pooled REX}: one network
-per cutoff over SG, TH and VN, members keyed by country, unit prices as percentiles within the country and a country embedding
-added to the month embedding; each country keeps its own universe (softmax, targets and scores masked to it) and its own popularity
-counts. Its search space allows $d$ up to 384 (selected: 384, one block, dropout 0.084, learning rate 0.00017).
+REX and the pipeline err on different anchors: a perfect re-order of the REX top 100 would give 0.372 on test, a perfect order of
+the repeats alone only 0.114. Three combinations were tried, every choice made on valid over the three countries. \emph{Rank
+fusion} (\texttt{ml/eval/fusion.py}) scores a model by $\sum_j w_j / (k + \mathrm{rank}_j)$ over $N$ lists. \emph{REX features}:
+REX, refitted per country $\times$ cutoff over the anchors of candidates\_v2 (point-in-time checks clean), adds its log-probability
+and rank to every pair, and P1 is re-tuned with the same budget. \emph{Pooled REX}: one network per cutoff over SG, TH and VN, with
+a country embedding and within-country price percentiles; each country keeps its own universe mask and popularity counts
+($d$ up to 384 in the search; selected 384, one block, dropout 0.084).
 
 \begin{table}[t]
 \caption{REX combined with the pipeline (test, TH + VN, NDCG@20; reported once after selection on valid; paired differences
@@ -795,25 +775,18 @@ differences of means.}
 \end{table}
 
 Each combination adds a few thousandths, the size of every model step so far (Table~\ref{tab:hybrid}). REX features lift P1 by
-$+0.0048$ $[+0.0041, +0.0056]$, mostly on explore recall, and pooled REX features by $+0.0080$ $[+0.0072, +0.0088]$. Pooling helps the
-smallest country most (by country, before re-tuning: SG $+0.0005$, TH $+0.0014$, VN $+0.0036$) and replaces the three-seed REX
-ensemble with one training; re-tuning adds $+0.0020$ $[+0.0013, +0.0026]$. The best list fuses pooled REX, the three P3 one-head
-seeds and P1 + REX features: 0.1102, $+0.0009$ $[+0.0005, +0.0014]$ over the same fusion with the untuned pooled REX and $+0.0082$
-over P3 one head alone. Replacing its third list by P1 + pooled REX features was rejected on valid (0.1120 against 0.1122).
-Rejected on valid and never run on test: the supermodel or product-nature ranking of REX as a prior of the fusion (+0.0004 to
-+0.0009, within the seed spread) and product-nature and retail-family embeddings in the item tower (0.1047 against 0.1054). The
-cost is three REX-type trainings, three P3 trainings and the P1 pipeline on a GPU.
+$+0.0048$ $[+0.0041, +0.0056]$, pooled REX features by $+0.0080$ $[+0.0072, +0.0088]$, mostly on explore recall. Pooling helps the
+smallest country most (VN $+0.0036$, TH $+0.0014$, SG $+0.0005$) and replaces the three-seed ensemble with one training. The best
+list, 0.1102, is $+0.0082$ over P3 one head. Rejected on valid: supermodel or nature rankings of REX as a fusion prior (within the
+seed spread) and nature and family embeddings in the item tower (0.1047 against 0.1054).
 
 \subsection{Coarser Product Levels}
 \label{sec:levels}
-NDCG@20 at the model level stays near 0.11 whatever the model, and changing the label window does not move it: re-scoring the
-valid lists with $\Delta$ of 7, 14, 30, 60 or 90 days or the next basket gives 0.106--0.118. The question was therefore changed in
-its item unit only. With \texttt{ml/eval/granularity.py}, D3 is re-run with the positives being the distinct groups bought in
-$(\text{anchor}, \text{anchor} + \Delta]$ at five levels of the catalogue (one group per model): supermodel (all variants of a
-product), product nature (the product type), retail family, sub-department and department. Returns are netted, a group is a repeat
-if the member bought one of its models before, and a model list becomes a group list by the best model score of each group. REX is
-also trained directly at a level, with events, web attention, universe, targets and the grid filter at the group level and the
-model-level parameters.
+Model-level NDCG@20 stays near 0.11 whatever the model, and the label window is not the lever (valid, $\Delta$ of 7 to 90 days
+or the next basket: 0.106--0.118). The item unit was therefore changed: \texttt{ml/eval/granularity.py} re-runs D3 with the
+distinct groups bought in $(\text{anchor}, \text{anchor} + \Delta]$ as positives, at five catalogue levels from supermodel (all
+variants of a product) and product nature (the product type) to department; a model list becomes a group list by the best model
+score of each group. REX is also trained directly at a level, with the model-level parameters.
 
 \begin{table}[t]
 \caption{NDCG@20 by product level (test, TH + VN; most popular, the best model-level list aggregated to the level, REX trained at
@@ -837,11 +810,9 @@ Department     & 0.560 & 0.592 & -- \\
 {\footnotesize Aggregated: the fusion of REX and P3 one head (0.107 at the model level).}
 \end{table}
 
-The 0.2 target is met by predicting the product type a member buys next (Table~\ref{tab:levels}): REX trained at the nature level
-reaches 0.372, $+0.0491$ $[+0.0473, +0.0508]$ over the aggregated model-level list and $+0.0750$ $[+0.0730, +0.0770]$ over the most
-popular natures, with $+0.140$ explore recall. Training at the level matters less at the supermodel ($+0.0074$
-$[+0.0063, +0.0085]$). At the sub-department and department, popularity alone exceeds 0.4 and the model adds less than at the nature.
-This is a different, coarser question (which kind of product, not which product), so the model level stays the headline metric.
+The 0.2 target is met by predicting the product type a member buys next (Table~\ref{tab:levels}): REX at the nature level reaches
+0.372, $+0.0491$ $[+0.0473, +0.0508]$ over the aggregated model list and $+0.0750$ over the most popular natures. At sub-department
+and department, popularity alone exceeds 0.4. This is a coarser question, so the model level stays the headline metric.
 
 \subsection{H1: Stacking Leakage}
 \label{sec:h1}
@@ -1062,12 +1033,10 @@ few thousandths, up to 0.1102; the same lists aggregated to the product nature s
 that level reaches 0.372. A target of 0.2 is thus a choice of question rather than of model: which product type a member buys next
 is predictable, which variant within it much less so.
 
-\textit{Tuning budget.} The selected fits use 10 trials; a 30-trial re-tuning of every ranker changed valid NDCG@20 by at most
-0.0004 and was not adopted. The final fits were repeated with three seeds: the seed spread ($\le 0.0003$ NDCG@20) is smaller than the
-P3 one-head gain over P1-tuned. The searches themselves ran with one sampler seed, the P3 ablation variants (\texttt{onehead}, \texttt{fixedgate}, \texttt{noseq}) reused the hyper-parameters tuned on \texttt{p3\_full}, and the candidate sources and NBR baselines kept
-the 10-trial budget; SASRec NBR has no NDCG@20 budget of its own (it keeps the R10 parameters, also when retrained on all targets). The margins between P1-tuned, P2 and P3 are below 0.001; P2's
-place depends on the budget (30 trials bring it level with P3 one head on test, not on valid), and P3 one head has a positive paired point estimate over
-P1-tuned across all three seeds (statistically significant at seeds 0 and 1, with seed 2's lower 95\,\% bound at $-0.0000$) and at both tuning budgets.
+\textit{Tuning budget.} The selected fits use 10 trials, and a 30-trial re-tuning changed valid NDCG@20 by at most 0.0004. With
+Optuna's ten random start-up trials and one sampler seed, the 10-trial budget is a seeded random search; the P3 ablation variants
+reused the \texttt{p3\_full} parameters and the sources and NBR baselines kept the 10-trial budget. The margins between P1-tuned, P2
+and P3 are below 0.001, but P3 one head stays above P1-tuned at all three seeds and both budgets.
 
 \textit{Offline only.} GMV figures are a proxy; recommendations change behaviour, which an offline replay cannot measure.
 
