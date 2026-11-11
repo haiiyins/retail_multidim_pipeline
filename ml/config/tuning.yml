@@ -54,6 +54,12 @@ rex:                  # single-stage model, own budget on NDCG@20 like the other
     lr:      {type: float, low: 0.0001, high: 0.003, log: true}
 rex2:
   space: *rex
+rex_pool:                # three countries' data: wider d range
+  space:
+    d:       {type: categorical, choices: [64, 128, 256, 384]}
+    blocks:  {type: int, low: 1, high: 3}
+    dropout: {type: float, low: 0.0, high: 0.4}
+    lr:      {type: float, low: 0.0001, high: 0.003, log: true}
 p3:
   space:
     d:          {type: categorical, choices: [64, 128]}

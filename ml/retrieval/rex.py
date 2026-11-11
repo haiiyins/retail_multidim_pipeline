@@ -27,12 +27,14 @@ REX v2 (source rex2) adds the price dimension and a richer repeat channel:
   rep(φ_i, φ2_i, price_i, u, v_i)  φ2: her own repeat share (shrunk), recency against her own cycle on i
 Stock is left out: the only exported stock table covers spare parts (gld_fs_model_country, issue #21).
 Usage: python ml/baselines/nbr.py --source rex|rex2 --tune --build"""
-import datetime as dt, os, queue, sys, threading
+import copy, datetime as dt, os, queue, sys, threading
 import numpy as np, pandas as pd, torch, torch.nn as nn, torch.nn.functional as F
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from ml.common.data import connect, ml_path
-from ml.retrieval.base import CFG, DAY_BITS, DEVICE, EPOCH, Source, day_num, item_attributes
+from ml.common.levels import group_map
+from ml.common.registry import config_hash
+from ml.retrieval.base import CFG, DAY_BITS, DEVICE, EPOCH, Source, Universe, day_num, item_attributes
 from ml.retrieval.neural import (GAP_BUCKETS, OFFSET, OOV, PAD, Encoder, basket_windows, gap_buckets, months, seed_everything,
                                  train)
 from ml.retrieval.two_tower import pick_refs, rfm
@@ -63,7 +65,7 @@ class WebEvents:
             WHERE country_code = ? AND model_code IS NOT NULL AND event_name IN ({names})
             GROUP BY ALL""", [ev.country]).df()
         m = ev.member_index(r["member_id"])
-        i = pd.Index(ev.items).get_indexer(r["model_code"])
+        i = ev.item_index(r["model_code"])
         keep = (m >= 0) & (i >= 0)
         m, i = m[keep], i[keep]
         day, views, carts = (r[c].to_numpy()[keep] for c in ("day", "views", "carts"))
@@ -109,7 +111,8 @@ class Prices:
         r = pd.read_parquet(path)
         self.day0 = day_num(PRICE_FROM)
         n_days = int(ev.day.max()) - self.day0 + 1
-        i = pd.Index(ev.items).get_indexer(r["model_code"])
+        assert ev.level == "model", "national prices are per model"
+        i = ev.item_index(r["model_code"])
         k = (i >= 0) & (r["day"].to_numpy() >= self.day0) & (r["day"].to_numpy() < self.day0 + n_days)
         i, d = i[k], r["day"].to_numpy()[k] - self.day0
         self.log_price = np.full((n_days, len(ev.items)), np.nan, np.float32)
@@ -158,10 +161,13 @@ def item_repeat_stats(ev, uni, cutoff):
     return np.stack([rate, log_gap], 1).astype(np.float32)
 
 
-def daily_buyers(ev, uni):
-    """(days + 1, universe) cumulative buyers per model: row k = buyers on days < day0 + k, and day0."""
+def daily_buyers(ev, uni, rows=None):
+    """(days + 1, universe) cumulative buyers per model: row k = buyers on days < day0 + k, and day0. rows: the purchase rows
+    counted (default all)."""
     u = uni.pos[ev.i]
     k = u >= 0
+    if rows is not None:
+        k &= rows
     day0 = int(ev.day.min())
     n_days = int(ev.day.max()) - day0 + 2
     d = np.zeros((n_days, uni.size), np.float32)
@@ -198,8 +204,10 @@ class Batch:
     """Inputs of a set of members m at days t: basket windows, RFM, month, the repeat pairs (member's universe models bought before
     t) with φ, the web pairs (models with web attention in the window) with ψ, and the unique days for the popularity features."""
 
-    def __init__(self, ev, web, uni, stats, m, t, row=None, idx=None):
+    def __init__(self, ev, web, uni, stats, m, t, row=None, idx=None, country=None):
+        """country: country index of each row (pooled REX): the popularity days become (country, day) keys."""
         n = len(m)
+        self.country = np.zeros(n, np.int64) if country is None else np.asarray(country, np.int64)
         if row is None:
             row, idx = ev.history(m, t)
         self.n = n
@@ -250,7 +258,7 @@ class Batch:
         self.web_row, self.web_item = (wk // uni.size).astype(np.int64), (wk % uni.size).astype(np.int64)
         bought = np.isin(wk, pk)
         self.psi = np.stack([np.log1p(views), np.log1p(v7), np.log1p(carts), np.log1p(wlast) / 3, bought], 1).astype(np.float32)
-        self.t_uni, self.t_inv = np.unique(t, return_inverse=True)
+        self.t_uni, self.t_inv = np.unique(t if country is None else self.country * DAY_BITS + t, return_inverse=True)
 
     def tensors(self):
         dev = DEVICE
@@ -258,7 +266,7 @@ class Batch:
         return {"x": f(self.x.astype(np.int64)), "days": f(self.days), "lens": f(self.lens), "t": f(self.t),
                 "rfm": self.rfm.to(dev), "month": f(self.month), "rep_row": f(self.rep_row), "rep_item": f(self.rep_item),
                 "phi": f(self.phi), "phi2": f(self.phi2), "member_lp": f(self.member_lp), "web_row": f(self.web_row),
-                "web_item": f(self.web_item), "psi": f(self.psi), "t_inv": f(self.t_inv)}
+                "web_item": f(self.web_item), "psi": f(self.psi), "t_inv": f(self.t_inv), "country": f(self.country)}
 
 
 def mlp(i, h, o, dropout):
@@ -266,11 +274,17 @@ def mlp(i, h, o, dropout):
 
 
 class REXNet(nn.Module):
-    def __init__(self, size, item_dept, item_price, d, blocks, dropout, drop=(), item_lp=None):
+    def __init__(self, size, item_dept, item_price, d, blocks, dropout, drop=(), item_lp=None, item_hier=(), n_countries=1):
         """drop: channels left out: web, pop, rep, seq (member = RFM + month, no basket transformer), and the v2 inputs price
         (price features, price affinity) and rep2 (φ2); REX v1 drops both. item_lp: mean log unit price paid for each universe model
-        before the cutoff, the fallback of the affinity when the model has no price interval."""
+        before the cutoff, the fallback of the affinity when the model has no price interval. item_hier: per universe model, its
+        group index at each extra product level (variant hier), embedded into the item tower. n_countries > 1 (pooled REX): a
+        country embedding added to the month embedding of the member."""
         super().__init__()
+        self.country = nn.Embedding(n_countries, d) if n_countries > 1 else None
+        self.hier = nn.ModuleList(nn.Embedding(int(h.max()) + 1, d) for h in item_hier)
+        for j, h in enumerate(item_hier):
+            self.register_buffer(f"item_hier{j}", torch.as_tensor(h))
         self.drop = set(drop)
         self.use_price, self.use_rep2 = "price" not in self.drop, "rep2" not in self.drop
         self.enc = Encoder(size + OFFSET, d, blocks, C["heads"], dropout, C["max_len"], causal=True)
@@ -279,7 +293,7 @@ class REXNet(nn.Module):
         self.user = mlp(3 * d, d, d, dropout)
         self.dept = nn.Embedding(int(item_dept.max()) + 1, d)
         self.price = nn.Embedding(C["price_buckets"], d)
-        self.item = mlp(3 * d, d, d, dropout)
+        self.item = mlp((3 + len(item_hier)) * d, d, d, dropout)
         n_price = N_PRICE if self.use_price else 0
         self.pop = mlp(N_POP + n_price, d, 1, 0.0)
         self.rep = mlp(N_REP + (N_REP2 if self.use_rep2 else 0) + n_price + 2 * d, d, 1, dropout)
@@ -297,12 +311,14 @@ class REXNet(nn.Module):
 
     def items(self):
         e = self.enc.emb.weight[OFFSET:]
-        return self.item(torch.cat([e, self.dept(self.item_dept), self.price(self.item_price)], 1))
+        hier = [emb(getattr(self, f"item_hier{j}")) for j, emb in enumerate(self.hier)]
+        return self.item(torch.cat([e, self.dept(self.item_dept), self.price(self.item_price)] + hier, 1))
 
     def users(self, b):
         x, days, lens = b["x"], b["days"], b["lens"]
+        when = self.month(b["month"]) + (self.country(b["country"]) if self.country is not None else 0)
         if "seq" in self.drop:
-            ctx = [self.rfm(b["rfm"]), self.month(b["month"])]
+            ctx = [self.rfm(b["rfm"]), when]
             return self.user(torch.cat([torch.zeros_like(ctx[0])] + ctx, 1))
         e = self.enc.emb(x)
         inp = e.sum(2) / (x != PAD).sum(2, keepdim=True).clamp(min=1)
@@ -311,7 +327,7 @@ class REXNet(nn.Module):
         age = torch.where(steps < lens[:, None], age, 0)
         h = self.enc(None, lens, inp + self.gap(gap_buckets(days, lens)) + self.age(age))
         last = h[torch.arange(len(lens), device=x.device), lens - 1]
-        return self.user(torch.cat([last, self.rfm(b["rfm"]), self.month(b["month"])], 1))
+        return self.user(torch.cat([last, self.rfm(b["rfm"]), when], 1))
 
     def forward(self, b, pop, price=None):
         """b: Batch.tensors(); pop: (unique days, universe, N_POP); price: price_features() at the same unique days (v2).
@@ -364,7 +380,7 @@ def prefetch(gen, depth=4):
 def full_target_loss(logits, target):
     logp = F.log_softmax(logits.float(), dim=1)
     t = target.float()
-    return -((logp * t).sum(1) / t.sum(1)).mean()
+    return -(torch.where(target, logp, 0.0).sum(1) / t.sum(1)).mean()   # masked logits are −inf off the targets
 
 
 def basket_days(ev, cutoff):
@@ -389,22 +405,27 @@ def targets(ev, uni, m, t):
 
 class REX(Source):
     """base rex (v1: no price, no φ2) or rex2 (v2); variant = full or an ablation (VARIANTS), named <base>_<variant>."""
-    VARIANTS = {"full": (), "noweb": ("web",), "nopop": ("pop",), "norep": ("rep",), "noseq": ("seq",), "noprice": ("price",)}
+    VARIANTS = {"full": (), "noweb": ("web",), "nopop": ("pop",), "norep": ("rep",), "noseq": ("seq",), "noprice": ("price",),
+                "hier": ()}
     V1 = ("price", "rep2")
+    HIER = ("nature", "family")   # product levels embedded by the hier variant
 
-    def __init__(self, variant="full", base="rex"):
-        self._web, self._prices, self.variant, self.base = {}, {}, variant, base
+    def __init__(self, variant="full", base="rex", level="model"):
+        self._web, self._prices, self.variant, self.base, self.level = {}, {}, variant, base, level
         self.drop = self.VARIANTS[variant] + (self.V1 if base == "rex" else ())
         self.name = base if variant == "full" else f"{base}_{variant}"
+        if level != "model":
+            self.name = f"{base}_{level}" + ("" if variant == "full" else f"_{variant}")
         self.version = 1 if base == "rex" else 2
         self.epochs = CFG[base].get("epochs", C["epochs"])
 
     def web(self, ev):
-        if ev.country not in self._web:
+        key = (ev.country, ev.level)
+        if key not in self._web:
             con = connect(threads=16)
-            self._web[ev.country] = WebEvents(con, ev)
+            self._web[key] = WebEvents(con, ev)
             con.close()
-        return self._web[ev.country]
+        return self._web[key]
 
     def prices(self, ev):
         if ev.country not in self._prices:
@@ -421,7 +442,14 @@ class REX(Source):
         dept, price, _ = item_attributes(ev, uni, cutoff, C["price_buckets"])
         cum, day0 = daily_buyers(ev, uni)
         prep = {"m": bm[ok], "lo": lo[ok], "hi": hi[ok], "dept": dept, "price": price, "stats": item_repeat_stats(ev, uni, cutoff),
-                "cum": cum, "day0": day0}
+                "cum": cum, "day0": day0, "hier": ()}
+        if self.variant == "hier":
+            con = connect(threads=16)
+            g = pd.read_parquet(group_map(con), columns=["model_code", *self.HIER]).set_index("model_code")
+            con.close()
+            codes = g.reindex(ev.items[uni.items])
+            prep["hier"] = tuple(np.unique(codes[lv].fillna("?").to_numpy(), return_inverse=True)[1].astype(np.int64)
+                                 for lv in self.HIER)
         if "price" not in self.drop:
             pt = self.prices(ev)
             f, lp = pt.features(uni.items)
@@ -437,12 +465,26 @@ class REX(Source):
     def price_inputs(self, model, t_uni):
         return price_features(model.price_f, model.price_lp, model.price_day0, t_uni) if model.price_f is not None else None
 
+    # one country per model; REXPool overrides these four
+    n_countries = 1
+
+    def countries_of(self, ev, m):
+        return None
+
+    def pop(self, cum, day0, b):
+        return pop_features(cum, day0, b.t_uni)
+
+    def allowed(self, model, country):
+        """(n, universe) bool of the items a row may score, None = every universe item."""
+        return None
+
     def fit(self, prep, params, ev, uni, cutoff):
         rng = seed_everything(self.seed)
         web = self.web(ev)
         cum = prep["cum"].to(DEVICE)
         model = REXNet(uni.size, prep["dept"], prep["price"], params["d"], params["blocks"], params["dropout"], self.drop,
-                       prep.get("item_lp")).to(DEVICE)
+                       prep.get("item_lp"), prep.get("hier", ()), self.n_countries).to(DEVICE)
+        model.country_items = prep["country_items"].to(DEVICE) if "country_items" in prep else None
         model.price_f = prep["price_f"].to(DEVICE) if "price_f" in prep else None
         model.price_lp = prep["price_lp"].to(DEVICE) if "price_lp" in prep else None
         model.price_day0 = prep.get("price_day0")
@@ -456,16 +498,22 @@ class REX(Source):
                 i = pick[s:s + bs]
                 m = prep["m"][i]
                 t = rng.integers(prep["lo"][i], prep["hi"][i] + 1)
-                b = Batch(ev, web, uni, prep["stats"], m, t)
+                country = self.countries_of(ev, m)
+                b = Batch(ev, web, uni, prep["stats"], m, t, country=country)
                 trow, titem = targets(ev, uni, m, t)
                 tgt = torch.zeros(len(i), uni.size, dtype=torch.bool, device=DEVICE)
                 tgt[torch.from_numpy(trow).to(DEVICE), torch.from_numpy(titem).to(DEVICE)] = True
+                ok = self.allowed(model, country)
+                if ok is not None:
+                    tgt &= ok
                 has = tgt.any(1)
-                yield b.tensors(), pop_features(cum, prep["day0"], b.t_uni), self.price_inputs(model, b.t_uni), tgt, has
+                yield b.tensors(), self.pop(cum, prep["day0"], b), self.price_inputs(model, b.t_uni), tgt, has, ok
 
         def loss_fn(model, batch):
-            b, pop, price, tgt, has = batch
+            b, pop, price, tgt, has, ok = batch
             logits = model(b, pop, price)
+            if ok is not None:
+                logits = logits.masked_fill(~ok, -torch.inf)
             return full_target_loss(logits[has], tgt[has])
 
         model = train(model, batches, loss_fn, self.epochs, params["lr"], log=f"{self.name} {ev.country} {str(cutoff)[:10]}")
@@ -480,11 +528,106 @@ class REX(Source):
         for s in range(0, q.n, SUB):
             e = min(s + SUB, q.n)
             lo, hi = np.searchsorted(q.all_row, [s, e])
+            country = self.countries_of(q.ev, m[s:e])
             b = Batch(q.ev, model.web_events, q.uni, model.stats, m[s:e], q.day[s:e].astype(np.int64),
-                      q.all_row[lo:hi] - s, q.all_idx[lo:hi])
+                      q.all_row[lo:hi] - s, q.all_idx[lo:hi], country=country)
             with torch.autocast("cuda", dtype=torch.bfloat16, enabled=DEVICE == "cuda"):
-                out.append(model(b.tensors(), pop_features(model.cum, model.day0, b.t_uni), self.price_inputs(model, b.t_uni)).float())
+                sc = model(b.tensors(), self.pop(model.cum, model.day0, b), self.price_inputs(model, b.t_uni)).float()
+            ok = self.allowed(model, country)
+            out.append(sc if ok is None else sc.masked_fill(~ok, -torch.inf))
         return torch.cat(out)
+
+
+class REXPool(REX):
+    """REX fitted once per cutoff on the purchases of every country (Events.pool): one network, the models shared by name, a
+    country embedding in the member tower; each country keeps its own universe (top universe.size models by its buyers, the
+    softmax and the scores masked to it) and its own popularity counts. Scores the anchors of each country through
+    Events.view(country). Prices are not used (v1)."""
+
+    def __init__(self):
+        super().__init__("full", "rex")
+        self.name = "rex_pool"
+        self._memo = {}
+
+    @property
+    def n_countries(self):
+        return len(self._countries)
+
+    def universe(self, ev, cutoff):
+        key = ("uni", cutoff)
+        if key not in self._memo:
+            self._countries = ev.countries
+            own = [Universe(_restrict(ev, c), cutoff).items for c in range(len(ev.countries))]
+            uni = Universe.__new__(Universe)
+            uni.items = np.unique(np.concatenate(own))
+            uni.size = len(uni.items)
+            uni.pos = np.full(len(ev.items), -1, np.int64)
+            uni.pos[uni.items] = np.arange(uni.size)
+            mask = np.zeros((len(own), uni.size), bool)
+            for c, it in enumerate(own):
+                mask[c, uni.pos[it]] = True
+            uni.country_items = torch.from_numpy(mask)
+            self._memo[key] = uni
+        return self._memo[key]
+
+    def prepare(self, ev, uni, cutoff):
+        key = ("prep", cutoff)
+        if key not in self._memo:
+            prep = super().prepare(ev, uni, cutoff)
+            rows = ev.member_country[ev.m]
+            cums = [daily_buyers(ev, uni, rows == c)[0] for c in range(len(ev.countries))]
+            prep["cum"], prep["country_items"] = torch.stack(cums), uni.country_items
+            self._memo[key] = prep
+        return self._memo[key]
+
+    def fit(self, prep, params, ev, uni, cutoff):
+        key = ("fit", cutoff, config_hash(params), self.seed)
+        if key not in self._memo:
+            for old in [k for k in self._memo if k[0] == "fit" and k[2:] != key[2:]]:   # another tuning trial: free the GPU
+                del self._memo[old]
+            torch.cuda.empty_cache()
+            self._memo[key] = super().fit(prep, params, ev, uni, cutoff)
+        return self._memo[key]
+
+    def forget(self, cutoff):
+        """Drop the universe, inputs and fitted models of a cutoff (rolling scoring over many cutoffs)."""
+        for k in [k for k in self._memo if isinstance(k, tuple) and k[1] == cutoff]:
+            del self._memo[k]
+        torch.cuda.empty_cache()
+
+    def web(self, ev):
+        if "web" not in self._memo:
+            con = connect(threads=16)
+            parts = [WebEvents(con, ev.view(c)) for c in ev.countries]
+            con.close()
+            w = WebEvents.__new__(WebEvents)
+            m, i, day = (np.concatenate([getattr(p, a) for p in parts]) for a in ("m", "i", "day"))
+            views, carts = (np.concatenate([getattr(p, a) for p in parts]) for a in ("views", "carts"))
+            order = np.lexsort((day, m))
+            w.m, w.i, w.day, w.views, w.carts = m[order], i[order], day[order], views[order], carts[order]
+            w.key = w.m * DAY_BITS + w.day
+            self._memo["web"] = w
+        return self._memo["web"]
+
+    def countries_of(self, ev, m):
+        own = ev.countries.index(ev.country) if ev.country in ev.countries else 0
+        return np.where(m >= 0, ev.member_country[np.maximum(m, 0)], own)
+
+    def pop(self, cum, day0, b):
+        c, t = b.t_uni // DAY_BITS, b.t_uni % DAY_BITS
+        return torch.cat([pop_features(cum[k], day0, t[c == k]) for k in np.unique(c)])
+
+    def allowed(self, model, country):
+        return model.country_items[torch.as_tensor(country, device=DEVICE)]
+
+
+def _restrict(ev, c):
+    """The pooled events reduced to the purchases of country c (for its universe)."""
+    keep = ev.member_country[ev.m] == c
+    r = copy.copy(ev)
+    r.m, r.i, r.day, r.ts = ev.m[keep], ev.i[keep], ev.day[keep], ev.ts[keep]
+    r.key = r.m.astype(np.int64) * DAY_BITS + r.day
+    return r
 
 
 if __name__ == "__main__":

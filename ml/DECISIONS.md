@@ -309,3 +309,89 @@ t − 1, the member's price affinity and her own repeat share and cycle (`rex2`,
 (`rex2_noprice`, 0.1058); 16 epochs (0.1015, overfits at dropout 0.008). Stock stays out (spare parts only, issue #21).
 Reading: one model matches the 13-source pipeline, so the candidate cap rather than the ranker bounds it; REX uses no price, store
 or member attribute, is harder to explain than the GBDT and needs a GPU. REX as a source or as a ranker feature is not tested.
+
+## 2026-11-07 · REX with the pipeline: rank fusion and REX ranker features (t31_hybrid)
+
+Question: do REX and the two-stage pipeline err on different anchors, so that combining them beats both? Ceilings on test TH + VN
+first: a perfect order of the repeat positives alone gives 0.114, a perfect re-order of the REX top 20 0.190 and of its top 100
+0.372, so the room is in the order of explore models REX already lists. (1) Rank fusion (`ml/eval/fusion.py`): w / (k + rank_REX)
++ (1 − w) / (k + rank_other), w ∈ {0.3…0.7}, k ∈ {5, 20, 60} and the partner (P1 tuned, P2, P3 one head) selected on valid
+(all countries): P3 one head, w 0.5, k 5, valid 0.1098. (2) REX as ranker features (`ml/retrieval/rex_pairs.py`): REX refitted per
+country × cutoff over the anchors of candidates_v2 (train anchors included, the model of cutoff_for(anchor), assert_pit clean),
+log-softmax probability and rank of each candidate pair → pairs_v2rex (102,686,571 rows, as pairs_v2; coverage 94–99.7 %, the
+rest train anchors before the first cutoff and models outside the universe); P1 retuned on it with the same 10-trial budget
+(valid 0.1083). Test, TH + VN, reported once: fusion 0.1066 (HR@10 0.2503), P1 + REX features 0.1060, REX 0.1033, P3 0.1020,
+P1 0.1011. Paired: fusion − REX +0.0033 [0.0027, 0.0039], fusion − P3 +0.0045 [0.0039, 0.0052]; P1 + REX − P1 +0.0048
+[0.0041, 0.0056] (explore recall +0.0054), P1 + REX − fusion −0.0006 [−0.0012, 0.0001]. The fusion is kept (best on valid); P1 +
+REX is its equal on test, stronger on explore, weaker on repeat (−0.036).
+Reading: the combination adds 3–5 thousandths, the size of every model step so far; NDCG@20 0.2 at the model level is out of reach
+of model changes alone (t40).
+
+## 2026-11-07 · Seed and three-way rank fusion at the model level (t31_ens)
+
+`ml/eval/fusion.py` generalised to weighted RRF of N score sets (DuckDB; weight set and k selected on valid, all countries).
+Equal-weight fusion of the three REX seeds (`rex_ens3`, valid 0.1069 against 0.1054 for one seed) and of the three P3 one-head
+seeds (`p3_ens3`, 0.1051); REX ensemble + P3 ensemble 0.1102 (the one-seed fusion 0.1098); with P1 + REX features as a third list
+(`ens_main`, weights 0.4 / 0.3 / 0.3 over five sets, k 5) 0.1111, paired on valid against the one-seed fusion +0.0013
+[0.0006, 0.0020]. Test, TH + VN, reported once: `ens_main` 0.1082 (HR@10 0.2536, explore recall 0.0982), REX ensemble 0.1050;
+paired: `ens_main` − one-seed fusion +0.0017 [0.0013, 0.0021], − REX +0.0050 [0.0043, 0.0057], − P1 + REX +0.0023
+[0.0018, 0.0028]; REX ensemble − REX +0.0017 [0.0013, 0.0022]. Rejected on valid, never run on test: REX supermodel ranking as a
+prior of the fusion (RRF of the model rank and the rank of its supermodel, +0.0009 on the one-seed fusion, +0.0004 on `ens_main`).
+Reading: `ens_main` is the best model-level list; it costs three REX and three P3 trainings plus the P1 pipeline.
+
+## 2026-11-08 · REX pooled over the three countries (t31_pool)
+
+Question: VN has a third of the purchases of TH or SG and the country universes share 73–77 % of their models; does one network
+trained on every country learn better explore embeddings? `REXPool` (`nbr.py --source rex_pool`): one REX per cutoff on
+Events.pool(SG, TH, VN) (members keyed by country, a member of two countries counted twice; unit prices as percentiles within the
+country), models shared by code, a country embedding added to the month embedding; each country keeps its own universe (top
+5 000 by its buyers; the softmax, the targets and the scores masked to it) and its own popularity counts; web attention and
+repeat inputs as REX; the REX parameters, no retuning. `full_target_loss` now takes the log-probability on the targets only
+(0 × −inf off them under the mask; unchanged values without a mask). Valid (all countries): 0.1079 against REX 0.1054 (seeds
+0.1040–0.1054). Fusion, selected on valid: pooled REX + P3 ensemble + P1 + REX features (`ens_pool3`, weights 0.5 / 0.25 / 0.25,
+k 5) 0.1118; adding the REX seed ensemble as a fourth list 0.1119, not kept (one more list for 0.0001). Test, TH + VN, reported
+once: pooled REX 0.1056 (REX 0.1033, REX ensemble 0.1050), paired − REX +0.0024 [0.0017, 0.0032] (explore recall +0.0068, repeat
+−0.0134), − REX ensemble +0.0007 [−0.0001, 0.0014]; by country SG +0.0005, TH +0.0014, VN +0.0036. `ens_pool3` 0.1093 (HR@10
+0.2560, explore recall 0.1011), − `ens_main` +0.0011 [0.0005, 0.0016], − one-seed fusion +0.0027 [0.0022, 0.0033].
+Reading: pooling helps the smallest country most and replaces the three-seed REX ensemble with one training; `ens_pool3` is the
+best model-level list.
+
+Retuned (2026-11-09, tuning.yml rex_pool: the REX space with d up to 384, 10 trials, valid NDCG@20 all countries): best d 384,
+1 block, dropout 0.084, lr 0.00017, valid 0.1083 (REX parameters 0.1079; trials 0.0940–0.1083); the first build, kept as
+`rex_pool_v0_nbr`, is replaced by `rex_pool_nbr`. Fusion reselected on valid (`ens_pool3t`, weights 0.4 / 0.3 / 0.3, k 5,
+0.1122). Test, TH + VN, reported once: pooled REX 0.1076 (HR@10 0.2534, explore recall 0.1009), − untuned +0.0020
+[0.0013, 0.0026]; `ens_pool3t` 0.1102 (HR@10 0.2567, explore recall 0.1030), − `ens_pool3` +0.0009 [0.0005, 0.0014]. The
+valid gain (+0.0004) was within the seed spread, the test gain is larger; `ens_pool3t` is the best model-level list.
+
+## 2026-11-11 · P1 with pooled REX features (t31_p1rexp)
+
+`rex_pairs.py --pool`: the tuned pooled REX fitted once per cutoff (13 cutoffs, every split's anchors of candidates_v2, the model of
+cutoff_for(anchor)), rex_lp / rex_rank of every candidate pair under the anchor country's universe mask → pairs_v2rexp
+(102,686,571 rows as pairs_v2; coverage train 94–97 %, valid / test 97.5–99.7 %; assert_pit 0 violations in every country). The
+scoring checkpoints one file per country × cutoff (data/ml/rex/pool_parts) so a stopped run resumes. P1 retuned with the same
+10-trial budget: valid 0.1100 against 0.1083 with single-country REX features, paired on valid +0.0017 [0.0008, 0.0027]. Test,
+TH + VN, reported once: 0.1091 (HR@10 0.2569, explore recall 0.1037), − P1 + single-country REX +0.0032 [0.0025, 0.0039],
+− P1 +0.0080 [0.0072, 0.0088]. Rejected on valid, never run on test: replacing P1 + single-country REX by it in the fusion
+(pooled REX + P3 ensemble + it, weights reselected, 0.1120 against `ens_pool3t` 0.1122, paired −0.0002 [−0.0007, 0.0003]).
+Reading: `ens_pool3t` stays the best list (0.1102); P1 + pooled REX features alone is within 0.0011 of it with one ranker and no P3.
+
+## 2026-11-07 · NDCG@20 at coarser product levels (t40_granularity)
+
+Question: the target NDCG@20 ≥ 0.2 is out of reach at the model level; which change of the task reaches it, and does the model
+still beat popularity there? Label windows first (valid, the Δ = 30 lists re-scored): Δ 7 / 14 / 30 / 60 / 90 and the next basket
+only give 0.106–0.118 for the fusion, so the window is not the lever. Product level: `ml/eval/granularity.py` re-runs D3 with the
+positives = the distinct groups bought in (anchor, anchor + Δ] (returns netted, repeat = a model of the group bought before), a
+model list turned into a group list by the best model score of each group; levels from bronze.dim_item (one group per model):
+supermodel (all variants of a product), product nature (the product type), retail family, sub-department, department. REX is
+also trained directly at a level (`nbr.py --source rex --level <level>`: Events, web attention, universe, targets and the
+anchor_model_grid filter at the group level, the model-level parameters, no retuning).
+Test, TH + VN, reported once (NDCG@20; most popular / best model-level list aggregated / REX trained at the level): model 0.075 /
+0.107 / –; supermodel 0.111 / 0.140 / 0.147; nature 0.297 / 0.323 / 0.372; family 0.270 / 0.298 / –; sub-department 0.430 /
+0.452 / –; department 0.560 / 0.592 / –. Paired at nature: REX nature − aggregated fusion +0.0491 [0.0473, 0.0508], − most popular
++0.0750 [0.0730, 0.0770] (explore recall +0.140); at supermodel: REX supermodel − aggregated fusion +0.0074 [0.0063, 0.0085].
+Rejected on valid, never run on test: the nature ranking of REX nature as a prior of the model-level fusion (RRF of the model rank
+and the rank of its nature, w and k on valid: +0.0004, within the seed spread); REX with product-nature and retail-family
+embeddings in the item tower (`rex_hier`, 0.1047 against 0.1054, seeds 0.1040–0.1054).
+Reading: the 0.2 target is met by predicting the product type a member buys next (0.372, 0.075 over popularity), a different and
+coarser question than the model; coarser still (sub-department, department) popularity alone exceeds 0.4 and the model adds less
+than at nature. The model level stays the headline metric; the nature level is reported as the product-type task.

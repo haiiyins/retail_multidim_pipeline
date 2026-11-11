@@ -9,11 +9,12 @@ and model_version; view ml.cand_<source>. With retrieval.explore_only the models
 (explore-only candidates; R1 covers the repeats).
 Usage: python ml/retrieval/<source>.py --tune [--trials N]   (valid, objective: explore coverage added to R1–R5@200)
        python ml/retrieval/<source>.py --build               (every split, tuned parameters when they exist)"""
-import argparse, datetime as dt, glob, json, os, sys, time
+import argparse, copy, datetime as dt, glob, json, os, sys, time
 import numpy as np, pandas as pd, torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from ml.common.data import connect, load_config, ml_path, publish_view
+from ml.common.levels import grid_relation, group_map
 from ml.common.pit import assert_pit, cutoff_for
 from ml.common.registry import Run, config_hash
 from ml.common.tuning import N_TRIALS, tune
@@ -34,9 +35,11 @@ def day_num(d):
 class Events:
     """Purchases of one country, one row per member × model × day, as integer arrays sorted by (member, day, model)."""
 
-    def __init__(self, country, members, items, m, i, day, ts, price=None, item_dept=None):
-        """price: unit price (local) of each row; item_dept: sport department code of each item (static product attribute)."""
+    def __init__(self, country, members, items, m, i, day, ts, price=None, item_dept=None, level="model", model_group=None):
+        """price: unit price (local) of each row; item_dept: sport department code of each item (static product attribute);
+        level: product level of the items (ml/common/levels.py), model_group: model_code → item code when level is not model."""
         self.country, self.members, self.items = country, pd.Index(members), np.asarray(items)
+        self.level, self.model_group = level, model_group
         order = np.lexsort((i, day, m))
         self.m, self.i, self.day, self.ts = (np.asarray(x)[order] for x in (m, i, day, ts))
         self.price = None if price is None else np.asarray(price, np.float32)[order]
@@ -44,12 +47,18 @@ class Events:
         self.key = self.m.astype(np.int64) * DAY_BITS + self.day
 
     @classmethod
-    def load(cls, con, country):
-        con.execute("""CREATE OR REPLACE TEMP TABLE _ev AS
-            SELECT member_id, model_code, transaction_date AS d, MAX(transaction_ts_local) AS ts,
-                   SUM(gmv_local) / NULLIF(SUM(qty), 0) AS price, ANY_VALUE(sport_department_code) AS dept
-            FROM lh.silver.slv_fact_sales_line
-            WHERE country_code = ? AND member_id IS NOT NULL AND model_code IS NOT NULL GROUP BY ALL""", [country])
+    def load(cls, con, country, level="model"):
+        """level: one row per member × group × day, the items being the groups of the level (model_code holds the group code)."""
+        code, join, model_group = "f.model_code", "", None
+        if level != "model":
+            gmap = group_map(con)
+            code, join = "g.grp", f"JOIN (SELECT model_code, {level} AS grp FROM read_parquet('{gmap}')) g USING (model_code)"
+            model_group = pd.read_parquet(gmap, columns=["model_code", level]).set_index("model_code")[level]
+        con.execute(f"""CREATE OR REPLACE TEMP TABLE _ev AS
+            SELECT f.member_id, {code} AS model_code, f.transaction_date AS d, MAX(f.transaction_ts_local) AS ts,
+                   SUM(f.gmv_local) / NULLIF(SUM(f.qty), 0) AS price, MODE(f.sport_department_code) AS dept
+            FROM lh.silver.slv_fact_sales_line f {join}
+            WHERE f.country_code = ? AND f.member_id IS NOT NULL AND f.model_code IS NOT NULL GROUP BY ALL""", [country])
         con.execute("CREATE OR REPLACE TEMP TABLE _mem AS SELECT member_id, (ROW_NUMBER() OVER (ORDER BY member_id) - 1)::INT AS m "
                     "FROM (SELECT DISTINCT member_id FROM _ev)")
         con.execute("CREATE OR REPLACE TEMP TABLE _itm AS SELECT model_code, (ROW_NUMBER() OVER (ORDER BY model_code) - 1)::INT AS i, "
@@ -61,10 +70,52 @@ class Events:
                            FROM _ev e JOIN _mem m USING (member_id) JOIN _itm i USING (model_code)""").fetchnumpy()
         con.execute("DROP TABLE _ev; DROP TABLE _mem; DROP TABLE _itm")
         return cls(country, members, it["model_code"], *(np.asarray(r[k]) for k in ("m", "i", "day", "ts")),
-                   price=np.nan_to_num(np.ma.filled(r["price"], np.nan), nan=0.0), item_dept=it["dept"].to_numpy())
+                   price=np.nan_to_num(np.ma.filled(r["price"], np.nan), nan=0.0), item_dept=it["dept"].to_numpy(),
+                   level=level, model_group=model_group)
+
+    @classmethod
+    def pool(cls, evs):
+        """The purchases of several countries in one Events: members keyed '<country>|<member_id>' (a member of two countries is two
+        members), items = the union of the models, unit prices replaced by their percentile within the country (currencies differ).
+        member_country: country index of each member; view(country) scores the anchors of one country."""
+        items = np.unique(np.concatenate([e.items for e in evs]))
+        idx = pd.Index(items)
+        dept = np.full(len(items), -1, np.int64)
+        m, i, day, ts, price = [], [], [], [], []
+        off = 0
+        for e in evs:
+            dept[idx.get_indexer(e.items)] = e.item_dept
+            m.append(e.m.astype(np.int64) + off)
+            i.append(idx.get_indexer(e.items)[e.i])
+            day.append(e.day)
+            ts.append(e.ts)
+            p = pd.Series(np.where(e.price > 0, e.price, np.nan)).rank(pct=True).fillna(0.0).to_numpy(np.float32)
+            price.append(p)
+            off += len(e.members)
+        members = np.concatenate([[f"{e.country}|{x}" for x in e.members] for e in evs])
+        ev = cls("+".join(e.country for e in evs), members, items, *(np.concatenate(x) for x in (m, i, day, ts)),
+                 price=np.concatenate(price), item_dept=dept)
+        ev.countries = [e.country for e in evs]
+        ev.member_country = np.repeat(np.arange(len(evs)), [len(e.members) for e in evs])
+        return ev
+
+    def view(self, country):
+        """The pooled events seen from one country (shared arrays): member ids of that country map to their pooled index."""
+        v = copy.copy(self)
+        v.country = country
+        return v
 
     def member_index(self, member_ids):
+        if getattr(self, "countries", None) and self.country in self.countries:
+            member_ids = [f"{self.country}|{x}" for x in member_ids]
         return self.members.get_indexer(member_ids).astype(np.int64)
+
+    def item_index(self, model_codes):
+        """Item index of model codes (their group at a coarser level), -1 for items the country never sold."""
+        codes = pd.Series(model_codes)
+        if self.model_group is not None:
+            codes = codes.map(self.model_group)
+        return pd.Index(self.items).get_indexer(codes)
 
     def before(self, cutoff, window_days=None):
         c = day_num(cutoff)
@@ -157,6 +208,9 @@ class Source:
     scores(): (n, universe) tensor on DEVICE for a Query."""
     name, version, seed = "", 1, 0
 
+    def universe(self, ev, cutoff):
+        return Universe(ev, cutoff)
+
     def prepare(self, ev, uni, cutoff):
         return None
 
@@ -202,7 +256,7 @@ def generate(src, params, con, splits, countries, events, cache=None, explore_on
             if cache is not None and key in cache:
                 uni, prep = cache[key]
             else:
-                uni = Universe(ev, cutoff)
+                uni = src.universe(ev, cutoff)
                 prep = src.prepare(ev, uni, cutoff)
                 if cache is not None:
                     cache[key] = (uni, prep)
@@ -237,7 +291,7 @@ def generate(src, params, con, splits, countries, events, cache=None, explore_on
                                  "model_version": version})
             if full:
                 write_full(full, a, ev, uni, country, cutoff, version, eval_rows, full_dir)
-            yield country, cutoff, grid_filter(con, part, n_out)
+            yield country, cutoff, grid_filter(con, part, n_out, ev.level)
 
 
 FULL_K = 100
@@ -258,13 +312,13 @@ def write_full(full, a, ev, uni, country, cutoff, version, eval_rows, full_dir):
     out.to_parquet(os.path.join(full_dir, f"{country}_{pd.Timestamp(cutoff).date()}.parquet"), index=False)
 
 
-def grid_filter(con, part, n_out):
+def grid_filter(con, part, n_out, level="model"):
     con.register("_part", part)
     out = con.execute(f"""
         SELECT c.member_id, c.country_code, CAST(c.anchor_date AS DATE) AS anchor_date, c.split, c.model_code, c.score,
                ROW_NUMBER() OVER (PARTITION BY c.member_id, c.anchor_date ORDER BY c.score DESC, c.model_code) AS rank,
                CAST(c.fit_cutoff AS DATE) AS fit_cutoff, c.source_ts_max, c.model_version
-        FROM _part c SEMI JOIN lh.gold.anchor_model_grid g
+        FROM _part c SEMI JOIN {grid_relation(con, level)} g
           ON g.country_code = c.country_code AND g.anchor_date = CAST(c.anchor_date AS DATE) AND g.model_code = c.model_code
         QUALIFY rank <= {int(n_out)}""").df()
     con.unregister("_part")
